@@ -190,13 +190,13 @@ let ops =
   let root = 0 in
   let mkdir ~parent ~name = 
     new_did () |>> fun did ->
-    let ws = with_state 
+    let ws : unit m = with_state 
         (fun s -> 
            let map = Map_did.find parent s.dirs in
            let map' = Map_string.add name (Did did) map in           
            {s with dirs=Map_did.add did map' s.dirs})
     in
-    (* ws |>> fun () -> FIXME typecheck? *) return did
+    (* ws |>> fun () -> FIXME typecheck? *) ((return did):did m)
   in
   assert(T.wf_ops 
            ~root ~resolve_path_relative ~resolve_path
