@@ -4,36 +4,6 @@ open Minifs
 
 module S = struct
 
-  type fid = Unix.file_descr
-  type did = Unix.dir_handle
-
-
-  module Map_fid = Map.Make(
-    struct 
-      type t = fid let compare: t->t->int = Pervasives.compare 
-    end)
-
-
-  module Map_did = Map.Make(
-    struct 
-      type t = did let compare: t->t->int = Pervasives.compare 
-    end)
-
-
-  module Map_string = Map.Make(
-    struct 
-      type t = string let compare: t->t->int = Pervasives.compare 
-    end)
-
-
-  module Set_string = Set.Make(
-    struct
-      type t = string let compare: t->t->int = Pervasives.compare 
-    end)
-
-
-  type id = Fid of fid | Did of did 
-
   type path = string
 
   type state = {
@@ -52,28 +22,11 @@ module S = struct
 
 end
 
-module X_ = (S:S)
-
-
 module T = Make(S)
-
-module T' = T
 
 open S
 
 let err x = fun s -> (Error x,s)
-
-let is_fid = function
-  | Fid _ -> true
-  | _ -> false
-
-let is_did x = not (is_fid x)
-
-let new_did () : did m = failwith ""
-
-let _ = new_did
-
-let new_fid () : fid m = failwith ""
 
 let with_state : (state -> state) -> unit m = failwith ""
 
@@ -82,22 +35,12 @@ let bind : ('a -> 'b m) -> 'a m -> 'b m = fun f x s ->
   | (Ok y,s') -> f y s'
   | (Error _,_) as e -> e
 
-let _ = bind
-
 let return : 'a -> 'a m = fun x s -> (Ok x,s)
 
-let _ = return
-
-let _ = 
-  let x : unit m = failwith "" in
-  let f : unit -> int m = failwith "" in
-  (x |> bind f)
-
-
-let err x = failwith ""
+exception No_such_entry
 
 let ops () = 
-  let resolve_path (path:path) : (did * id option) m = failwith "" in
+  let resolve_path (path:path) : (path * string option) m = failwith "" in
 
 (*
   let resolve_dir_path (path:path) : did m = 
@@ -195,12 +138,16 @@ let ops () =
   in
 
   let kind path : st_kind m = 
-    resolve_path path |> bind @@ fun (_,id) ->    
-    id |> function 
-    | None -> err @@ `No_such_entry
-    | Some x -> x |> function
-      | Fid fid -> return (`File:st_kind)
-      | Did did -> return (`Dir:st_kind)
+    resolve_path path |> bind @@ fun (_,name) ->    
+    name |> function 
+    | None -> err @@ No_such_entry
+    | Some name -> 
+      Unix.(
+        stat (path^"/"^name) |> fun st ->
+        st.st_kind |> (function
+            | S_DIR -> (`Dir:st_kind)
+            | S_REG -> (`File:st_kind)
+            | _ -> `Other) |> return)
   in
     
   let reset () = return () in
