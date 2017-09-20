@@ -58,8 +58,8 @@ module Make = functor (S:S) -> struct
      etc? probably values, since they just record eg a did and an index *)
   let wf_ops (* type did fid rd fd *) 
       ~root ~resolve_path_relative ~resolve_path
-      ~mkdir ~rmdir ~opendir ~readdir ~closedir 
-      ~create ~delete ~open_ ~pread ~pwrite ~close 
+      ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
+      ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
       ~stat
     =
 
@@ -74,26 +74,31 @@ module Make = functor (S:S) -> struct
     let resolve_path : string list -> (did * id option) m 
       = resolve_path in
 
+    let unlink : parent:did -> name:string -> kind:[ `Dir | `File ] -> unit m = unlink in
+
     let mkdir : parent:did -> name:string -> did m = mkdir in
 
-    let rmdir : parent:did -> did:did -> name:string -> unit m = rmdir in
+    (* calls unlink *)
+    let rmdir : parent:did -> (* did:did -> *) name:string -> unit m = rmdir in
 
     let opendir : did -> rd m = opendir in
 
     (* boolean indicates whether more to come *)
-    let readdir : rd:rd -> (string list * bool) m = readdir in
+    let readdir : rd -> (string list * bool) m = readdir in
 
-    let closedir : rd:rd -> unit m = closedir in
-
+    let closedir : rd -> unit m = closedir in
 
     let create : parent:did -> name:string -> fid m = create in
 
-    let delete : parent:did -> fid:fid -> name:string -> unit m = delete in
+    (* calls unlink *)
+    let delete : parent:did -> (* fid:fid -> *) name:string -> unit m = delete in
 
     (* FIXME do we really need fid and fd since we only use pread and pwrite? *)
     let open_ : fid -> fd m = open_ in
 
-    let pread : fd:fd -> off:int -> length:int -> buffer:buffer -> buffer m 
+    (* mutable buffers? really? *)
+    let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
+      -> unit m 
       = pread in
 
     let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
@@ -102,7 +107,9 @@ module Make = functor (S:S) -> struct
 
     let close : fd:fd -> unit m = close in
 
-    let stat : fid:fid -> stat m = stat in
+    let truncate : fid:fid -> int -> unit m = truncate in
+
+    let stat : id:id -> stat m = stat in
 
     true[@@ocaml.warning "-26"]
 
@@ -118,8 +125,8 @@ end
 
 module S = struct
 
-  type fid = int
-  type did = int
+  type fid(* = int *)
+  type did(* = int *)
 
 
   module Map_fid = Map.Make(
@@ -173,35 +180,151 @@ module T' = T
 
 open S
 
+let err x = failwith ""
+
+let is_fid = function
+  | Fid _ -> true
+  | _ -> false
+
+let is_did x = not (is_fid x)
+
 let new_did () : did m = failwith ""
+
+let _ = new_did
+
+let new_fid () : fid m = failwith ""
 
 let with_state : (state -> state) -> unit m = failwith ""
 
-let ( |>> ) : 'a m -> ('a -> 'b m) -> 'b m = failwith ""
+let bind : ('a -> 'b m) -> 'a m -> 'b m = fun f x s ->
+  match x s with
+  | (y,s') -> f y s'
 
-let return : 'a -> 'a m = failwith ""
+let _ = bind
+
+let return : 'a -> 'a m = fun x s -> (x,s)
+
+let _ = return
+
+let _ = 
+  let x : unit m = failwith "" in
+  let f : unit -> int m = failwith "" in
+  (x |> bind f)
+
+
 
 let ops = 
   let 
-    root,resolve_path_relative,resolve_path,
-    mkdir,rmdir,opendir,readdir,closedir,create,delete,
-    open_,pread,pwrite,close,stat = failwith "" 
+    resolve_path_relative,resolve_path
+    = failwith "" 
   in
-  let root = 0 in
-  let mkdir ~parent ~name = 
-    new_did () |>> fun did ->
-    let ws : unit m = with_state 
-        (fun s -> 
-           let map = Map_did.find parent s.dirs in
-           let map' = Map_string.add name (Did did) map in           
-           {s with dirs=Map_did.add did map' s.dirs})
-    in
-    (* ws |>> fun () -> FIXME typecheck? *) ((return did):did m)
+  let root : did = failwith "" (* 0 *) in
+
+  let unlink ~parent ~name ~kind = 
+    with_state 
+      (fun s ->
+         let map = Map_did.find parent s.dirs in
+         let entry = Map_string.find name map in
+         let entry_kind_matches = 
+           match () with
+           | _ when (is_fid entry && kind=`File) -> true
+           | _ when (is_did entry && kind=`Dir) -> true
+           | _ -> false
+         in
+         entry_kind_matches |> function
+         | true -> 
+           let map' = Map_string.remove name map in           
+           {s with dirs=Map_did.add parent map' s.dirs}
+         | false -> err `Unlink_kind_fails_to_match)
+    |> bind @@ fun () -> return ()
   in
+
+  let mkdir ~parent ~name : did m = 
+    new_did () |> bind @@ fun (did:did) -> 
+    with_state 
+      (fun s -> 
+         let map = Map_did.find parent s.dirs in
+         let map' = Map_string.add name (Did did) map in           
+         {s with dirs=Map_did.add parent map' s.dirs})
+    |> bind @@ fun () -> return did
+  in
+
+  let rmdir ~parent ~name = unlink ~parent ~name ~kind:`Dir in
+
+  let mk_rd ~did es = (did,es) in
+  
+  let opendir did = ["FIXME"] |> mk_rd ~did |> return in
+
+  let readdir rd = rd |> function (did,es) -> return (es,false) in
+
+  let closedir rd = return () in  (* FIXME should we record which rd are valid? ie not closed *)
+
+  let create ~parent ~name : fid m = 
+    new_fid () |> bind @@ fun (fid:fid) -> 
+    with_state 
+      (fun s -> 
+         let map = Map_did.find parent s.dirs in
+         let map' = Map_string.add name (Fid fid) map in           
+         {s with dirs=Map_did.add parent map' s.dirs})
+    |> bind @@ fun () -> return fid
+  in
+
+  let delete ~parent ~name = unlink ~parent ~name ~kind:`File in
+
+  let mk_fd fid = fid in
+
+  let open_ fid = mk_fd fid |> return in
+
+  let pread ~fd ~foff ~length ~buffer ~boff = 
+    let fid = fd in
+    fun s ->
+      s.files |> fun map ->
+      Map_fid.find fid map |> fun (contents:string) ->
+      Bytes.blit_string contents foff buffer boff length;
+      ((),s)
+  in
+
+  let pwrite ~fd ~foff ~length ~buffer ~boff = 
+    let fid = fd in
+    fun s ->
+      s.files |> fun files ->
+      Map_fid.find fid files |> fun (contents:string) ->
+      let contents = Bytes.of_string contents in
+      Bytes.blit buffer boff contents foff length;  (* FIXME extend contents *)
+      Map_fid.add fid (Bytes.to_string contents) files |> fun files ->
+      (length,{s with files})
+  in
+
+  let close ~fd = return () in  (* FIXME record which are open? *)
+
+  let truncate ~fid i = 
+    fun s ->
+      s.files |> fun files ->
+      Map_fid.find fid files |> fun contents ->
+      let contents' = Bytes.create i in
+      Bytes.blit_string contents 0 contents' 0 i;
+      Map_fid.add fid (Bytes.to_string contents') files |> fun files ->
+      ((),{s with files})
+  in
+  
+  let stat ~id s = id |> function
+    | Fid fid -> 
+      s.files |> fun files ->
+      Map_fid.find fid files |> fun contents ->
+      String.length contents |> fun sz ->
+      ({ sz; st_kind=`File },s)
+    | Did did ->
+      s.dirs |> fun dirs ->
+      Map_did.find did dirs |> fun dir ->
+      let sz = -1 in
+      ({ sz; st_kind=`Dir },s)
+  in
+    
+
   assert(T.wf_ops 
            ~root ~resolve_path_relative ~resolve_path
-           ~mkdir ~rmdir ~opendir ~readdir ~closedir 
-           ~create ~delete ~open_ ~pread ~pwrite ~close 
+           ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
+           ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
            ~stat);
   fun k -> k 
       ~root ~resolve_path_relative ~resolve_path
