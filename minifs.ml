@@ -49,13 +49,13 @@ module type S = sig
      resources can just be reset by the client, if the client is
      trusted not to exhaust resources... or just throw a resource
      exception if we open too many fids? *)
-  type fid
+(*  type fid
   type did
-  type id  (* = fid + did *)
+  type id  (* = fid + did *) *)
 
   type path
 
-  type rd (* readdir_descriptor *)
+  type dh (* dir_handle, for reading dirs *)
 
   type fd
 
@@ -72,18 +72,19 @@ module Make = functor (S:S) -> struct
      etc? probably values, since they just record eg a did and an index *)
   let wf_ops (* type did fid rd fd *) 
       ~root 
-      ~resolve_path_relative ~resolve_path 
+(*       ~resolve_path_relative ~resolve_path *)
       ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
       ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
       ~stat_file ~kind ~reset
     =
 
-    let root : did = root in
+    let root : path = root in
 
 
     (* FIXME unsure about did and fid; allow a chroot function? or
        just punt? chroot could be added as a layer, so just punt.. *)
 
+(*    
     (* note return parent; root has itself as parent; either an object
        exists, or we return none indicating that we can create an object *)
     let resolve_path_relative : did:did -> string -> (did * id option) m 
@@ -91,26 +92,27 @@ module Make = functor (S:S) -> struct
 
     let resolve_path : path -> (did * id option) m 
       = resolve_path in
+*)
 
     (* FIXME remove rmdir and delete? remove kind? *)
     let unlink : parent:path -> name:string -> unit m = unlink in
 
-    let mkdir : parent:path -> name:string -> did m = mkdir in
+    let mkdir : parent:path -> name:string -> unit m = mkdir in
 
     (* calls unlink *)
-    let rmdir : parent:path -> (* did:did -> *) name:string -> unit m = rmdir in
+    let rmdir : parent:path -> name:string -> unit m = rmdir in
 
-    let opendir : path -> rd m = opendir in
+    let opendir : path -> dh m = opendir in
 
     (* boolean indicates whether more to come *)
-    let readdir : rd -> (string list * bool) m = readdir in
+    let readdir : dh -> (string list * bool) m = readdir in
 
-    let closedir : rd -> unit m = closedir in
+    let closedir : dh -> unit m = closedir in
 
-    let create : parent:path -> name:string -> fid m = create in
+    let create : parent:path -> name:string -> unit m = create in
 
     (* calls unlink *)
-    let delete : parent:did -> (* fid:fid -> *) name:string -> unit m = delete in
+    let delete : parent:path -> name:string -> unit m = delete in
 
     (* FIXME do we really need fid and fd since we only use pread and
        pwrite? fds are temporary, but fids are permanent; some impls may
@@ -119,7 +121,7 @@ module Make = functor (S:S) -> struct
 
     (* mutable buffers? really? *)
     let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
-      -> unit m 
+      -> int m 
       = pread in
 
     let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
@@ -128,11 +130,11 @@ module Make = functor (S:S) -> struct
 
     let close : fd -> unit m = close in
 
-    let truncate : fid:fid -> int -> unit m = truncate in
+    let truncate : path:path -> int -> unit m = truncate in
 
-    let stat_file : fid:fid -> file_stat m = stat_file in
+    let stat_file : path -> file_stat m = stat_file in
 
-    let kind : id -> st_kind m = kind in
+    let kind : path -> st_kind m = kind in
 
     (* for this connection, forget all fds fids etc ie reduce caching
        and resources to minimal level *)

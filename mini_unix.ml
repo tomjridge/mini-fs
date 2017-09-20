@@ -32,17 +32,17 @@ module S = struct
     end)
 
 
-  type id = Fid of fid | Did of did
+  type id = Fid of fid | Did of did 
 
+  type path = string
 
   type state = {
-    files: fid Map_fid.t;  (* really a set *)
-    dirs: did Map_did.t;  
+    dummy: unit;
   }
 
-  type rd = did * string list (* inefficient *)
+  type dh = Unix.dir_handle
 
-  type fd = fid
+  type fd = Unix.file_descr
 
   type buffer = bytes  (* or cstruct? *)
 
@@ -94,122 +94,127 @@ let _ =
   (x |> bind f)
 
 
+let err x = failwith ""
+
 let ops () = 
-  let 
-    resolve_path_relative,resolve_path
-    = failwith "" 
+  let resolve_path (path:path) : (did * id option) m = failwith "" in
+
+(*
+  let resolve_dir_path (path:path) : did m = 
+    resolve_path path |> bind @@ function
+    | (_,Some (Did did)) -> return did 
+    | _ -> err __LOC__
   in
-  let root : did = failwith "" (* 0 *) in
+
+  let resolve_file_path (path:path) : fid m = 
+    resolve_path path |> bind @@ function
+    | (_,Some (Fid fid)) -> return fid 
+    | _ -> err __LOC__
+  in
+*)
+
+  let root : path = "/" in
+
+  let unix_unlink ~parent ~name = Unix.unlink @@ parent^"/"^name in
 
   (* FIXME or just allow unlink with no expectation of the kind? *)
   let unlink ~parent ~name = 
     with_state 
       (fun s ->
-         s.dirs |> fun dirs ->
-         Map_did.find parent dirs |> fun pdir ->
-         Map_string.find name pdir |> fun entry ->
-         Map_string.remove name pdir |> fun pdir ->
-         Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs})
+         unix_unlink ~parent ~name;
+         s)
     |> bind @@ fun () -> return ()
   in
 
-  let mkdir ~parent ~name : did m = 
-    new_did () |> bind @@ fun (did:did) -> 
+  let default_perm = 0o640 in
+
+  let unix_mkdir ~parent ~name = Unix.mkdir (parent^"/"^name) default_perm in
+
+  let mkdir ~parent ~name : unit m = 
     with_state 
       (fun s -> 
-         s.dirs |> fun dirs ->
-         Map_did.find parent s.dirs |> fun pdir ->
-         Map_string.add name (Did did) pdir |> fun pdir ->
-         Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs})
-    |> bind @@ fun () -> return did
+         unix_mkdir ~parent ~name;
+         s)
+    |> bind @@ fun () -> return ()
   in
 
-  let rmdir ~parent ~name = unlink ~parent ~name ~kind:`Dir in
+  let rmdir ~parent ~name = unlink ~parent ~name in
 
-  let mk_rd ~did es = (did,es) in
+  let mk_dh ~path = Unix.opendir path in
 
-  let opendir did = ["FIXME"] |> mk_rd ~did |> return in
+  let opendir path = mk_dh path |> return in
 
-  let readdir rd = rd |> function (did,es) -> return (es,false) in
+  let readdir dh = 
+    try Unix.readdir dh |> fun e -> return ([e],true) 
+    with _ -> return ([],false)
+  in
 
-  let closedir rd = return () in  (* FIXME should we record which rd are valid? ie not closed *)
+  let closedir dh = Unix.closedir dh; return () in  (* FIXME should we record which dh are valid? ie not closed *)
 
-  let create ~parent ~name : fid m = 
-    new_fid () |> bind @@ fun (fid:fid) -> 
+  let create ~parent ~name : unit m = 
     with_state 
-      (fun s -> 
-         s.dirs |> fun dirs ->
-         Map_did.find parent dirs |> fun pdir ->
-         Map_string.add name (Fid fid) pdir |> fun pdir ->
-         Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs})
-    |> bind @@ fun () -> return fid
+      Unix.(fun s -> 
+         openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
+         close fd;
+         s)
+    |> bind @@ fun () -> return () (* fid *)
   in
 
-  let delete ~parent ~name = unlink ~parent ~name ~kind:`File in
+  let delete ~parent ~name = unlink ~parent ~name in
 
-  let mk_fd fid = fid in
+  let mk_fd path = Unix.(openfile path [O_RDWR] default_perm) in
 
-  let open_ fid = mk_fd fid |> return in
+  let open_ path = mk_fd path |> return in
 
   let pread ~fd ~foff ~length ~buffer ~boff = 
-    let fid = fd in
     fun s ->
-      s.files |> fun map ->
-      Map_fid.find fid map |> fun (contents:string) ->
-      Bytes.blit_string contents foff buffer boff length;
-      ((),s)
+      ExtUnix.All.pread fd foff buffer boff length |> fun nread ->
+      (Ok nread,s)
   in
 
   let pwrite ~fd ~foff ~length ~buffer ~boff = 
-    let fid = fd in
     fun s ->
-      s.files |> fun files ->
-      Map_fid.find fid files |> fun contents ->
-      let contents = Bytes.of_string contents in
-      Bytes.blit buffer boff contents foff length;  (* FIXME extend contents *)
-      Bytes.to_string contents |> fun contents ->
-      Map_fid.add fid contents files |> fun files ->
-      (length,{s with files})
+      ExtUnix.All.pwrite fd foff (Bytes.to_string buffer) boff length 
+      |> fun n ->
+      (Ok n,s)
   in
 
-  let close ~fd = return () in  (* FIXME record which are open? *)
+  let close fd = Unix.close fd; return () in (* FIXME record which are open? *)
 
-  let truncate ~fid i = 
+  let truncate ~path i = 
     fun s ->
-      s.files |> fun files ->
-      Map_fid.find fid files |> fun contents ->
-      let contents' = Bytes.create i in
-      Bytes.blit_string contents 0 contents' 0 i;
-      Bytes.to_string contents' |> fun contents ->
-      Map_fid.add fid contents files |> fun files ->
-      ((),{s with files})
+      Unix.truncate path i; 
+      (Ok (),s)
   in
 
-  let stat_file ~fid s = 
-    s.files |> fun files ->
-    Map_fid.find fid files |> fun contents ->
-    String.length contents |> fun sz ->
-    ({ sz },s)
+  let stat_file path = 
+    fun s -> Unix.(
+        stat path |> fun st ->
+        st.st_size |> fun sz ->        
+        (Ok{sz},s))
   in
 
-  let kind id : st_kind m = id |> function
-    | Fid fid -> return (`File:st_kind)
-    | Did did -> return (`Dir:st_kind)
+  let kind path : st_kind m = 
+    resolve_path path |> bind @@ fun (_,id) ->    
+    id |> function 
+    | None -> err @@ `No_such_entry
+    | Some x -> x |> function
+      | Fid fid -> return (`File:st_kind)
+      | Did did -> return (`Dir:st_kind)
   in
     
   let reset () = return () in
   
 
   assert(T.wf_ops 
-           ~root ~resolve_path_relative ~resolve_path
+           ~root 
+           (* ~resolve_path_relative ~resolve_path *)
            ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
            ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
            ~stat_file ~kind ~reset);
   fun k -> k 
-      ~root ~resolve_path_relative ~resolve_path
+      ~root 
+      (* ~resolve_path_relative ~resolve_path *)
       ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
       ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
       ~stat_file ~kind ~reset
