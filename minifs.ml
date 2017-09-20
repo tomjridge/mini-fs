@@ -16,7 +16,7 @@ let return : 'a -> 'a m = failwith ""
 (* type state  (* system state; gets passed in the monad *) *)
 
 *)
-  
+
 *)
 (*
 let id_cases (id:id) ~(fid:fid -> 'a) ~(did:did -> 'a) = failwith ""
@@ -67,13 +67,13 @@ module Make = functor (S:S) -> struct
 
     (* note return parent; root has itself as parent; either an object
        exists, or we return none indicating that we can create an object *)
-    let resolve_path_relative : did:did -> string list -> (did * id option) m 
+    let resolve_path_relative : did:did -> string -> (did * id option) m 
       = resolve_path_relative in
 
-    (* or string -> (did * id option) promise m *)
-    let resolve_path : string list -> (did * id option) m 
+    let resolve_path : string -> (did * id option) m 
       = resolve_path in
 
+    (* FIXME remove rmdir and delete? remove kind? *)
     let unlink : parent:did -> name:string -> kind:[ `Dir | `File ] -> unit m = unlink in
 
     let mkdir : parent:did -> name:string -> did m = mkdir in
@@ -93,7 +93,9 @@ module Make = functor (S:S) -> struct
     (* calls unlink *)
     let delete : parent:did -> (* fid:fid -> *) name:string -> unit m = delete in
 
-    (* FIXME do we really need fid and fd since we only use pread and pwrite? *)
+    (* FIXME do we really need fid and fd since we only use pread and
+       pwrite? fds are temporary, but fids are permanent; some impls may
+       like to have fds separate *)
     let open_ : fid -> fd m = open_ in
 
     (* mutable buffers? really? *)
@@ -148,8 +150,8 @@ module S = struct
 
 
   module Set_string = Set.Make(
-      struct
-        type t = string let compare: t->t->int = Pervasives.compare 
+    struct
+      type t = string let compare: t->t->int = Pervasives.compare 
     end)
 
 
@@ -212,7 +214,6 @@ let _ =
   (x |> bind f)
 
 
-
 let ops = 
   let 
     resolve_path_relative,resolve_path
@@ -220,11 +221,14 @@ let ops =
   in
   let root : did = failwith "" (* 0 *) in
 
+  (* FIXME or just allow unlink with no expectation of the kind? *)
   let unlink ~parent ~name ~kind = 
     with_state 
       (fun s ->
-         let map = Map_did.find parent s.dirs in
-         let entry = Map_string.find name map in
+         s.dirs |> fun dirs ->
+         Map_did.find parent dirs |> fun pdir ->
+         Map_string.find name pdir |> fun entry ->
+         (* FIXME here and elsewhere we need to take care about find etc when key not present *)
          let entry_kind_matches = 
            match () with
            | _ when (is_fid entry && kind=`File) -> true
@@ -233,8 +237,9 @@ let ops =
          in
          entry_kind_matches |> function
          | true -> 
-           let map' = Map_string.remove name map in           
-           {s with dirs=Map_did.add parent map' s.dirs}
+           Map_string.remove name pdir |> fun pdir ->
+           Map_did.add parent pdir dirs |> fun dirs ->
+           {s with dirs}
          | false -> err `Unlink_kind_fails_to_match)
     |> bind @@ fun () -> return ()
   in
@@ -243,16 +248,18 @@ let ops =
     new_did () |> bind @@ fun (did:did) -> 
     with_state 
       (fun s -> 
-         let map = Map_did.find parent s.dirs in
-         let map' = Map_string.add name (Did did) map in           
-         {s with dirs=Map_did.add parent map' s.dirs})
+         s.dirs |> fun dirs ->
+         Map_did.find parent s.dirs |> fun pdir ->
+         Map_string.add name (Did did) pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
     |> bind @@ fun () -> return did
   in
 
   let rmdir ~parent ~name = unlink ~parent ~name ~kind:`Dir in
 
   let mk_rd ~did es = (did,es) in
-  
+
   let opendir did = ["FIXME"] |> mk_rd ~did |> return in
 
   let readdir rd = rd |> function (did,es) -> return (es,false) in
@@ -263,9 +270,11 @@ let ops =
     new_fid () |> bind @@ fun (fid:fid) -> 
     with_state 
       (fun s -> 
-         let map = Map_did.find parent s.dirs in
-         let map' = Map_string.add name (Fid fid) map in           
-         {s with dirs=Map_did.add parent map' s.dirs})
+         s.dirs |> fun dirs ->
+         Map_did.find parent dirs |> fun pdir ->
+         Map_string.add name (Fid fid) pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
     |> bind @@ fun () -> return fid
   in
 
@@ -288,10 +297,11 @@ let ops =
     let fid = fd in
     fun s ->
       s.files |> fun files ->
-      Map_fid.find fid files |> fun (contents:string) ->
+      Map_fid.find fid files |> fun contents ->
       let contents = Bytes.of_string contents in
       Bytes.blit buffer boff contents foff length;  (* FIXME extend contents *)
-      Map_fid.add fid (Bytes.to_string contents) files |> fun files ->
+      Bytes.to_string contents |> fun contents ->
+      Map_fid.add fid contents files |> fun files ->
       (length,{s with files})
   in
 
@@ -303,10 +313,11 @@ let ops =
       Map_fid.find fid files |> fun contents ->
       let contents' = Bytes.create i in
       Bytes.blit_string contents 0 contents' 0 i;
-      Map_fid.add fid (Bytes.to_string contents') files |> fun files ->
+      Bytes.to_string contents' |> fun contents ->
+      Map_fid.add fid contents files |> fun files ->
       ((),{s with files})
   in
-  
+
   let stat ~id s = id |> function
     | Fid fid -> 
       s.files |> fun files ->
@@ -319,7 +330,7 @@ let ops =
       let sz = -1 in
       ({ sz; st_kind=`Dir },s)
   in
-    
+
 
   assert(T.wf_ops 
            ~root ~resolve_path_relative ~resolve_path
