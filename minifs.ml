@@ -30,7 +30,7 @@ type dir
 
 type st_kind = [`Dir | `File | `Symlink | `Other ]
 
-type stat = { sz:int; st_kind:st_kind }
+type file_stat = { sz:int }
 
 (* what we assume *)
 module type S = sig
@@ -60,7 +60,7 @@ module Make = functor (S:S) -> struct
       ~root ~resolve_path_relative ~resolve_path
       ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
       ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
-      ~stat
+      ~stat_file ~kind
     =
 
     let root : did = root in
@@ -111,7 +111,9 @@ module Make = functor (S:S) -> struct
 
     let truncate : fid:fid -> int -> unit m = truncate in
 
-    let stat : id:id -> stat m = stat in
+    let stat_file : fid:fid -> file_stat m = stat_file in
+
+    let kind : id -> st_kind m = kind in
 
     true[@@ocaml.warning "-26"]
 
@@ -318,27 +320,26 @@ let ops =
       ((),{s with files})
   in
 
-  let stat ~id s = id |> function
-    | Fid fid -> 
-      s.files |> fun files ->
-      Map_fid.find fid files |> fun contents ->
-      String.length contents |> fun sz ->
-      ({ sz; st_kind=`File },s)
-    | Did did ->
-      s.dirs |> fun dirs ->
-      Map_did.find did dirs |> fun dir ->
-      let sz = -1 in
-      ({ sz; st_kind=`Dir },s)
+  let stat_file ~fid s = 
+    s.files |> fun files ->
+    Map_fid.find fid files |> fun contents ->
+    String.length contents |> fun sz ->
+    ({ sz },s)
   in
 
+  let kind id : st_kind m = id |> function
+    | Fid fid -> return (`File:st_kind)
+    | Did did -> return (`Dir:st_kind)
+  in
+    
 
   assert(T.wf_ops 
            ~root ~resolve_path_relative ~resolve_path
            ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
            ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
-           ~stat);
+           ~stat_file ~kind);
   fun k -> k 
       ~root ~resolve_path_relative ~resolve_path
-      ~mkdir ~rmdir ~opendir ~readdir ~closedir 
+      ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
       ~create ~delete ~open_ ~pread ~pwrite ~close 
-      ~stat
+      ~stat_file ~kind
