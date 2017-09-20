@@ -53,6 +53,8 @@ module type S = sig
   type did
   type id  (* = fid + did *)
 
+  type path
+
   type rd (* readdir_descriptor *)
 
   type fd
@@ -69,7 +71,8 @@ module Make = functor (S:S) -> struct
   (* are rd and fd references? or are they values that can be duplicated
      etc? probably values, since they just record eg a did and an index *)
   let wf_ops (* type did fid rd fd *) 
-      ~root ~resolve_path_relative ~resolve_path
+      ~root 
+      ~resolve_path_relative ~resolve_path 
       ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
       ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
       ~stat_file ~kind ~reset
@@ -77,30 +80,34 @@ module Make = functor (S:S) -> struct
 
     let root : did = root in
 
+
+    (* FIXME unsure about did and fid; allow a chroot function? or
+       just punt? chroot could be added as a layer, so just punt.. *)
+
     (* note return parent; root has itself as parent; either an object
        exists, or we return none indicating that we can create an object *)
     let resolve_path_relative : did:did -> string -> (did * id option) m 
       = resolve_path_relative in
 
-    let resolve_path : string -> (did * id option) m 
+    let resolve_path : path -> (did * id option) m 
       = resolve_path in
 
     (* FIXME remove rmdir and delete? remove kind? *)
-    let unlink : parent:did -> name:string -> kind:[ `Dir | `File ] -> unit m = unlink in
+    let unlink : parent:path -> name:string -> unit m = unlink in
 
-    let mkdir : parent:did -> name:string -> did m = mkdir in
+    let mkdir : parent:path -> name:string -> did m = mkdir in
 
     (* calls unlink *)
-    let rmdir : parent:did -> (* did:did -> *) name:string -> unit m = rmdir in
+    let rmdir : parent:path -> (* did:did -> *) name:string -> unit m = rmdir in
 
-    let opendir : did -> rd m = opendir in
+    let opendir : path -> rd m = opendir in
 
     (* boolean indicates whether more to come *)
     let readdir : rd -> (string list * bool) m = readdir in
 
     let closedir : rd -> unit m = closedir in
 
-    let create : parent:did -> name:string -> fid m = create in
+    let create : parent:path -> name:string -> fid m = create in
 
     (* calls unlink *)
     let delete : parent:did -> (* fid:fid -> *) name:string -> unit m = delete in
@@ -108,7 +115,7 @@ module Make = functor (S:S) -> struct
     (* FIXME do we really need fid and fd since we only use pread and
        pwrite? fds are temporary, but fids are permanent; some impls may
        like to have fds separate *)
-    let open_ : fid -> fd m = open_ in
+    let open_ : path -> fd m = open_ in
 
     (* mutable buffers? really? *)
     let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
@@ -119,7 +126,7 @@ module Make = functor (S:S) -> struct
       -> int m 
       = pwrite in
 
-    let close : fd:fd -> unit m = close in
+    let close : fd -> unit m = close in
 
     let truncate : fid:fid -> int -> unit m = truncate in
 

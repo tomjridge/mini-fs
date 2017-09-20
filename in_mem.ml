@@ -44,6 +44,8 @@ module S = struct
 
   type fd = fid
 
+  type path = string
+
   type buffer = bytes  (* or cstruct? *)
 
   type 'a m = state -> 'a * state
@@ -90,38 +92,42 @@ let _ =
   let f : unit -> int m = failwith "" in
   (x |> bind f)
 
-
 let ops () = 
   let 
     resolve_path_relative,resolve_path
     = failwith "" 
   in
+
+  let resolve_dir_path (path:path) : did m = resolve_path path |> bind @@ function
+    | (_,Some (Did did)) -> return did 
+    | _ -> err __LOC__
+  in
+
+  let resolve_file_path (path:path) : fid m = resolve_path path |> bind @@ function
+    | (_,Some (Fid fid)) -> return fid 
+    | _ -> err __LOC__
+  in
+
   let root : did = failwith "" (* 0 *) in
 
   (* FIXME or just allow unlink with no expectation of the kind? *)
-  let unlink ~parent ~name ~kind = 
+  let unlink ~parent ~name = 
+    resolve_dir_path parent |> bind @@ fun parent ->
     with_state 
       (fun s ->
+
          s.dirs |> fun dirs ->
          Map_did.find parent dirs |> fun pdir ->
          Map_string.find name pdir |> fun entry ->
          (* FIXME here and elsewhere we need to take care about find etc when key not present *)
-         let entry_kind_matches = 
-           match () with
-           | _ when (is_fid entry && kind=`File) -> true
-           | _ when (is_did entry && kind=`Dir) -> true
-           | _ -> false
-         in
-         entry_kind_matches |> function
-         | true -> 
-           Map_string.remove name pdir |> fun pdir ->
-           Map_did.add parent pdir dirs |> fun dirs ->
-           {s with dirs}
-         | false -> err `Unlink_kind_fails_to_match)
+         Map_string.remove name pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
     |> bind @@ fun () -> return ()
   in
 
   let mkdir ~parent ~name : did m = 
+    resolve_dir_path parent |> bind @@ fun parent ->
     new_did () |> bind @@ fun (did:did) -> 
     with_state 
       (fun s -> 
@@ -133,7 +139,7 @@ let ops () =
     |> bind @@ fun () -> return did
   in
 
-  let rmdir ~parent ~name = unlink ~parent ~name ~kind:`Dir in
+  let rmdir ~parent ~name = unlink ~parent ~name in
 
   let mk_rd ~did es = (did,es) in
 
@@ -144,6 +150,7 @@ let ops () =
   let closedir rd = return () in  (* FIXME should we record which rd are valid? ie not closed *)
 
   let create ~parent ~name : fid m = 
+    resolve_dir_path parent |> bind @@ fun parent ->
     new_fid () |> bind @@ fun (fid:fid) -> 
     with_state 
       (fun s -> 
@@ -155,11 +162,11 @@ let ops () =
     |> bind @@ fun () -> return fid
   in
 
-  let delete ~parent ~name = unlink ~parent ~name ~kind:`File in
+  let delete ~parent ~name = unlink ~parent ~name in
 
-  let mk_fd fid = fid in
+  let mk_fd fid = fid in 
 
-  let open_ fid = mk_fd fid |> return in
+  let open_ path = resolve_file_path path |> mk_fd |> return in
 
   let pread ~fd ~foff ~length ~buffer ~boff = 
     let fid = fd in

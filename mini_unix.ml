@@ -4,8 +4,8 @@ open Minifs
 
 module S = struct
 
-  type fid(* = int *)
-  type did(* = int *)
+  type fid = Unix.file_descr
+  type did = Unix.dir_handle
 
 
   module Map_fid = Map.Make(
@@ -36,8 +36,8 @@ module S = struct
 
 
   type state = {
-    files: string Map_fid.t;
-    dirs: id Map_string.t Map_did.t;
+    files: fid Map_fid.t;  (* really a set *)
+    dirs: did Map_did.t;  
   }
 
   type rd = did * string list (* inefficient *)
@@ -46,7 +46,9 @@ module S = struct
 
   type buffer = bytes  (* or cstruct? *)
 
-  type 'a m = state -> 'a * state
+  type 'a or_error = ('a,exn) result
+  
+  type 'a m = state -> ('a or_error * state)
 
 end
 
@@ -59,7 +61,7 @@ module T' = T
 
 open S
 
-let err x = failwith ""
+let err x = fun s -> (Error x,s)
 
 let is_fid = function
   | Fid _ -> true
@@ -77,11 +79,12 @@ let with_state : (state -> state) -> unit m = failwith ""
 
 let bind : ('a -> 'b m) -> 'a m -> 'b m = fun f x s ->
   match x s with
-  | (y,s') -> f y s'
+  | (Ok y,s') -> f y s'
+  | (Error _,_) as e -> e
 
 let _ = bind
 
-let return : 'a -> 'a m = fun x s -> (x,s)
+let return : 'a -> 'a m = fun x s -> (Ok x,s)
 
 let _ = return
 
@@ -99,25 +102,15 @@ let ops () =
   let root : did = failwith "" (* 0 *) in
 
   (* FIXME or just allow unlink with no expectation of the kind? *)
-  let unlink ~parent ~name ~kind = 
+  let unlink ~parent ~name = 
     with_state 
       (fun s ->
          s.dirs |> fun dirs ->
          Map_did.find parent dirs |> fun pdir ->
          Map_string.find name pdir |> fun entry ->
-         (* FIXME here and elsewhere we need to take care about find etc when key not present *)
-         let entry_kind_matches = 
-           match () with
-           | _ when (is_fid entry && kind=`File) -> true
-           | _ when (is_did entry && kind=`Dir) -> true
-           | _ -> false
-         in
-         entry_kind_matches |> function
-         | true -> 
-           Map_string.remove name pdir |> fun pdir ->
-           Map_did.add parent pdir dirs |> fun dirs ->
-           {s with dirs}
-         | false -> err `Unlink_kind_fails_to_match)
+         Map_string.remove name pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
     |> bind @@ fun () -> return ()
   in
 

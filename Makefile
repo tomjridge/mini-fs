@@ -1,2 +1,2 @@
 all:
-	ocamlc -c `ocamldep -sort -one-line *.ml`
+	for f in minifs.ml in_mem.ml mini_unix.ml; do ocamlc -c $$f; done
