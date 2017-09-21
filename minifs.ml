@@ -24,61 +24,59 @@ end
 module Make = functor (S:S) -> struct
   open S
 
-  let wf_ops 
-      ~root 
-      ~unlink ~mkdir (* ~rmdir *) ~opendir ~readdir ~closedir 
-      ~create (* ~delete *) ~open_ ~pread ~pwrite ~close ~truncate
-      ~stat_file ~kind ~reset
-    =
 
-    let root : path = root in
+  type unlink = parent:path -> name:string -> unit m
+  type mkdir = parent:path -> name:string -> unit m
+  type opendir = path -> dh m
+  type readdir = dh -> (string list * bool) m
+  type closedir = dh -> unit m 
+  type create = parent:path -> name:string -> unit m
+  type open_ = path -> fd m
+  type pread = fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m 
+  type pwrite = fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m 
+  type close = fd -> unit m
+  type truncate = path:path -> length:int -> unit m
+  type stat_file = path -> file_stat m
+  type kind = path -> st_kind m
+  type reset = unit -> unit m
 
-    (* FIXME remove rmdir and delete? remove kind? *)
-    let unlink : parent:path -> name:string -> unit m = unlink in
+  
+  type ops = {
+    root:path;
+    unlink:unlink;
+    mkdir:mkdir;
+    opendir:opendir;
+    readdir:readdir;
+    closedir:closedir;
+    create:create;
+    open_:open_;
+    pread:pread;
+    pwrite:pwrite;
+    close:close;
+    truncate:truncate;
+    stat_file:stat_file;
+    kind:kind;
+    reset:reset;
+  }
 
-    let mkdir : parent:path -> name:string -> unit m = mkdir in
 
-    (* calls unlink *)
-    (* let rmdir : parent:path -> name:string -> unit m = rmdir in *)
-
-    let opendir : path -> dh m = opendir in
-
-    (* boolean indicates whether more to come *)
-    let readdir : dh -> (string list * bool) m = readdir in
-
-    let closedir : dh -> unit m = closedir in
-
-    let create : parent:path -> name:string -> unit m = create in
-
-    (* calls unlink *)
-    (* let delete : parent:path -> name:string -> unit m = delete in *)
-
-    let open_ : path -> fd m = open_ in
-
-    (* mutable buffers? really? *)
-    let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
-      -> int m 
-      = pread in
-
-    let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int 
-      -> int m 
-      = pwrite in
-
-    let close : fd -> unit m = close in
-
-    let truncate : path:path -> int -> unit m = truncate in
-
-    let stat_file : path -> file_stat m = stat_file in
-
-    let kind : path -> st_kind m = kind in
-
-    (* for this connection, forget all fds fids etc ie reduce caching
-       and resources to minimal level *)
-    let reset : unit -> unit m = reset in   
-
-    true[@@ocaml.warning "-26"]
-
-  let _ = wf_ops
+(*    ignore {
+      unlink;
+      mkdir;
+      opendir;
+      readdir;
+      closedir;
+      create;
+      open_;
+      pread;
+      pwrite;
+      close;
+      truncate;
+      stat_file;
+      kind;
+      reset;
+    };
+*)
 end
 
 

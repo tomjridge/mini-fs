@@ -25,6 +25,7 @@ end
 module T = Make(S)
 
 open S
+open T
 
 let err x = fun s -> (Error x,s)
 
@@ -39,7 +40,7 @@ let return : 'a -> 'a m = fun x s -> (Ok x,s)
 
 exception No_such_entry
 
-let ops () = 
+let mk_ops () = 
   let resolve_path (path:path) : (path * string option) m = failwith "" in
 
 
@@ -73,8 +74,6 @@ let ops () =
   in
 
 
-  (* let rmdir ~parent ~name = unlink ~parent ~name in *)
-
 
   let mk_dh ~path = Unix.opendir path in
 
@@ -87,7 +86,8 @@ let ops () =
   in
 
 
-  let closedir dh = Unix.closedir dh; return () in  (* FIXME should we record which dh are valid? ie not closed *)
+  let closedir dh = Unix.closedir dh; return () in  
+  (* FIXME should we record which dh are valid? ie not closed *)
 
 
   let create ~parent ~name : unit m = 
@@ -99,7 +99,6 @@ let ops () =
     |> bind @@ fun () -> return () (* fid *)
   in
 
-  (* let delete ~parent ~name = unlink ~parent ~name in *)
 
   let mk_fd path = Unix.(openfile path [O_RDWR] default_perm) in
 
@@ -124,9 +123,9 @@ let ops () =
   let close fd = Unix.close fd; return () in (* FIXME record which are open? *)
 
 
-  let truncate ~path i = 
+  let truncate ~path ~length = 
     fun s ->
-      Unix.truncate path i; 
+      Unix.truncate path length; 
       (Ok (),s)
   in
 
@@ -153,18 +152,23 @@ let ops () =
   in
     
   let reset () = return () in
-  
 
-  assert(T.wf_ops 
-           ~root 
-           (* ~resolve_path_relative ~resolve_path *)
-           ~unlink ~mkdir ~opendir ~readdir ~closedir 
-           ~create ~open_ ~pread ~pwrite ~close ~truncate
-           ~stat_file ~kind ~reset);
-  fun k -> k 
-      ~root 
-      (* ~resolve_path_relative ~resolve_path *)
-      ~unlink ~mkdir ~opendir ~readdir ~closedir 
-      ~create ~open_ ~pread ~pwrite ~close ~truncate
-      ~stat_file ~kind ~reset
+  {
+    root;
+    unlink;
+    mkdir;
+    opendir;
+    readdir;
+    closedir;
+    create;
+    open_;
+    pread;
+    pwrite;
+    close;
+    truncate;
+    stat_file;
+    kind;
+    reset;
+  }  
+
 

@@ -60,8 +60,8 @@ end
 
 module T = Make(S)
 
-
 open S
+open T
 
 let err x = failwith ""
 
@@ -90,7 +90,7 @@ let return : 'a -> 'a m = fun x s -> (x,s)
 let _ = return
 
 
-let ops () = 
+let mk_ops () = 
 
   let resolve_path (path:path) : (did * id option) m = failwith "" in
 
@@ -212,13 +212,13 @@ let ops () =
   let close fd = return () in  (* FIXME record which are open? *)
 
 
-  let truncate ~path i = 
+  let truncate ~path ~length = 
     resolve_file_path path |> bind @@ fun fid ->
     fun s ->
       s.files |> fun files ->
       Map_fid.find fid files |> fun contents ->
-      let contents' = Bytes.create i in
-      Bytes.blit_string contents 0 contents' 0 i;
+      let contents' = Bytes.create length in
+      Bytes.blit_string contents 0 contents' 0 length;
       Bytes.to_string contents' |> fun contents ->
       Map_fid.add fid contents files |> fun files ->
       ((),{s with files})
@@ -247,17 +247,20 @@ let ops () =
     
   let reset () = return () in
   
-
-  assert(T.wf_ops 
-           ~root 
-           (* ~resolve_path_relative ~resolve_path *)
-           ~unlink ~mkdir ~opendir ~readdir ~closedir 
-           ~create ~open_ ~pread ~pwrite ~close ~truncate
-           ~stat_file ~kind ~reset);
-  fun k -> k 
-      ~root 
-      (* ~resolve_path_relative ~resolve_path *)
-      ~unlink ~mkdir ~opendir ~readdir ~closedir 
-      ~create ~open_ ~pread ~pwrite ~close ~truncate
-      ~stat_file ~kind ~reset
-
+  {
+    root;
+    unlink;
+    mkdir;
+    opendir;
+    readdir;
+    closedir;
+    create;
+    open_;
+    pread;
+    pwrite;
+    close;
+    truncate;
+    stat_file;
+    kind;
+    reset;
+  }[@@ocaml.warning "-26"]
