@@ -41,7 +41,7 @@ let return : 'a -> 'a m = fun x s -> (Ok x,s)
 exception No_such_entry
 
 let mk_ops () = 
-  let resolve_path (path:path) : (path * string option) m = failwith "" in
+  (* let resolve_path (path:path) : (path * string option) m = failwith "" in *)
 
 
   let root : path = "/" in
@@ -51,12 +51,13 @@ let mk_ops () =
 
 
   (* FIXME or just allow unlink with no expectation of the kind? *)
+
+
+  (* FIXME make these use "with state", which traps errors, and returns unit *)
   let unlink ~parent ~name = 
-    with_state 
-      (fun s ->
-         unix_unlink ~parent ~name;
-         s)
-    |> bind @@ fun () -> return ()
+    fun s ->
+      unix_unlink ~parent ~name;
+      (Ok (),s)
   in
 
 
@@ -66,11 +67,9 @@ let mk_ops () =
   let unix_mkdir ~parent ~name = Unix.mkdir (parent^"/"^name) default_perm in
 
   let mkdir ~parent ~name : unit m = 
-    with_state 
-      (fun s -> 
-         unix_mkdir ~parent ~name;
-         s)
-    |> bind @@ fun () -> return ()
+    fun s -> 
+      unix_mkdir ~parent ~name;
+      (Ok (),s)
   in
 
 
@@ -91,12 +90,10 @@ let mk_ops () =
 
 
   let create ~parent ~name : unit m = 
-    with_state 
-      Unix.(fun s -> 
-         openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
-         close fd;
-         s)
-    |> bind @@ fun () -> return () (* fid *)
+    Unix.(fun s -> 
+        openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
+        close fd;
+        (Ok (), s))
   in
 
 
@@ -114,8 +111,7 @@ let mk_ops () =
 
   let pwrite ~fd ~foff ~length ~buffer ~boff = 
     fun s ->
-      ExtUnix.All.pwrite fd foff (Bytes.to_string buffer) boff length 
-      |> fun n ->
+      ExtUnix.All.pwrite fd foff (Bytes.to_string buffer) boff length |> fun n ->
       (Ok n,s)
   in
 
@@ -139,19 +135,17 @@ let mk_ops () =
 
 
   let kind path : st_kind m = 
-    resolve_path path |> bind @@ fun (_,name) ->    
-    name |> function 
-    | None -> err @@ No_such_entry
-    | Some name -> 
-      Unix.(
-        stat (path^"/"^name) |> fun st ->
-        st.st_kind |> (function
-            | S_DIR -> (`Dir:st_kind)
-            | S_REG -> (`File:st_kind)
-            | _ -> `Other) |> return)
+    Unix.(
+      stat path |> fun st ->
+      st.st_kind |> (function
+          | S_DIR -> (`Dir:st_kind)
+          | S_REG -> (`File:st_kind)
+          | _ -> `Other) |> return)
   in
+
     
   let reset () = return () in
+
 
   {
     root;
