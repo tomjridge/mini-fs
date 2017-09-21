@@ -1,57 +1,13 @@
 (* minimal fs-like thing *)
 
-(*
-type error
-
-(* type 'a promise  (* potentially takes a long time *) *)
-
-type 'a comp (* computation that takes steps *)
-
-type 'a err (* computation that may return err *)
-
-(*
-let bind: ('a -> 'b m) -> 'a m -> 'b m = failwith ""
-let error : error -> 'b m = failwith ""
-let return : 'a -> 'a m = failwith ""
-(* type state  (* system state; gets passed in the monad *) *)
-
-*)
-
-*)
-(*
-let id_cases (id:id) ~(fid:fid -> 'a) ~(did:did -> 'a) = failwith ""
-*)
-
-(*
-type file
-type dir
-*)
-
-
 type st_kind = [`Dir | `File | `Symlink | `Other ]
 
 type file_stat = { sz:int }
 
-(* what we assume *)
-module type S = sig
-  type 'a m (* comp that takes steps and may return err *)
 
-  (* these are intended to be ints; equality comparison ok *)
-  (* path resolution is potentially expensive, so we allow clients
-     access to an "id"; unlike fds, these are not guaranteed to remain
-     valid - its a performance optimization; but in order to avoid the
-     possibility of the trivial-do-nothing implementation it is
-     guaranteed that at least the last min_valid_fids are valid; so an
-     implementation must preserve files even if they are deleted from
-     the dir-hierarchy (similar to posix fd behaviour); so a
-     straightforward implementation is to open an fd and cache in an
-     LRU, and close fd when expunged; alternatively, the connection
-     resources can just be reset by the client, if the client is
-     trusted not to exhaust resources... or just throw a resource
-     exception if we open too many fids? *)
-(*  type fid
-  type did
-  type id  (* = fid + did *) *)
+module type S = sig
+  type 'a m 
+  (* comp that takes steps and may return err *)
 
   type path
 
@@ -68,31 +24,14 @@ end
 module Make = functor (S:S) -> struct
   open S
 
-  (* are rd and fd references? or are they values that can be duplicated
-     etc? probably values, since they just record eg a did and an index *)
-  let wf_ops (* type did fid rd fd *) 
+  let wf_ops 
       ~root 
-(*       ~resolve_path_relative ~resolve_path *)
-      ~unlink ~mkdir ~rmdir ~opendir ~readdir ~closedir 
-      ~create ~delete ~open_ ~pread ~pwrite ~close ~truncate
+      ~unlink ~mkdir (* ~rmdir *) ~opendir ~readdir ~closedir 
+      ~create (* ~delete *) ~open_ ~pread ~pwrite ~close ~truncate
       ~stat_file ~kind ~reset
     =
 
     let root : path = root in
-
-
-    (* FIXME unsure about did and fid; allow a chroot function? or
-       just punt? chroot could be added as a layer, so just punt.. *)
-
-(*    
-    (* note return parent; root has itself as parent; either an object
-       exists, or we return none indicating that we can create an object *)
-    let resolve_path_relative : did:did -> string -> (did * id option) m 
-      = resolve_path_relative in
-
-    let resolve_path : path -> (did * id option) m 
-      = resolve_path in
-*)
 
     (* FIXME remove rmdir and delete? remove kind? *)
     let unlink : parent:path -> name:string -> unit m = unlink in
@@ -100,7 +39,7 @@ module Make = functor (S:S) -> struct
     let mkdir : parent:path -> name:string -> unit m = mkdir in
 
     (* calls unlink *)
-    let rmdir : parent:path -> name:string -> unit m = rmdir in
+    (* let rmdir : parent:path -> name:string -> unit m = rmdir in *)
 
     let opendir : path -> dh m = opendir in
 
@@ -112,11 +51,8 @@ module Make = functor (S:S) -> struct
     let create : parent:path -> name:string -> unit m = create in
 
     (* calls unlink *)
-    let delete : parent:path -> name:string -> unit m = delete in
+    (* let delete : parent:path -> name:string -> unit m = delete in *)
 
-    (* FIXME do we really need fid and fd since we only use pread and
-       pwrite? fds are temporary, but fids are permanent; some impls may
-       like to have fds separate *)
     let open_ : path -> fd m = open_ in
 
     (* mutable buffers? really? *)
