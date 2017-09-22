@@ -4,22 +4,14 @@ open Tjr_minifs;;
 
 #use "test.ml";;
 
+open Minifs
 open Mini_unix
 
-open S
-open T
+let _ = 
+  dest_imperative_ops unix_imperative_ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
 
-let ops = mk_ops()
-
-let run = run_imperative
-
-let dh = run @@ ops.opendir "."
-
-let _ = run @@ ops.readdir dh
-
-module Extra_ops_ = Extra_ops(struct let ops=ops end)
-
-open Extra_ops_
-
-let _ = readdir "."
+  let dh = opendir "." in
+  let _ = readdir dh in
+  let _ = readdir' "." in
+  ()
 

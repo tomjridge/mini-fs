@@ -1,67 +1,44 @@
+open Monad
 open Minifs
 
 (* unix impl -------------------------------------------------------- *)
 
-module S = struct
+type path = string
 
-  type path = string
+type state = {
+  dummy: unit;
+}
 
-  type state = {
-    dummy: unit;
-  }
+type t = state
 
-  type dh = Unix.dir_handle
+type dh = Unix.dir_handle
 
-  type fd = Unix.file_descr
+type fd = Unix.file_descr
 
-  type buffer = bytes  (* or cstruct? *)
+type buffer = bytes  (* or cstruct? *)
 
-  type 'a or_error = ('a,exn) result
-  
-  type 'a m = state -> ('a or_error * state)
+(*
+type 'a or_error = ('a,exn) result
 
-end
-
-module T = Make(S)
-
-open S
-open T
+type 'a m = state -> ('a or_error * state)
+*)
 
 
 let err x = fun s -> (Error x,s)
 
-let safely : 'a m -> 'a m = fun f s -> 
-  try f s 
-  with e -> (Error e,s)
+let exn_err e = err (e|>Printexc.to_string)
 
-let with_state : (state -> 'a * state) -> 'a m = fun f -> 
+let safely : ('a,t) m -> ('a,t) m = fun f s -> 
+  try f s 
+  with e -> exn_err e s
+
+let with_state : (state -> 'a * state) -> ('a,t) m = fun f -> 
   safely @@ (fun s -> f s |> fun (x,s) -> (Ok x,s))
 
-let bind : ('a -> 'b m) -> 'a m -> 'b m = fun f x s ->
-  match x s with
-  | (Ok y,s') -> f y s'
-  | (Error _,_) as e -> e
-
-let return : 'a -> 'a m = fun x s -> (Ok x,s)
-
-
-(* run a command against a ref holding a state *)
-let run_imperative ~ref_ f = 
-  f !ref_ |> fun (x,s) ->
-  ref_:=s;
-  x|> function
-  | Ok x -> x
-  | Error e -> raise e
-
-let _ = run_imperative
-
-(* special case for dummy state *)
-let run_imperative f =
-  run_imperative ~ref_:(ref {dummy=()}) f
-
-let _ = run_imperative
 
 exception No_such_entry
+
+(* ops -------------------------------------------------------------- *)
 
 let mk_ops () = 
   let root : path = "/" in
@@ -77,7 +54,7 @@ let mk_ops () =
   let default_perm = 0o640 in
 
 
-  let mkdir ~parent ~name : unit m = 
+  let mkdir ~parent ~name = 
     with_state @@ fun s -> 
     Unix.mkdir (parent^"/"^name) default_perm;
     ((),s)
@@ -100,7 +77,7 @@ let mk_ops () =
   (* FIXME should we record which dh are valid? ie not closed *)
 
 
-  let create ~parent ~name : unit m = 
+  let create ~parent ~name = 
     with_state @@ fun s -> 
     let open Unix in
     openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
@@ -147,7 +124,7 @@ let mk_ops () =
   in
 
 
-  let kind path : st_kind m = 
+  let kind path = 
     safely @@ 
     let open Unix in
     stat path |> fun st ->
@@ -163,36 +140,44 @@ let mk_ops () =
   let reset () = return () in
 
 
-  {
-    root;
-    unlink;
-    mkdir;
-    opendir;
-    readdir;
-    closedir;
-    create;
-    open_;
-    pread;
-    pwrite;
-    close;
-    truncate;
-    stat_file;
-    kind;
-    reset;
-  }  
+  ignore(wf_ops 
+    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
+    ~create ~open_ ~pread ~pwrite ~close ~truncate 
+    ~stat_file ~kind ~reset);
+  mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+
+let unix_ops = mk_ops ()
+
+(* imperative ------------------------------------------------------- *)
+
+(* run a command against a ref holding a state *)
+let run_imperative ~ref_ f = 
+  f !ref_ |> fun (x,s) ->
+  ref_:=s;
+  x|> function
+  | Ok x -> x
+  | Error e -> failwith e
+
+let _ = run_imperative
+
+(* special case for dummy state *)
+let run_imperative f =
+  run_imperative ~ref_:(ref {dummy=()}) f
+
+let _ = run_imperative
+
+let run = { run=run_imperative }
+
+let unix_imperative_ops = ops_to_imperative run unix_ops
+
+
+let readdir' = readdir' ~ops:unix_imperative_ops
 
 
 
+(* old -------------------------------------------------------------- *)
 
-(* extra ops -------------------------------------------------------- *)
-
-(* this is to make top-level interaction a bit smoother *)
-
-module Extra_ops = functor (S:sig val ops: T.ops end) -> struct
-
-  open S
-
-  let run = run_imperative
+(* 
 
   let mk_toplevel k = 
     let root= ops.root in
@@ -233,8 +218,7 @@ module Extra_ops = functor (S:sig val ops: T.ops end) -> struct
   (* FIXME similarly, can change pread/pwrite to work with path, or
      just implement write_string and read_string *)
 
-end
-
 let ops = mk_ops()
 
 module Extra_ops_ = Extra_ops(struct let ops=ops end)
+*)

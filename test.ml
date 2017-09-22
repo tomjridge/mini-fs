@@ -3,6 +3,7 @@ open Minifs
 
 let ( / ) dir n = dir^"/"^n
 
+(* readdir should return all entries *)
 let find ~kind ~readdir =
   let rec f ~dir =
     readdir dir |> fun es ->
@@ -19,7 +20,10 @@ let find ~kind ~readdir =
 (* for unix *)
 
 open Mini_unix
-open Extra_ops_
-let unix_find = find ~kind ~readdir
+let ops = unix_imperative_ops
+
+let unix_find = 
+  dest_imperative_ops unix_imperative_ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+  find ~kind ~readdir:readdir'
   
   
