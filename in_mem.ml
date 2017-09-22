@@ -71,11 +71,11 @@ let is_fid = function
 
 let is_did x = not (is_fid x)
 
-let new_did () : did m = failwith ""
+let new_did () : did m = fun s -> failwith ""
 
-let new_fid () : fid m = failwith ""
+let new_fid () : fid m = fun s -> failwith ""
 
-let with_state : (state -> state) -> unit m = failwith ""
+let with_state : (state -> state) -> unit m = fun f -> failwith ""
 
 
 let bind : ('a -> 'b m) -> 'a m -> 'b m = fun f x s ->

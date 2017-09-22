@@ -20,15 +20,20 @@ module type S = sig
 end
 
 
+type is_finished = bool
+let finished = true
+
 
 module Make = functor (S:S) -> struct
   open S
 
-
+  (* FIXME surely unlink just takes a path? *)
   type unlink = parent:path -> name:string -> unit m
   type mkdir = parent:path -> name:string -> unit m
   type opendir = path -> dh m
-  type readdir = dh -> (string list * bool) m
+
+  (* . and .. are returned *)
+  type readdir = dh -> (string list * is_finished) m
   type closedir = dh -> unit m 
   type create = parent:path -> name:string -> unit m
   type open_ = path -> fd m
