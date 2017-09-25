@@ -1,1 +1,1 @@
-PKG extlib extunix Fuse tjr_lib
+PKG extlib extunix Fuse tjr_lib core ppx_bin_prot

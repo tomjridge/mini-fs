@@ -9,6 +9,12 @@ type file_stat = { sz:int }
 type is_finished = bool
 let finished = true
 
+(* ensure 64 bit system *)
+let _ = assert(Sys.int_size = 63)
+
+type length = int (* FIXME in following *)
+type offset = int
+
 
 let wf_ops (type path dh fd buffer t) 
     ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 

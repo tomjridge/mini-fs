@@ -41,7 +41,7 @@ ocamldep="ocamlfind ocamldep $PKGS"
 
 # mls ----------------------------------------
 
-mls="monad.ml minifs.ml in_mem.ml mini_unix.ml mini_fuse.ml"
+mls="monad.ml minifs.ml in_mem.ml mini_unix.ml mini_fuse.ml mini_nfs.ml"
 
 cmos="${mls//.ml/.cmo}"
 cmxs="${mls//.ml/.cmx}"
