@@ -1,6 +1,11 @@
 open Monad
 open Minifs
 
+(* to make integration with fuse easier; extunix supports this in module BA *)
+type fuse_buffer = Fuse.buffer
+
+type buffer = fuse_buffer
+
 (* unix impl -------------------------------------------------------- *)
 
 
@@ -17,7 +22,7 @@ type dh = Unix.dir_handle
 
 type fd = Unix.file_descr
 
-type buffer = bytes  (* or cstruct? *)
+(* type buffer = bytes  (* or cstruct? *) *)
 
 (* type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t *)
 
@@ -95,16 +100,20 @@ let mk_ops () =
   let open_ path = safely (mk_fd path |> return) in
 
 
-  let pread ~fd ~foff ~length ~buffer ~boff = 
+  let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     with_state @@ fun s ->
-    ExtUnix.All.pread fd foff buffer boff length |> fun nread ->
+    (* bigarray pread has no boff, and length is taken from array, so
+       resort to slicing *)
+    Bigarray.Array1.sub buffer boff length |> fun buffer -> 
+    ExtUnix.All.BA.pread fd foff buffer |> fun nread ->
     (nread,s)
   in
 
 
-  let pwrite ~fd ~foff ~length ~buffer ~boff = 
+  let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     with_state @@ fun s ->
-    ExtUnix.All.pwrite fd foff (Bytes.to_string buffer) boff length |> fun n ->
+    Bigarray.Array1.sub buffer boff length |> fun buffer -> 
+    ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
     (n,s)
   in
 

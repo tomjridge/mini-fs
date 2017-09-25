@@ -24,12 +24,9 @@ let default_file_stats st_size =
 let default_dir_stats = default_stats
 
 
-type fuse_buffer = Fuse.buffer
-
 
 let mk_fuse_ops (type path) 
     ~(path_to_string:path->string) ~(string_to_path:string->path) 
-    ~(buf_of_unix:buffer -> fuse_buffer) ~(buf_to_unix:fuse_buffer -> buffer)
     ~run ~ops 
   = 
 
