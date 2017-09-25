@@ -9,160 +9,132 @@ open Fuse
 
 open Minifs
 
-module type S = Minifs.S with type 'a m = 'a
-
-module T = Minifs.Make(S)
-open S
-open T
-
-
-let bind : ('a -> 'b m) -> 'a m -> 'b m = fun f x -> failwith ""
-
-let return: 'a -> 'a m = fun x -> failwith ""
 
 let default_stats = LargeFile.stat "."
 
 
-let default_file_stats size = 
+let default_file_stats st_size = 
   { default_stats with 
     st_nlink = 1;
-    st_kind = S_REG;
+    st_kind=Unix.S_REG;
     st_perm = 0o640;
-    st_size = size }
+    st_size
+  }
+
+let default_dir_stats = default_stats
 
 
-let mk_fuse_ops ~path_to_string ~readdirall ~(ops:ops) = 
-  let get_attr path = 
-    ops.kind path |> bind @@ function
+type fuse_buffer = Fuse.buffer
+
+
+let mk_fuse_ops (type path) 
+    ~(path_to_string:path->string) ~(string_to_path:string->path) 
+    ~(buf_of_unix:buffer -> fuse_buffer) ~(buf_to_unix:fuse_buffer -> buffer)
+    ~run ~ops 
+  = 
+
+  let ops = ops_to_imperative run ops in
+  dest_imperative_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+
+
+  let dirname_basename (path:path) : path * string = failwith __LOC__ in (* FIXME *)
+
+
+
+  let unlink path = 
+    path |> string_to_path |> dirname_basename |> fun (parent,name) -> 
+    unlink ~parent ~name
+  in
+
+  let mkdir path _perms = 
+    path |> string_to_path |> dirname_basename |> fun (parent,name) -> 
+    mkdir ~parent ~name
+  in
+
+  (* opendir and closedir omitted *)
+  (* create combined with fopen *)
+
+
+  let readdir' = readdir' ~ops in
+  let readdir path _ = 
+    path |> string_to_path |> fun path ->
+    readdir' path 
+  in
+
+  let _ = kind in
+
+  (* FIXME tricky combining create with fopen *)
+  let fopen (path:string) flags = 
+    path |> string_to_path |> fun path ->
+    Unix.(List.mem O_CREAT flags) |> function
+    | true -> 
+      (* may be creating a file *)
+      dirname_basename path |> fun (parent,name) ->
+      create ~parent ~name;
+      None
+    | false -> 
+      path |> kind |> function
+      | `File -> None
+      | _ -> raise @@ Unix_error (ENOENT,"open",path|>path_to_string)
+  in
+
+
+  (* really worth making sure that buffer types match, or abstracting over *)
+  let read path buf ofs _ : int = 
+    path |> string_to_path |> fun path ->
+    ofs |> Int64.to_int |> fun ofs -> (* FIXME ofs should be int64 *)
+    let buf_size = Bigarray.Array1.dim buf in
+    open_ path |> fun fd ->  (* FIXME cache fds in LRU? *)
+    pread ~fd ~foff:ofs ~length:buf_size ~buffer:buf ~boff:0 |> fun n ->
+    close fd;
+    n
+  in
+    
+
+  let write path buf foff _ : int = 
+    path |> string_to_path |> fun path ->
+    foff |> Int64.to_int |> fun foff -> (* FIXME ofs should be int64 *)
+    let buf_size = Bigarray.Array1.dim buf in
+    open_ path |> fun fd ->
+    pwrite ~fd ~foff ~length:buf_size ~buffer:buf ~boff:0 |> fun n ->
+    close fd;
+    n
+  in
+
+
+  let truncate path length = 
+    path |> string_to_path |> fun path ->
+    length |> Int64.to_int |> fun length ->  (* FIXME *)
+    truncate ~path ~length
+  in
+
+  
+
+  (* stat_file and kind combined in following *)
+  let getattr path0 = 
+    path0 |> string_to_path |> fun path ->
+    path |> kind |> function
     | `File -> 
-      ops.stat_file path |> bind @@ fun x -> 
-      x.sz |> Int64.of_int |> default_file_stats |> return
-    | `Dir -> return default_stats
-    | _ -> raise @@ Unix_error (ENOENT,"readdir",path|>path_to_string)
-  in
-
-  let readdir path _ = readdirall path in
-
-  let fopen path flags = 
-    ops.kind path |> bind @@ function
-    | `File -> None
-    | _ -> raise @@ Unix_error (ENOENT,"open",path|>path_to_string)
+      stat_file path |> fun x -> 
+      x.sz |> Int64.of_int |> default_file_stats
+    | `Dir -> default_dir_stats
+    | _ -> raise @@ Unix_error (ENOENT,"getattr" ^ __LOC__,path0)
   in
 
 
-(* assume all reads are block-aligned *)
-let do_read path buf ofs _ = safely (fun () ->     
-    let buf_size = Bigarray.Array1.dim buf in
-    let wf = 
-      path = "/"^Img.fn &&
-      buf_size >= blk_sz &&  (* allow attempts to read more, but only read blk_sz *)
-      Int64.rem ofs (Int64.of_int blk_sz) = Int64.zero       
-    in 
-    let msg () = 
-      `List[`String "read"; `String path; `Int (Int64.to_int ofs);
-            `Int buf_size]
-      |> Yojson.Safe.to_string 
-    in
-    Test.test(fun () -> 
-      msg () |> print_endline);
-    (if buf_size > blk_sz then
-       Test.warn (__LOC__^": buf_size > blk_sz"));
-    let open Btree_api.Imperative_map_ops in
-    match () with
-    | _ when (not wf) -> (
-        Test.warn (__LOC__^": not wf");
-        raise (Unix_error (ENOENT,"read",path)))
-    | _ -> (
-        try
-          (* we want to return a single block FIXME to begin with *)
-          let i = ((Int64.to_int ofs) / blk_sz) in
-          let blk = imap_ops.find i in
-          let blk = 
-            match blk with
-            | None -> Blk.of_string ""
-            | Some blk -> blk
-          in
-          let blk = Blk.to_string blk in
-          for j = 0 to blk_sz -1 do  (* copy to buf FIXME use blit *)
-            buf.{j} <- String.get blk j 
-          done;
-          blk_sz
-        with e -> (
-            print_endline "do_read:!"; 
-            msg ()|>print_endline; 
-            e|>Printexc.to_string|>print_endline;
-            Printexc.get_backtrace() |> print_endline;
-            ignore(exit 1);  (* exit rather than allow fs to continue *)
-            raise (Unix_error (ENOENT,"read",path)))))
-
-(* NOTE ofs is offset in file (pointer to by path); loopback writes
-   may be non-block-aligned, and less than the block size *)
-let do_write path (buf:('x,'y,'z)Bigarray.Array1.t) ofs _fd = safely (fun () -> 
-    let buf_size = Bigarray.Array1.dim buf in
-    let blk_id = ((Int64.to_int ofs) / blk_sz) in
-    let offset_within_block = Int64.rem ofs (Int64.of_int blk_sz) |> Int64.to_int in
-    let wf = 
-      path = "/"^Img.fn &&
-      buf_size > 0 &&  (* allow < blk_sz, but not 0 *)
-      true (* offset_within_block = 0  FIXME may want to allow writing at an offset *)
-    in 
-    let msg () = 
-      `List[`String "write"; `String path; `Int (Int64.to_int ofs); 
-            `String "buf_size,blk_id,offset_within_block"; `Int buf_size; `Int blk_id; `Int offset_within_block]
-      |> Yojson.Safe.to_string 
-    in
-    Test.test (fun () -> msg () |> print_endline);
-    (if (offset_within_block + buf_size > blk_sz) then
-       Test.warn (__LOC__^": offset_within_block + buf_size > blk_sz"));
-    let open Btree_api.Imperative_map_ops in
-    match () with
-    | _ when (not wf) -> (
-        Test.warn (__LOC__^": not wf");
-        raise (Unix_error (ENOENT,"write",path)))
-    | _ -> (
-        try
-          let blk = 
-            match offset_within_block = 0 with
-            | true -> Bytes.create blk_sz
-            | false -> (
-                (* have to read existing block *)
-                imap_ops.find blk_id |> function None -> Bytes.create blk_sz | Some blk -> blk|>Blk.to_string)
-          in
-          let n = min (blk_sz - offset_within_block) buf_size in  (* allow writing < blk_sz *)
-          for j = 0 to n -1 do
-            Bytes.set blk (offset_within_block+j) buf.{j}  (* FIXME use blit *)
-          done;
-          blk |> Bytes.to_string |> Blk.of_string |> fun blk ->
-          imap_ops.insert blk_id blk |> (fun () -> n)
-        with e -> (
-            print_endline "do_write:!"; 
-            msg ()|>print_endline;
-            e|>Printexc.to_string|>print_endline;
-            Printexc.get_backtrace() |> print_endline;
-            ignore(exit 1);
-            raise (Unix_error (ENOENT,"write",path))) ))
+  { default_operations with 
+    unlink;
+    mkdir;    
+    readdir;
+    fopen;
+    read;
+    write;
+    truncate;
+    getattr;
+  } [@@ocaml.warning "-26"]
 
 
-(* following apparently required for a block device backed by a file on a fuse fs ? *)
-(* let do_fsync path ds hnd = () *)
+let _ = mk_fuse_ops
 
-(* let do_getxattr s1 s2 = "?" *)
-
-
-let _ =
-  main Sys.argv 
-    { default_operations with 
-      getattr = do_getattr;
-      readdir = do_readdir;
-      fopen = do_fopen;
-      read = do_read;
-      write = do_write;
-      truncate = (fun _ _ -> print_endline "truncate"; ());
-      (*      fsync = do_fsync;
-              getxattr = do_getxattr; *)
-    }
-
-
-(* opendir = (fun path flags -> 
-   (Unix.openfile path flags 0 |> Unix.close);
-   None); (* FIXME from fusexmp; not sure needed *) *)
+let unix_fuse_ops = 
+  mk_fuse_ops ~path_to_string:(fun s -> s) ~ops:Mini_unix.unix_ops

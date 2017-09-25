@@ -3,6 +3,8 @@ open Minifs
 
 (* unix impl -------------------------------------------------------- *)
 
+
+
 type path = string
 
 type state = {
@@ -16,6 +18,8 @@ type dh = Unix.dir_handle
 type fd = Unix.file_descr
 
 type buffer = bytes  (* or cstruct? *)
+
+(* type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t *)
 
 (*
 type 'a or_error = ('a,exn) result
