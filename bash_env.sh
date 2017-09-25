@@ -7,7 +7,7 @@ Libname=Tjr_minifs
 #mls_in_subdirs=`ls {ac,ag,c,d,e,f,h,i,j,n}_*/*.ml`
 meta_description="Minimal file-system-like thing"
 
-required_packages="extunix,extlib,Fuse"
+required_packages="extunix,extlib,Fuse,tjr_lib"
 
 natives=""
 bytes=""

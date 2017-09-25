@@ -141,6 +141,11 @@ let readdir' ~ops =
 
 
 
+(* following for strings *)
+let dirname_basename path = 
+  assert(Tjr_string.contains ~sub:"/" path);
+  Tjr_string.split_on_last ~sub:"/" path
+
 
 
 (* old -------------------------------------------------------------- *)

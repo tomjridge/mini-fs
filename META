@@ -1,6 +1,6 @@
 name="tjr_minifs"
 description="Minimal file-system-like thing"
-version="Mon 25 Sep 16:21:18 BST 2017 2ed6cb884c4d474a3b2ae6ed781c36187c7cea46"
-requires="extunix,extlib,Fuse"
+version="Mon 25 Sep 16:28:23 BST 2017 9ad074a59b582e04ec40edf3b66a45b637ff5bf0"
+requires="extunix,extlib,Fuse,tjr_lib"
 archive(byte)="tjr_minifs.cma"
 archive(native)="tjr_minifs.cmxa"

@@ -27,15 +27,12 @@ let default_dir_stats = default_stats
 
 let mk_fuse_ops (type path) 
     ~(path_to_string:path->string) ~(string_to_path:string->path) 
+    ~(dirname_basename: path -> path * string)
     ~run ~ops 
   = 
 
   let ops = ops_to_imperative run ops in
   dest_imperative_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
-
-
-  let dirname_basename (path:path) : path * string = failwith __LOC__ in (* FIXME *)
-
 
 
   let unlink path = 
@@ -86,7 +83,7 @@ let mk_fuse_ops (type path)
     close fd;
     n
   in
-    
+
 
   let write path buf foff _ : int = 
     path |> string_to_path |> fun path ->
@@ -105,7 +102,7 @@ let mk_fuse_ops (type path)
     truncate ~path ~length
   in
 
-  
+
 
   (* stat_file and kind combined in following *)
   let getattr path0 = 
@@ -133,5 +130,13 @@ let mk_fuse_ops (type path)
 
 let _ = mk_fuse_ops
 
+
 let unix_fuse_ops = 
-  mk_fuse_ops ~path_to_string:(fun s -> s) ~ops:Mini_unix.unix_ops
+  mk_fuse_ops 
+    ~path_to_string:(fun s -> s) 
+    ~string_to_path:(fun s -> s)
+    ~dirname_basename
+    ~run:Mini_unix.run
+    ~ops:Mini_unix.unix_ops
+
+let _ : Fuse.operations = unix_fuse_ops
