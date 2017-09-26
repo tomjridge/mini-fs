@@ -130,7 +130,7 @@ let mk_fuse_ops (type path)
 
 let _ = mk_fuse_ops
 
-
+(* TODO 
 let unix_fuse_ops = 
   mk_fuse_ops 
     ~path_to_string:(fun s -> s) 
@@ -140,3 +140,4 @@ let unix_fuse_ops =
     ~ops:Mini_unix.unix_ops
 
 let _ : Fuse.operations = unix_fuse_ops
+*)

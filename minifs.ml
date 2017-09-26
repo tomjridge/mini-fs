@@ -1,5 +1,5 @@
 (* minimal fs-like thing *)
-open Monad
+open Tjr_monad
 
 type st_kind = [`Dir | `File | `Symlink | `Other ]
 

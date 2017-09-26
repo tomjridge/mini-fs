@@ -1,5 +1,7 @@
-open Monad
+open Tjr_monad
 open Minifs
+
+let ( >> ) f x = x >>= f
 
 (* in-mem impl ------------------------------------------------------ *)
 
@@ -61,25 +63,27 @@ let is_fid = function
 
 let is_did x = not (is_fid x)
 
-let new_did () : (did,t) m = fun s -> failwith ""
+let new_did () : (did,t) m = err "FIXME"
 
-let new_fid () : (fid,t) m = fun s -> failwith ""
+let new_fid () : (fid,t) m = err "FIXME"
 
 let with_state : (state -> state) -> (unit,t) m = fun f -> failwith ""
+
+let with_state': (state -> 'a * state) -> ('a,t) m = fun f -> failwith ""
 
 
 let resolve_path (path:path) : (did * id option,t) m = failwith ""
 
 
 let resolve_dir_path (path:path) : (did,t) m = 
-  resolve_path path |> bind @@ function
+  resolve_path path >>= function
   | (_,Some (Did did)) -> return did 
   | _ -> err __LOC__
 
 
 
 let resolve_file_path (path:path) : (fid,t) m = 
-  resolve_path path |> bind @@ function
+  resolve_path path >>= function
   | (_,Some (Fid fid)) -> return fid 
   | _ -> err __LOC__
 
@@ -90,7 +94,7 @@ let root : path = "/"
 
 (* FIXME or just allow unlink with no expectation of the kind? *)
 let unlink ~parent ~name = 
-  resolve_dir_path parent |> bind @@ fun parent ->
+  resolve_dir_path parent >>= fun parent ->
   with_state 
     (fun s ->
        s.dirs |> fun dirs ->
@@ -100,13 +104,13 @@ let unlink ~parent ~name =
        Map_string.remove name pdir |> fun pdir ->
        Map_did.add parent pdir dirs |> fun dirs ->
        {s with dirs})
-  |> bind @@ fun () -> return ()
+  >>= fun () -> return ()
 
 
 
 let mkdir ~parent ~name : (unit,t) m = 
-  resolve_dir_path parent |> bind @@ fun parent ->
-  new_did () |> bind @@ fun (did:did) -> 
+  resolve_dir_path parent >>= fun parent ->
+  new_did () >>= fun (did:did) -> 
   with_state 
     (fun s -> 
        s.dirs |> fun dirs ->
@@ -114,7 +118,7 @@ let mkdir ~parent ~name : (unit,t) m =
        Map_string.add name (Did did) pdir |> fun pdir ->
        Map_did.add parent pdir dirs |> fun dirs ->
        {s with dirs})
-  |> bind @@ fun () -> return () (* did *)
+  >>= fun () -> return () (* did *)
 
 
 
@@ -122,7 +126,7 @@ let mk_dh ~did es = (did,es)
 
 
 let opendir path = 
-  resolve_dir_path path |> bind @@ fun did ->
+  resolve_dir_path path >>= fun did ->
   ["FIXME"] |> mk_dh ~did |> return 
 
 
@@ -134,8 +138,8 @@ let closedir dh = return ()  (* FIXME should we record which rd are valid? ie no
 
 
 let create ~parent ~name : (unit,t) m = 
-  resolve_dir_path parent |> bind @@ fun parent ->
-  new_fid () |> bind @@ fun (fid:fid) -> 
+  resolve_dir_path parent >>= fun parent ->
+  new_fid () >>= fun (fid:fid) -> 
   with_state 
     (fun s -> 
        s.dirs |> fun dirs ->
@@ -143,7 +147,7 @@ let create ~parent ~name : (unit,t) m =
        Map_string.add name (Fid fid) pdir |> fun pdir ->
        Map_did.add parent pdir dirs |> fun dirs ->
        {s with dirs})
-  |> bind @@ fun () -> return () (* fid *)
+  >>= fun () -> return () (* fid *)
 
 
 
@@ -151,59 +155,59 @@ let mk_fd (fid:fid) = fid
 
 
 let open_ path = 
-  resolve_file_path path |> bind @@ fun fid -> 
+  resolve_file_path path >>= fun fid -> 
   fid |> mk_fd |> return 
 
 
 let pread ~fd ~foff ~length ~buffer ~boff = 
   let fid = fd in
-  fun s ->
+  with_state' @@ fun s ->
     s.files |> fun map ->
     Map_fid.find fid map |> fun (contents:string) ->
     Bytes.blit_string contents foff buffer boff length;
-    (Ok length,s)
+    (length,s)
 
 
 let pwrite ~fd ~foff ~length ~buffer ~boff = 
   let fid = fd in
-  fun s ->
+  with_state' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     let contents = Bytes.of_string contents in
     Bytes.blit buffer boff contents foff length;  (* FIXME extend contents *)
     Bytes.to_string contents |> fun contents ->
     Map_fid.add fid contents files |> fun files ->
-    (Ok length,{s with files})
+    (length,{s with files})
 
 
 let close fd = return () (* FIXME record which are open? *)
 
 
 let truncate ~path ~length = 
-  resolve_file_path path |> bind @@ fun fid ->
-  fun s ->
+  resolve_file_path path >>= fun fid ->
+  with_state' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     let contents' = Bytes.create length in
     Bytes.blit_string contents 0 contents' 0 length;
     Bytes.to_string contents' |> fun contents ->
     Map_fid.add fid contents files |> fun files ->
-    (Ok (),{s with files})
+    ((),{s with files})
 
 
 
 let stat_file path = 
-  resolve_file_path path |> bind @@ fun fid ->
-  fun s ->
+  resolve_file_path path >>= fun fid ->
+  with_state' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     String.length contents |> fun sz ->
-    (Ok { sz },s)
+    ({ sz },s)
 
 
 
 let kind path : (st_kind,t) m = 
-  resolve_path path |> bind @@ fun (_,id) ->    
+  resolve_path path >>= fun (_,id) ->    
   id |> function 
   | None -> err @@ `No_such_entry
   | Some x -> x |> function

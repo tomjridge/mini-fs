@@ -1,4 +1,4 @@
-open Monad
+open Tjr_monad
 open Minifs
 
 (* to make integration with fuse easier; extunix supports this in module BA *)
@@ -32,29 +32,38 @@ type 'a or_error = ('a,exn) result
 type 'a m = state -> ('a or_error * state)
 *)
 
-
+(*
 let err x = fun s -> (Error x,s)
 
 let exn_err e = err (e|>Printexc.to_string)
+*)
 
+(*
 let safely : ('a,t) m -> ('a,t) m = fun f s -> 
   try f s 
   with e -> exn_err e s
+*)
 
+(*
 let with_state : (state -> 'a * state) -> ('a,t) m = fun f -> 
   safely @@ (fun s -> f s |> fun (x,s) -> (Ok x,s))
-
+*)
 
 exception No_such_entry
 
 (* ops -------------------------------------------------------------- *)
 
-let mk_ops () = 
+type extra_ops = {
+  safely: 'a. ('a,t) m -> ('a,t) m;
+  with_state: 'a. (state -> 'a * state) -> ('a,t) m;
+}
+
+let mk_ops ~extra () = 
   let root : path = "/" in
 
 
   let unlink ~parent ~name = 
-    with_state @@ fun s ->
+    extra.with_state @@ fun s ->
     Unix.unlink @@ parent^"/"^name ;
     ((),s)
   in
@@ -64,7 +73,7 @@ let mk_ops () =
 
 
   let mkdir ~parent ~name = 
-    with_state @@ fun s -> 
+    extra.with_state @@ fun s -> 
     Unix.mkdir (parent^"/"^name) default_perm;
     ((),s)
   in
@@ -73,7 +82,7 @@ let mk_ops () =
 
   let mk_dh ~path = Unix.opendir path in
 
-  let opendir path = safely (mk_dh path |> return) in
+  let opendir path = extra.safely (mk_dh path |> return) in
 
 
   let readdir dh = 
@@ -82,12 +91,12 @@ let mk_ops () =
   in
 
 
-  let closedir dh = safely (Unix.closedir dh; return ()) in  
+  let closedir dh = extra.safely (Unix.closedir dh; return ()) in  
   (* FIXME should we record which dh are valid? ie not closed *)
 
 
   let create ~parent ~name = 
-    with_state @@ fun s -> 
+    extra.with_state @@ fun s -> 
     let open Unix in
     openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
     close fd;
@@ -97,11 +106,11 @@ let mk_ops () =
 
   let mk_fd path = Unix.(openfile path [O_RDWR] default_perm) in
 
-  let open_ path = safely (mk_fd path |> return) in
+  let open_ path = extra.safely (mk_fd path |> return) in
 
 
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    with_state @@ fun s ->
+    extra.with_state @@ fun s ->
     (* bigarray pread has no boff, and length is taken from array, so
        resort to slicing *)
     Bigarray.Array1.sub buffer boff length |> fun buffer -> 
@@ -111,25 +120,25 @@ let mk_ops () =
 
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    with_state @@ fun s ->
+    extra.with_state @@ fun s ->
     Bigarray.Array1.sub buffer boff length |> fun buffer -> 
     ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
     (n,s)
   in
 
 
-  let close fd = safely (Unix.close fd; return ()) in (* FIXME record which are open? *)
+  let close fd = extra.safely (Unix.close fd; return ()) in (* FIXME record which are open? *)
 
 
   let truncate ~path ~length = 
-    with_state @@ fun s ->
+    extra.with_state @@ fun s ->
     Unix.truncate path length; 
     ((),s)
   in
 
 
   let stat_file path = 
-    with_state @@ fun s -> 
+    extra.with_state @@ fun s -> 
     let open Unix in
     stat path |> fun st ->
     st.st_size |> fun sz ->        
@@ -138,7 +147,7 @@ let mk_ops () =
 
 
   let kind path = 
-    safely @@ 
+    extra.safely @@ 
     let open Unix in
     stat path |> fun st ->
     st.st_kind 
@@ -179,6 +188,8 @@ let run_imperative f =
 
 let _ = run_imperative
 
+(* FIXME TODO 
+
 let run = { run=run_imperative }
 
 let unix_imperative_ops = ops_to_imperative run unix_ops
@@ -186,7 +197,7 @@ let unix_imperative_ops = ops_to_imperative run unix_ops
 
 let readdir' = readdir' ~ops:unix_imperative_ops
 
-
+*)
 
 (* old -------------------------------------------------------------- *)
 
