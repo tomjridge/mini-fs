@@ -1,7 +1,5 @@
-open Tjr_monad
+(* open Tjr_monad *)
 open Minifs
-
-let ( >> ) f x = x >>= f
 
 (* in-mem impl ------------------------------------------------------ *)
 
@@ -63,26 +61,49 @@ let is_fid = function
 
 let is_did x = not (is_fid x)
 
-let new_did () : (did,t) m = err "FIXME"
+let new_did () : (did -> 'm) -> 'm = err "FIXME"
 
-let new_fid () : (fid,t) m = err "FIXME"
+let new_fid () : (fid -> 'm) -> 'm = err "FIXME"
 
-let with_state : (state -> state) -> (unit,t) m = fun f -> failwith ""
+(* sort of co-inductive object *)
+type m = Trans of (state -> state * m)
 
-let with_state': (state -> 'a * state) -> ('a,t) m = fun f -> failwith ""
+(* following could be parameters *)
+let with_state : (state -> state) -> (unit -> 'm) -> 'm = 
+  fun f k -> Trans (fun s ->
+      f s, k ())
+
+let _ = with_state
+
+let with_state': (state -> 'a * state) -> ('a -> 'm) -> 'm = 
+  fun f k -> 
+    Trans (fun s -> 
+        f s |> fun (a,s) ->
+        s,k a)
+
+let _ = with_state'
 
 
-let resolve_path (path:path) : (did * id option,t) m = failwith ""
+let resolve_path : path -> ((did * id option -> 'm)) -> 'm = failwith ""
 
+(* 'a comp is ('a -> 'm ) -> 'm  where 'm represents the computation *) 
 
-let resolve_dir_path (path:path) : (did,t) m = 
+let ( >>= ) x f = fun k -> (x (fun rx -> f rx k))
+
+let bind f x = fun k -> (x (fun rx -> f rx k))
+
+let _ = bind
+
+let return x k = k x
+
+let resolve_dir_path (path:path) : (did -> 'm) -> 'm = 
   resolve_path path >>= function
   | (_,Some (Did did)) -> return did 
   | _ -> err __LOC__
 
 
 
-let resolve_file_path (path:path) : (fid,t) m = 
+let resolve_file_path (path:path) : (fid -> 'm) -> 'm = 
   resolve_path path >>= function
   | (_,Some (Fid fid)) -> return fid 
   | _ -> err __LOC__
@@ -108,7 +129,7 @@ let unlink ~parent ~name =
 
 
 
-let mkdir ~parent ~name : (unit,t) m = 
+let mkdir ~parent ~name : (unit -> 'm) -> 'm = 
   resolve_dir_path parent >>= fun parent ->
   new_did () >>= fun (did:did) -> 
   with_state 
@@ -137,7 +158,7 @@ let readdir dh = dh |> function (did,es) -> return (es,false)
 let closedir dh = return ()  (* FIXME should we record which rd are valid? ie not closed *)
 
 
-let create ~parent ~name : (unit,t) m = 
+let create ~parent ~name : (unit -> 'm) -> 'm = 
   resolve_dir_path parent >>= fun parent ->
   new_fid () >>= fun (fid:fid) -> 
   with_state 
@@ -206,7 +227,7 @@ let stat_file path =
 
 
 
-let kind path : (st_kind,t) m = 
+let kind path : (st_kind -> 'm) -> 'm = 
   resolve_path path >>= fun (_,id) ->    
   id |> function 
   | None -> err @@ `No_such_entry

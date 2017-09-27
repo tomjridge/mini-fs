@@ -1,6 +1,4 @@
 (* minimal fs-like thing *)
-open Tjr_monad
-
 type st_kind = [`Dir | `File | `Symlink | `Other ]
 
 type file_stat = { sz:int }
@@ -16,27 +14,28 @@ type length = int (* FIXME in following *)
 type offset = int
 
 
-let wf_ops (type path dh fd buffer t) 
+
+let wf_ops (type path dh fd buffer t m) 
     ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
     ~create ~open_ ~pread ~pwrite ~close ~truncate 
     ~stat_file ~kind ~reset    
   = 
   let root : path = root in
-  let unlink : parent:path -> name:string -> (unit,t) m = unlink in
-  let mkdir : parent:path -> name:string -> (unit,t) m = mkdir in
-  let opendir : path -> (dh,t) m = opendir in
+  let unlink : parent:path -> name:string -> (unit -> m) -> m = unlink in
+  let mkdir : parent:path -> name:string -> (unit -> m) -> m = mkdir in
+  let opendir : path -> (dh -> m) -> m = opendir in
   (* . and .. are returned *)
-  let readdir : dh -> ((string list * is_finished),t) m = readdir in
-  let  closedir : dh -> (unit,t) m = closedir in
-  let create : parent:path -> name:string -> (unit,t) m = create in
-  let open_ : path -> (fd,t) m = open_ in
-  let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,t) m = pread in
-  let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,t) m = pwrite in
-  let close : fd -> (unit,t) m = close in
-  let truncate : path:path -> length:int -> (unit,t) m = truncate in
-  let stat_file : path -> (file_stat,t) m = stat_file in
-  let kind : path -> (st_kind,t) m = kind in
-  let reset : unit -> (unit,t) m = reset in
+  let readdir : dh -> ((string list * is_finished) -> m) -> m = readdir in
+  let  closedir : dh -> (unit -> m) -> m = closedir in
+  let create : parent:path -> name:string -> (unit -> m) -> m = create in
+  let open_ : path -> (fd -> m) -> m = open_ in
+  let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int -> m) -> m = pread in
+  let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int -> m) -> m = pwrite in
+  let close : fd -> (unit -> m) -> m = close in
+  let truncate : path:path -> length:int -> (unit -> m) -> m = truncate in
+  let stat_file : path -> (file_stat -> m) -> m = stat_file in
+  let kind : path -> (st_kind -> m) -> m = kind in
+  let reset : unit -> (unit -> m) -> m = reset in
   true[@@ocaml.warning "-26"]
 
 let mk_ops 
@@ -66,8 +65,8 @@ let opendir_readdir_closedir ops =
 (* imperative operations -------------------------------------------- *)
 
 
-type 't run = {
-    run:'a. ('a,'t) m -> 'a
+type 'm run = {
+    run:'a. (('a -> 'm) -> 'm) -> 'a
   }
 
 let wf_imperative_ops (type path dh fd buffer t)  
