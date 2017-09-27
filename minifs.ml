@@ -13,6 +13,7 @@ let _ = assert(Sys.int_size = 63)
 type length = int (* FIXME in following *)
 type offset = int
 
+type ('a,'m) m_ = ('a -> 'm) -> 'm
 
 
 let wf_ops (type path dh fd buffer t m) 
@@ -21,21 +22,21 @@ let wf_ops (type path dh fd buffer t m)
     ~stat_file ~kind ~reset    
   = 
   let root : path = root in
-  let unlink : parent:path -> name:string -> (unit -> m) -> m = unlink in
-  let mkdir : parent:path -> name:string -> (unit -> m) -> m = mkdir in
-  let opendir : path -> (dh -> m) -> m = opendir in
+  let unlink : parent:path -> name:string -> (unit,m) m_ = unlink in
+  let mkdir : parent:path -> name:string -> (unit,m) m_ = mkdir in
+  let opendir : path -> (dh,m) m_ = opendir in
   (* . and .. are returned *)
-  let readdir : dh -> ((string list * is_finished) -> m) -> m = readdir in
+  let readdir : dh -> ((string list * is_finished),m) m_ = readdir in
   let  closedir : dh -> (unit -> m) -> m = closedir in
-  let create : parent:path -> name:string -> (unit -> m) -> m = create in
-  let open_ : path -> (fd -> m) -> m = open_ in
-  let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int -> m) -> m = pread in
-  let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int -> m) -> m = pwrite in
-  let close : fd -> (unit -> m) -> m = close in
-  let truncate : path:path -> length:int -> (unit -> m) -> m = truncate in
-  let stat_file : path -> (file_stat -> m) -> m = stat_file in
-  let kind : path -> (st_kind -> m) -> m = kind in
-  let reset : unit -> (unit -> m) -> m = reset in
+  let create : parent:path -> name:string -> (unit,m) m_ = create in
+  let open_ : path -> (fd,m) m_ = open_ in
+  let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,m) m_ = pread in
+  let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,m) m_ = pwrite in
+  let close : fd -> (unit,m) m_ = close in
+  let truncate : path:path -> length:int -> (unit,m) m_ = truncate in
+  let stat_file : path -> (file_stat,m) m_ = stat_file in
+  let kind : path -> (st_kind,m) m_ = kind in
+  let reset : unit -> (unit,m) m_ = reset in
   true[@@ocaml.warning "-26"]
 
 let mk_ops 

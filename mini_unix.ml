@@ -11,11 +11,13 @@ type buffer = fuse_buffer
 
 type path = string
 
+(*
 type state = {
   dummy: unit;
 }
+*)
 
-type t = state
+(*type t = state*)
 
 type dh = Unix.dir_handle
 
@@ -52,19 +54,47 @@ exception No_such_entry
 
 (* ops -------------------------------------------------------------- *)
 
+type w
+
+type 'a m = ('a -> w -> w) -> w -> w
+
+
+let ( >>= ) : 'a m -> ('a -> 'b m) -> 'b m = fun x -> failwith ""
+
 type extra_ops = {
-  safely: 'a. ('a,t) m -> ('a,t) m;
-  with_state: 'a. (state -> 'a * state) -> ('a,t) m;
+  safely: 'a. (unit -> 'a m) -> 'a m;  (* this delays until receives a world *)
+(*  with_state: 'a. (state -> 'a * state) -> ('a -> 'm) -> 'm; *)
+  return: 'a. 'a -> 'a m;
 }
+
+
+(*
+
+safely is ?
+
+(('a -> 'm) -> 'm) -> (('a -> 'm)-> 'm)
+
+and we want to install an exception handler for the part that computes 'a
+
+this suggests that hat(a) (the repr of a computation producing a) is
+
+('a -> world -> world) -> world -> world
+
+ie 'm in ('a -> 'm) -> 'm is a function type world -> world, and the 
+
+normal or exceptional termination can be handled via exceptions which
+return the modified world state
+
+*)
 
 let mk_ops ~extra () = 
   let root : path = "/" in
 
 
-  let unlink ~parent ~name = 
-    extra.with_state @@ fun s ->
+  let unlink ~parent ~name : unit m = 
+    extra.safely @@ fun () ->
     Unix.unlink @@ parent^"/"^name ;
-    ((),s)
+    extra.return ()
   in
 
 
@@ -72,81 +102,91 @@ let mk_ops ~extra () =
 
 
   let mkdir ~parent ~name = 
-    extra.with_state @@ fun s -> 
+    extra.safely @@ fun () -> 
     Unix.mkdir (parent^"/"^name) default_perm;
-    ((),s)
+    extra.return ()
   in
 
 
 
   let mk_dh ~path = Unix.opendir path in
 
-  let opendir path = extra.safely (mk_dh path |> return) in
-
-
-  let readdir dh = 
-    try Unix.readdir dh |> fun e -> return ([e],not finished) 
-    with _ -> return ([],finished)
+  let opendir path = 
+    extra.safely @@ fun () -> extra.return (mk_dh path)
   in
 
 
-  let closedir dh = extra.safely (Unix.closedir dh; return ()) in  
+  let readdir dh = 
+    extra.safely @@ fun () -> (* safely is just to delay till world available *)
+    try Unix.readdir dh |> fun e -> extra.return ([e],not finished)
+    with _ -> extra.return ([],finished)
+  in
+
+
+  let closedir dh = 
+    extra.safely @@ fun () -> Unix.closedir dh; extra.return ()
+  in  
   (* FIXME should we record which dh are valid? ie not closed *)
 
 
   let create ~parent ~name = 
-    extra.with_state @@ fun s -> 
+    extra.safely @@ fun () -> 
     let open Unix in
     openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
     close fd;
-    ((), s)
+    extra.return ()
   in
 
 
-  let mk_fd path = Unix.(openfile path [O_RDWR] default_perm) in
+  let mk_fd path = 
+    extra.safely @@ fun () ->
+    Unix.(openfile path [O_RDWR] default_perm) |> extra.return
+  in
 
-  let open_ path = extra.safely (mk_fd path |> return) in
+  let open_ path = mk_fd path in
 
 
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    extra.with_state @@ fun s ->
+    extra.safely @@ fun () ->
     (* bigarray pread has no boff, and length is taken from array, so
        resort to slicing *)
     Bigarray.Array1.sub buffer boff length |> fun buffer -> 
     ExtUnix.All.BA.pread fd foff buffer |> fun nread ->
-    (nread,s)
+    extra.return nread
   in
 
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    extra.with_state @@ fun s ->
+    extra.safely @@ fun () ->
     Bigarray.Array1.sub buffer boff length |> fun buffer -> 
     ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
-    (n,s)
+    extra.return n
   in
 
 
-  let close fd = extra.safely (Unix.close fd; return ()) in (* FIXME record which are open? *)
+  let close fd = extra.safely @@ fun () ->
+    (Unix.close fd; extra.return ()) 
+  in (* FIXME record which are open? *)
 
 
   let truncate ~path ~length = 
-    extra.with_state @@ fun s ->
+    extra.safely @@ fun () -> 
     Unix.truncate path length; 
-    ((),s)
+    extra.return ()
   in
 
 
   let stat_file path = 
-    extra.with_state @@ fun s -> 
+    extra.safely @@ fun () -> 
     let open Unix in
     stat path |> fun st ->
     st.st_size |> fun sz ->        
-    ({sz},s)
+    extra.return {sz}
   in
 
 
   let kind path = 
-    extra.safely @@ 
+    extra.safely @@ fun () ->
     let open Unix in
     stat path |> fun st ->
     st.st_kind 
@@ -154,11 +194,11 @@ let mk_ops ~extra () =
         | S_DIR -> (`Dir:st_kind)
         | S_REG -> (`File:st_kind)
         | _ -> `Other) 
-    |> return
+    |> extra.return
   in
 
     
-  let reset () = return () in
+  let reset () = extra.return () in
 
 
   ignore(wf_ops 
@@ -183,7 +223,7 @@ let _ = run_imperative
 
 (* special case for dummy state *)
 let run_imperative f =
-  run_imperative ~ref_:(ref {dummy=()}) f
+  run_imperative ~ref_:(ref ()) f
 
 let _ = run_imperative
 
