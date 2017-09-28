@@ -5,17 +5,10 @@ type fuse_buffer = Fuse.buffer
 
 type buffer = fuse_buffer
 
+
 (* unix impl -------------------------------------------------------- *)
 
-
-
 type path = string
-
-(*
-type state = {
-  dummy: unit;
-}
-*)
 
 (*type t = state*)
 
@@ -27,29 +20,6 @@ type fd = Unix.file_descr
 
 (* type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t *)
 
-(*
-type 'a or_error = ('a,exn) result
-
-type 'a m = state -> ('a or_error * state)
-*)
-
-(*
-let err x = fun s -> (Error x,s)
-
-let exn_err e = err (e|>Printexc.to_string)
-*)
-
-(*
-let safely : ('a,t) m -> ('a,t) m = fun f s -> 
-  try f s 
-  with e -> exn_err e s
-*)
-
-(*
-let with_state : (state -> 'a * state) -> ('a,t) m = fun f -> 
-  safely @@ (fun s -> f s |> fun (x,s) -> (Ok x,s))
-*)
-
 exception No_such_entry
 
 (* ops -------------------------------------------------------------- *)
@@ -58,8 +28,14 @@ type w
 
 type 'a m = ('a -> w -> w) -> w -> w
 
+(* following a bit horrible *)
+let bind (am : 'a m) (f:'a -> 'b m) : 'b m = 
+  fun bww w ->
+    (* apply am *)
+    let aww = fun a w -> (f a) bww w in
+    am aww w
 
-let ( >>= ) : 'a m -> ('a -> 'b m) -> 'b m = fun x -> failwith ""
+let ( >>= ) = bind 
 
 type extra_ops = {
   safely: 'a. (unit -> 'a m) -> 'a m;  (* this delays until receives a world *)
@@ -67,25 +43,6 @@ type extra_ops = {
   return: 'a. 'a -> 'a m;
 }
 
-
-(*
-
-safely is ?
-
-(('a -> 'm) -> 'm) -> (('a -> 'm)-> 'm)
-
-and we want to install an exception handler for the part that computes 'a
-
-this suggests that hat(a) (the repr of a computation producing a) is
-
-('a -> world -> world) -> world -> world
-
-ie 'm in ('a -> 'm) -> 'm is a function type world -> world, and the 
-
-normal or exceptional termination can be handled via exceptions which
-return the modified world state
-
-*)
 
 let mk_ops ~extra () = 
   let root : path = "/" in
@@ -166,7 +123,8 @@ let mk_ops ~extra () =
 
   let close fd = extra.safely @@ fun () ->
     (Unix.close fd; extra.return ()) 
-  in (* FIXME record which are open? *)
+  in 
+  (* FIXME record which are open? *)
 
 
   let truncate ~path ~length = 
@@ -209,10 +167,15 @@ let mk_ops ~extra () =
 
 let unix_ops = mk_ops ()
 
+
 (* imperative ------------------------------------------------------- *)
 
+let the_world : w = Obj.magic ()
+
+let _ = the_world
+
 (* run a command against a ref holding a state *)
-let run_imperative ~ref_ f = 
+let run_imperative f = 
   f !ref_ |> fun (x,s) ->
   ref_:=s;
   x|> function
