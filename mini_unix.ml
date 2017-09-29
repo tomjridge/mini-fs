@@ -165,7 +165,14 @@ let mk_ops ~extra () =
     ~stat_file ~kind ~reset);
   mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
 
-let unix_ops = mk_ops ()
+(* at the moment we just re-raise e; if we alter m we can eg embed in result *)
+let safely : 'a. (unit -> 'a m) -> 'a m = fun f -> try f () with e -> raise e
+
+let return: 'a. 'a -> 'a m = fun x -> fun f -> f x
+
+let extra = { safely; return }
+
+let unix_ops = mk_ops ~extra ()
 
 
 (* imperative ------------------------------------------------------- *)
@@ -174,77 +181,17 @@ let the_world : w = Obj.magic ()
 
 let _ = the_world
 
-(* run a command against a ref holding a state *)
-let run_imperative f = 
-  f !ref_ |> fun (x,s) ->
-  ref_:=s;
-  x|> function
-  | Ok x -> x
-  | Error e -> failwith e
+
+(* some bug with ppx not working with local exceptions, so use first class modules instead *)
+let run_imperative (type a) (f:a m) : a = 
+  let module M = struct exception E of a end in
+  try ignore(f (fun a w -> raise (M.E a)) the_world); failwith __LOC__
+  with M.E a -> a
 
 let _ = run_imperative
-
-(* special case for dummy state *)
-let run_imperative f =
-  run_imperative ~ref_:(ref ()) f
-
-let _ = run_imperative
-
-(* FIXME TODO 
 
 let run = { run=run_imperative }
 
 let unix_imperative_ops = ops_to_imperative run unix_ops
 
-
 let readdir' = readdir' ~ops:unix_imperative_ops
-
-*)
-
-(* old -------------------------------------------------------------- *)
-
-(* 
-
-  let mk_toplevel k = 
-    let root= ops.root in
-    let unlink=(fun ~parent ~name -> run @@ ops.unlink ~parent ~name) in
-    let mkdir=(fun ~parent ~name -> run @@ ops.mkdir ~parent ~name) in
-    let opendir=(fun p -> run @@ ops.opendir p) in
-    let readdir=(fun dh -> run @@ ops.readdir dh) in
-    let closedir=(fun dh -> run @@ ops.closedir dh) in
-    let create=(fun ~parent ~name -> run @@ ops.create ~parent ~name) in
-    let open_=(fun path -> run @@ ops.open_ path) in
-    let pread=(fun ~fd ~foff ~length ~buffer ~boff -> run @@ ops.pread ~fd ~foff ~length ~buffer ~boff) in
-    let pwrite=(fun ~fd ~foff ~length ~buffer ~boff -> run @@ ops.pwrite ~fd ~foff ~length ~buffer ~boff) in
-    let close=(fun fd -> run @@ ops.close fd) in
-    let truncate=(fun ~path ~length -> run @@ ops.truncate ~path ~length) in
-    let stat_file=(fun path -> run @@ ops.stat_file path) in
-    let kind=(fun path -> run @@ ops.kind path) in
-    let reset=(fun () -> run @@ ops.reset ()) in
-    k ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
-
-  let (root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset) 
-    = mk_toplevel @@ fun 
-      ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
-    (root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset) 
-
-  (* for small directories *)
-  let readdir path = 
-    let dh = opendir path in
-    let es = ref [] in
-    let finished = ref false in
-    while(not !finished) do
-      let (es',f) = readdir dh in
-      es:=!es@es';
-      finished:=f;
-    done;
-    closedir dh;
-    !es
-
-  (* FIXME similarly, can change pread/pwrite to work with path, or
-     just implement write_string and read_string *)
-
-let ops = mk_ops()
-
-module Extra_ops_ = Extra_ops(struct let ops=ops end)
-*)
