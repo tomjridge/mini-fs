@@ -12,5 +12,6 @@ let _ =
   let dh = opendir "." in
   let _ = readdir dh in
   let _ = readdir' "." |> List.map print_endline in
+  let _ = readdir' "asdasds" |> List.map print_endline in
   ()
 

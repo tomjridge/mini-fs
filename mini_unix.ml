@@ -166,7 +166,7 @@ let mk_ops ~extra () =
   mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
 
 (* at the moment we just re-raise e; if we alter m we can eg embed in result *)
-let safely : 'a. (unit -> 'a m) -> 'a m = fun f -> try f () with e -> raise e
+let safely : 'a. (unit -> 'a m) -> 'a m = fun f aww w -> try f () aww w with e -> raise e
 
 let return: 'a. 'a -> 'a m = fun x -> fun f -> f x
 
