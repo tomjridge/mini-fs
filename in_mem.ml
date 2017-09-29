@@ -1,4 +1,3 @@
-(* open Tjr_monad *)
 open Minifs
 
 (* in-mem impl ------------------------------------------------------ *)
@@ -34,12 +33,14 @@ module Set_string = Set.Make(
 type id = Fid of fid | Did of did
 
 
-type state = {
+type fs_t = {
   files: string Map_fid.t;
   dirs: id Map_string.t Map_did.t;
 }
 
-type t = state
+
+type t = fs_t
+
 
 type dh = did * string list (* inefficient *)
 
@@ -53,38 +54,28 @@ type path = string
 type buffer = bytes  (* or cstruct? *)
 
 
-let err x = failwith ""
 
-let is_fid = function
-  | Fid _ -> true
-  | _ -> false
+(* monad ops -------------------------------------------------------- *)
 
-let is_did x = not (is_fid x)
-
-let new_did () : (did -> 'm) -> 'm = err "FIXME"
-
-let new_fid () : (fid -> 'm) -> 'm = err "FIXME"
+(* explicit state passing, steppable, final result via state;
+   errors via exception *)
 
 (* sort of co-inductive object *)
-type m = Trans of (state -> state * m)
+type steppable = {step:fs_t -> fs_t * steppable }
 
 (* following could be parameters *)
-let with_state : (state -> state) -> (unit -> 'm) -> 'm = 
-  fun f k -> Trans (fun s ->
-      f s, k ())
+let with_fs : (fs_t -> fs_t) -> (unit -> 'm) -> 'm = 
+  fun f k -> { step=(fun s -> f s, k ()) }
 
-let _ = with_state
+let _ = with_fs
 
-let with_state': (state -> 'a * state) -> ('a -> 'm) -> 'm = 
+let with_fs': (fs_t -> 'a * fs_t) -> ('a -> 'm) -> 'm = 
   fun f k -> 
-    Trans (fun s -> 
-        f s |> fun (a,s) ->
-        s,k a)
+    { step=(fun s -> 
+          f s |> fun (a,s) ->
+          s,k a) }
 
-let _ = with_state'
-
-
-let resolve_path : path -> ((did * id option -> 'm)) -> 'm = failwith ""
+let _ = with_fs'
 
 (* 'a comp is ('a -> 'm ) -> 'm  where 'm represents the computation *) 
 
@@ -96,102 +87,135 @@ let _ = bind
 
 let return x k = k x
 
-let resolve_dir_path (path:path) : (did -> 'm) -> 'm = 
-  resolve_path path >>= function
-  | (_,Some (Did did)) -> return did 
-  | _ -> err __LOC__
+
+type ('e,'m) extra_ops = {
+  err: ' a. 'e -> ('a -> 'm) -> 'm;
+  new_did: unit -> (did -> 'm) -> 'm;
+  new_fid: unit -> (fid -> 'm) -> 'm;
+}
+
+
+(*
+let err x : ('a -> 'm) -> 'm = fun k -> raise x
 
 
 
-let resolve_file_path (path:path) : (fid -> 'm) -> 'm = 
-  resolve_path path >>= function
-  | (_,Some (Fid fid)) -> return fid 
-  | _ -> err __LOC__
+let new_did () : (did -> 'm) -> 'm = err "FIXME"
+
+let new_fid () : (fid -> 'm) -> 'm = err "FIXME"
+*)
 
 
 
-let root : path = "/" 
+(* fs ops ----------------------------------------------------------- *)
+
+let is_fid = function
+  | Fid _ -> true
+  | _ -> false
+
+let is_did x = not (is_fid x)
 
 
-(* FIXME or just allow unlink with no expectation of the kind? *)
-let unlink ~parent ~name = 
-  resolve_dir_path parent >>= fun parent ->
-  with_state 
-    (fun s ->
-       s.dirs |> fun dirs ->
-       Map_did.find parent dirs |> fun pdir ->
-       Map_string.find name pdir |> fun entry ->
-       (* FIXME here and elsewhere we need to take care about find etc when key not present *)
-       Map_string.remove name pdir |> fun pdir ->
-       Map_did.add parent pdir dirs |> fun dirs ->
-       {s with dirs})
-  >>= fun () -> return ()
+let mk_ops ~extra () = 
+
+  let resolve_path : path -> ((did * id option -> 'm)) -> 'm = fun p -> failwith "" in
 
 
-
-let mkdir ~parent ~name : (unit -> 'm) -> 'm = 
-  resolve_dir_path parent >>= fun parent ->
-  new_did () >>= fun (did:did) -> 
-  with_state 
-    (fun s -> 
-       s.dirs |> fun dirs ->
-       Map_did.find parent s.dirs |> fun pdir ->
-       Map_string.add name (Did did) pdir |> fun pdir ->
-       Map_did.add parent pdir dirs |> fun dirs ->
-       {s with dirs})
-  >>= fun () -> return () (* did *)
+  let resolve_dir_path (path:path) : (did -> 'm) -> 'm = 
+    resolve_path path >>= function
+    | (_,Some (Did did)) -> return did 
+    | _ -> extra.err (`S __LOC__)
+  in
 
 
+  let resolve_file_path (path:path) : (fid -> 'm) -> 'm = 
+    resolve_path path >>= function
+    | (_,Some (Fid fid)) -> return fid 
+    | _ -> extra.err (`S __LOC__)
+  in
 
-let mk_dh ~did es = (did,es) 
-
-
-let opendir path = 
-  resolve_dir_path path >>= fun did ->
-  ["FIXME"] |> mk_dh ~did |> return 
-
-
-
-let readdir dh = dh |> function (did,es) -> return (es,false) 
+  let root : path = "/" in
 
 
-let closedir dh = return ()  (* FIXME should we record which rd are valid? ie not closed *)
+  (* FIXME or just allow unlink with no expectation of the kind? *)
+  let unlink ~parent ~name = 
+    resolve_dir_path parent >>= fun parent ->
+    with_fs 
+      (fun s ->
+         s.dirs |> fun dirs ->
+         Map_did.find parent dirs |> fun pdir ->
+         Map_string.find name pdir |> fun entry ->
+         (* FIXME here and elsewhere we need to take care about find etc when key not present *)
+         Map_string.remove name pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
+    >>= fun () -> return ()
+  in
 
 
-let create ~parent ~name : (unit -> 'm) -> 'm = 
-  resolve_dir_path parent >>= fun parent ->
-  new_fid () >>= fun (fid:fid) -> 
-  with_state 
-    (fun s -> 
-       s.dirs |> fun dirs ->
-       Map_did.find parent dirs |> fun pdir ->
-       Map_string.add name (Fid fid) pdir |> fun pdir ->
-       Map_did.add parent pdir dirs |> fun dirs ->
-       {s with dirs})
-  >>= fun () -> return () (* fid *)
+  let mkdir ~parent ~name : (unit -> 'm) -> 'm = 
+    resolve_dir_path parent >>= fun parent ->
+    extra.new_did () >>= fun (did:did) -> 
+    with_fs 
+      (fun s -> 
+         s.dirs |> fun dirs ->
+         Map_did.find parent s.dirs |> fun pdir ->
+         Map_string.add name (Did did) pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
+    >>= fun () -> return () (* did *)
+  in
 
 
-
-let mk_fd (fid:fid) = fid 
-
-
-let open_ path = 
-  resolve_file_path path >>= fun fid -> 
-  fid |> mk_fd |> return 
+  let mk_dh ~did es = (did,es) in
 
 
-let pread ~fd ~foff ~length ~buffer ~boff = 
-  let fid = fd in
-  with_state' @@ fun s ->
+  let opendir path = 
+    resolve_dir_path path >>= fun did ->
+    ["FIXME"] |> mk_dh ~did |> return 
+  in
+
+
+  let readdir dh = dh |> function (did,es) -> return (es,false) in
+
+
+  let closedir dh = return () in (* FIXME should we record which rd are valid? ie not closed *)
+
+
+  let create ~parent ~name : (unit -> 'm) -> 'm = 
+    resolve_dir_path parent >>= fun parent ->
+    extra.new_fid () >>= fun (fid:fid) -> 
+    with_fs 
+      (fun s -> 
+         s.dirs |> fun dirs ->
+         Map_did.find parent dirs |> fun pdir ->
+         Map_string.add name (Fid fid) pdir |> fun pdir ->
+         Map_did.add parent pdir dirs |> fun dirs ->
+         {s with dirs})
+    >>= fun () -> return () (* fid *)
+  in
+
+
+  let mk_fd (fid:fid) = fid in
+
+
+  let open_ path = 
+    resolve_file_path path >>= fun fid -> 
+    fid |> mk_fd |> return 
+  in
+
+  let pread ~fd ~foff ~length ~buffer ~boff = 
+    let fid = fd in
+    with_fs' @@ fun s ->
     s.files |> fun map ->
     Map_fid.find fid map |> fun (contents:string) ->
     Bytes.blit_string contents foff buffer boff length;
     (length,s)
+  in
 
-
-let pwrite ~fd ~foff ~length ~buffer ~boff = 
-  let fid = fd in
-  with_state' @@ fun s ->
+  let pwrite ~fd ~foff ~length ~buffer ~boff = 
+    let fid = fd in
+    with_fs' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     let contents = Bytes.of_string contents in
@@ -199,14 +223,14 @@ let pwrite ~fd ~foff ~length ~buffer ~boff =
     Bytes.to_string contents |> fun contents ->
     Map_fid.add fid contents files |> fun files ->
     (length,{s with files})
+  in
+
+  let close fd = return () in (* FIXME record which are open? *)
 
 
-let close fd = return () (* FIXME record which are open? *)
-
-
-let truncate ~path ~length = 
-  resolve_file_path path >>= fun fid ->
-  with_state' @@ fun s ->
+  let truncate ~path ~length = 
+    resolve_file_path path >>= fun fid ->
+    with_fs' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     let contents' = Bytes.create length in
@@ -214,34 +238,60 @@ let truncate ~path ~length =
     Bytes.to_string contents' |> fun contents ->
     Map_fid.add fid contents files |> fun files ->
     ((),{s with files})
+  in
 
 
-
-let stat_file path = 
-  resolve_file_path path >>= fun fid ->
-  with_state' @@ fun s ->
+  let stat_file path = 
+    resolve_file_path path >>= fun fid ->
+    with_fs' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     String.length contents |> fun sz ->
     ({ sz },s)
+  in
+
+
+  let kind path : (st_kind -> 'm) -> 'm = 
+    resolve_path path >>= fun (_,id) ->    
+    id |> function 
+    | None -> extra.err @@ `No_such_entry
+    | Some x -> x |> function
+      | Fid fid -> return (`File:st_kind)
+      | Did did -> return (`Dir:st_kind)
+  in
+
+
+  let reset () = return () in
 
 
 
-let kind path : (st_kind -> 'm) -> 'm = 
-  resolve_path path >>= fun (_,id) ->    
-  id |> function 
-  | None -> err @@ `No_such_entry
-  | Some x -> x |> function
-    | Fid fid -> return (`File:st_kind)
-    | Did did -> return (`Dir:st_kind)
+  let _ = wf_ops 
+      ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
+      ~create ~open_ ~pread ~pwrite ~close ~truncate 
+      ~stat_file ~kind ~reset    
+  in
+
+  mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+
+let _ = mk_ops  (* NOTE the error cases are captured in the type *)
 
 
-    
-let reset () = return () 
-  
+exception E of [ `No_such_entry | `S of string ]
 
 
-let _ = wf_ops 
-    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
-    ~create ~open_ ~pread ~pwrite ~close ~truncate 
-    ~stat_file ~kind ~reset    
+let extra = {
+  err=(fun e k -> {step=(fun s -> raise (E e)) });
+  new_did=(fun () k -> {step=(
+      fun s -> 
+        let s' = s in
+        let did = failwith "FIXME" in
+        (s',k did))});
+  new_fid=(fun () k -> {step=(
+      fun s -> 
+        let s' = s in
+        let fid = failwith "FIXME" in
+        (s',k fid))});
+}
+
+
+let ops = mk_ops ~extra  (* NOTE the error cases are captured in the type *)
