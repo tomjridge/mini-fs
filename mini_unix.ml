@@ -24,7 +24,11 @@ exception No_such_entry
 
 (* ops -------------------------------------------------------------- *)
 
-type w
+type w = {
+  error_state: exn option;
+  world_state: unit
+}
+
 
 type 'a m = ('a -> w -> w) -> w -> w
 
@@ -168,7 +172,10 @@ let mk_ops ~extra () =
 (* at the moment we just re-raise e; if we alter m we can eg embed in result *)
 let safely : 'a. (unit -> 'a m) -> 'a m = fun f aww w -> try f () aww w with e -> raise e
 
-let return: 'a. 'a -> 'a m = fun x -> fun f -> f x
+let return: 'a. 'a -> 'a m = fun x -> fun f w -> 
+  match w.error_state with
+  | None -> f x w
+  | Some _ -> w
 
 let extra = { safely; return }
 
@@ -177,7 +184,7 @@ let unix_ops = mk_ops ~extra ()
 
 (* imperative ------------------------------------------------------- *)
 
-let the_world : w = Obj.magic ()
+let the_world : w = { error_state=None; world_state=() }
 
 let _ = the_world
 
