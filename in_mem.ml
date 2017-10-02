@@ -3,7 +3,7 @@ open Minifs
 (* in-mem impl ------------------------------------------------------ *)
 
 module Fid : sig
-  type fid
+  type fid = int  (* FIXME hide *)
   val fid0 : fid
   val inc_fid : fid -> fid
 end = struct
@@ -14,7 +14,7 @@ end
 include Fid
  
 module Did : sig
-  type did 
+  type did = int (* FIXME hide *)
   val root_did : did
   val inc_did : did -> did
 end = struct
@@ -69,7 +69,7 @@ let init_fs = {
   files=Map_fid.empty;
   max_fid=fid0;
   dirs=(Map_did.empty |> Map_did.add root_did empty_dir);
-  max_did=inc_did root_did;
+  max_did=root_did;
 }
 
 
@@ -161,9 +161,17 @@ let mk_ops ~extra () =
   in
 
 
-  let resolve_path : path -> (did * id option,'m) m_ = fun p -> 
+  let resolve_path : path -> (did * id option,'m) m_ = fun p ->     
     String.split_on_char '/' p |> fun names ->
-    resolve_names_1 ~parent_id:root_did ~names
+    (* remove head "" since paths are absolute, and any trailing "" *)
+    assert(List.hd names = "");
+    let names = List.tl names in
+    assert(names <> []);
+    let names = Tjr_list.(if last names = "" then butlast names else names) in
+    (* not sure about special casing root *)
+    if names = [] 
+    then return @@ (root_did,Some (Did root_did)) 
+    else resolve_names_1 ~parent_id:root_did ~names
   in
 
 
@@ -205,8 +213,12 @@ let mk_ops ~extra () =
     with_fs 
       (fun s -> 
          s.dirs |> fun dirs ->
+         (* add new empty dir to dirs *)
+         Map_did.add did empty_dir dirs |> fun dirs ->
+         (* add name to parent *)
          Map_did.find parent s.dirs |> fun pdir ->
          Map_string.add name (Did did) pdir |> fun pdir ->
+         (* update parent in dirs *)
          Map_did.add parent pdir dirs |> fun dirs ->
          {s with dirs})
     >>= fun () -> return () (* did *)
@@ -226,7 +238,7 @@ let mk_ops ~extra () =
   in
 
 
-  let readdir dh = dh |> function (did,es) -> return (es,false) in
+  let readdir dh = dh |> function (did,es) -> return (es,finished) in
 
 
   let closedir dh = return () in (* FIXME should we record which rd are valid? ie not closed *)
@@ -368,4 +380,4 @@ module Mk_state_passing_ = Mk_state_passing(W_)
 
 let ref_ = ref init_fs
 
-let imperative_ops = Mk_state_passing_.mk_imperative_ops ops init_fs
+let imperative_ops = Mk_state_passing_.mk_imperative_ops ops ref_

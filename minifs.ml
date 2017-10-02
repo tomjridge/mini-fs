@@ -162,9 +162,7 @@ module Mk_state_passing = functor(W: sig type w end) -> struct
       let (b,w') = f w in
       (g b) h w'
 
-  let mk_imperative_ops ops w0 = 
-
-    let ref_ = ref w0 in
+  let mk_imperative_ops ops ref_ = 
 
     (* some bug with ppx not working with local exceptions, so use
        first class modules instead *)
