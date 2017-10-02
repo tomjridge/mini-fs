@@ -123,6 +123,137 @@ let dest_imperative_ops (`Imperative_ops(root,unlink,mkdir,opendir,readdir,close
 
 
 
+(* state passing, no error ------------------------------------------ *)
+
+module Mk_state_passing = functor(W: sig type w end) -> struct
+  (* assume world state is 'w, so 'm = 'w -> 'w *)
+
+  module W = W
+  open W
+
+  type ww = w -> w
+
+  type 'a m = ('a,ww) m_
+
+  (* NOTE following a bit hairy *)
+  let ( >>= ) (x:'a m) (f:'a -> 'b m) : 'b m = 
+    fun (g:'b -> w -> w) -> 
+    fun (w:w) ->
+      let f' : 'a -> ww = fun a -> f a g in
+      let x' : ww = x f' in
+      let w' : w = x' w in
+      w'
+
+  let return (x: 'a) : 'a m = 
+    fun (g: 'a -> ww) -> g x
+
+
+  (* change state before running remainder of computation *)
+  let with_state (f:w->w) (x:'a m) : 'a m = 
+    fun (g:'a -> w -> w) -> 
+    fun (w:w) -> 
+      let w' : w = f w in
+      x g w'
+
+  (* change state, and derive a parameter required for rest of computation *)
+  let with_state' (f:w -> 'b*w) (g:'b -> 'a m) : 'a m = 
+    fun (h:'a -> w -> w) ->
+    fun (w:w) ->
+      let (b,w') = f w in
+      (g b) h w'
+
+  let mk_imperative_ops ops w0 = 
+
+    let ref_ = ref w0 in
+
+    (* some bug with ppx not working with local exceptions, so use
+       first class modules instead *)
+
+    let run_imperative (type a) (f:a m) : a = 
+      let f : (a -> ww) -> ww = f in
+      let module M = struct exception E of a end in
+      (* a -> ww is the type of the "rest of the computation" *)
+      let a_ww : a -> ww = fun a w -> ref_:=w; raise (M.E a) in
+      try ignore(f a_ww (!ref_)); failwith __LOC__
+      with M.E a -> a
+    in
+
+    let run = { run=run_imperative } in
+
+    ops_to_imperative run ops
+
+end
+
+
+
+(* steppable -------------------------------------------------------- *)
+
+
+(* FIXME would like another version which is iso to w->w, but with an
+   explicit step operation
+
+(* explicit state passing, steppable, final result via state;
+   errors via exception *)
+
+(* NOTE we aim for ('a,'m) m_ = ('a,steppable) m_ = ('a -> steppable) -> steppable)*)
+
+
+(* sort of co-inductive object *)
+type steppable = {step:fs_t -> fs_t * steppable }
+
+
+(* following could be parameters *)
+let with_fs : (fs_t -> fs_t) -> (unit -> 'm) -> 'm = 
+  fun f k -> { step=(fun s -> f s, k ()) }
+
+
+let _ = with_fs
+
+
+let with_fs': (fs_t -> 'a * fs_t) -> ('a -> 'm) -> 'm = 
+  fun f k -> 
+    { step=(fun s -> 
+          f s |> fun (a,s) ->
+          s,k a) }
+
+
+let _ = with_fs'
+
+(* 'a comp is ('a -> 'm ) -> 'm  where 'm represents the computation *) 
+
+let ( >>= ) x f = fun k -> (x (fun rx -> f rx k))
+
+let bind f x = fun k -> (x (fun rx -> f rx k))
+
+let _ = bind
+
+let return x k = k x
+
+
+type ('e,'m) extra_ops = {
+  err: ' a. 'e -> ('a,'m)m_;
+  new_did: unit -> (did,'m)m_;
+  new_fid: unit -> (fid,'m)m_;
+}
+
+
+let extra = {
+  err=(fun e k -> {step=(fun s -> raise (E e)) });
+  new_did=(fun () k -> {step=(
+      fun s -> 
+        let s' = { s with max_did=(inc_did s.max_did) }in
+        let did = s'.max_did in
+        (s',k did))});
+  new_fid=(fun () k -> {step=(
+      fun s -> 
+        let s' = { s with max_fid=(inc_fid s.max_fid) } in
+        let fid = s'.max_fid in
+        (s',k fid))});
+}
+
+
+
+*)
 
 
 (* extra ops -------------------------------------------------------- *)
@@ -154,110 +285,4 @@ let dirname_basename path =
   assert(Tjr_string.contains ~sub:"/" path);
   Tjr_string.split_on_last ~sub:"/" path
 
-
-
-(* old -------------------------------------------------------------- *)
-
-
-
-(*
-
-
-
-    let root= ops.root in
-    let unlink=(fun ~parent ~name -> run.run @@ ops.unlink ~parent ~name) in
-    let mkdir=(fun ~parent ~name -> run.run @@ ops.mkdir ~parent ~name) in
-    let opendir=(fun p -> run.run @@ ops.opendir p) in
-    let readdir=(fun dh -> run.run @@ ops.readdir dh) in
-    let closedir=(fun dh -> run.run @@ ops.closedir dh) in
-    let create=(fun ~parent ~name -> run.run @@ ops.create ~parent ~name) in
-    let open_=(fun path -> run.run @@ ops.open_ path) in
-    let pread=(fun ~fd ~foff ~length ~buffer ~boff -> run.run @@ ops.pread ~fd ~foff ~length ~buffer ~boff) in
-    let pwrite=(fun ~fd ~foff ~length ~buffer ~boff -> run.run @@ ops.pwrite ~fd ~foff ~length ~buffer ~boff) in
-    let close=(fun fd -> run.run @@ ops.close fd) in
-    let truncate=(fun ~path ~length -> run.run @@ ops.truncate ~path ~length) in
-    let stat_file=(fun path -> run.run @@ ops.stat_file path) in
-    let kind=(fun path -> run.run @@ ops.kind path) in
-    let reset=(fun () -> run.run @@ ops.reset ()) in
-    k ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
-      ~create ~open_ ~pread ~pwrite ~close ~truncate 
-      ~stat_file ~kind ~reset
-
-
-module type S = sig
-
-  type path
-
-  type dh (* dir_handle, for reading dirs *)
-
-  type fd
-
-  type buffer
-
-end
-*)
-
-
-(*
-module Make = functor (S:S) -> struct
-  module S = S
-  open S
-
-  (* FIXME surely unlink just takes a path? *)
-  type unlink = parent:path -> name:string -> unit m
-  type mkdir = parent:path -> name:string -> unit m
-  type opendir = path -> dh m
-
-  (* . and .. are returned *)
-  type readdir = dh -> (string list * is_finished) m
-  type closedir = dh -> unit m 
-  type create = parent:path -> name:string -> unit m
-  type open_ = path -> fd m
-  type pread = fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m 
-  type pwrite = fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m 
-  type close = fd -> unit m
-  type truncate = path:path -> length:int -> unit m
-  type stat_file = path -> file_stat m
-  type kind = path -> st_kind m
-  type reset = unit -> unit m
-
-  
-  type ops = {
-    root:path;
-    unlink:unlink;
-    mkdir:mkdir;
-    opendir:opendir;
-    readdir:readdir;
-    closedir:closedir;
-    create:create;
-    open_:open_;
-    pread:pread;
-    pwrite:pwrite;
-    close:close;
-    truncate:truncate;
-    stat_file:stat_file;
-    kind:kind;
-    reset:reset;
-  }
-
-
-(*    ignore {
-      unlink;
-      mkdir;
-      opendir;
-      readdir;
-      closedir;
-      create;
-      open_;
-      pread;
-      pwrite;
-      close;
-      truncate;
-      stat_file;
-      kind;
-      reset;
-    };
-*)
-end
-*)
 

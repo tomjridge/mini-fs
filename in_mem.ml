@@ -50,13 +50,26 @@ module Set_string = Set.Make(
 
 type id = Fid of fid | Did of did
 
+
 type dir = id Map_string.t
+
 
 type fs_t = {
   files: string Map_fid.t;
   max_fid: fid;
   dirs: dir Map_did.t;
   max_did: did;
+}
+
+
+let empty_dir = Map_string.empty
+
+
+let init_fs = {
+  files=Map_fid.empty;
+  max_fid=fid0;
+  dirs=(Map_did.empty |> Map_did.add root_did empty_dir);
+  max_did=inc_did root_did;
 }
 
 
@@ -78,42 +91,22 @@ type buffer = bytes  (* or cstruct? *)
 
 (* monad ops -------------------------------------------------------- *)
 
-(* explicit state passing, steppable, final result via state;
-   errors via exception *)
 
-(* NOTE we aim for ('a,'m) m_ = ('a,steppable) m_ = ('a -> steppable) -> steppable)*)
+module X_ = Mk_state_passing(struct type w = fs_t end)
+let ( >>= ) = X_.( >>= )
+let return = X_.return
 
-
-(* sort of co-inductive object *)
-type steppable = {step:fs_t -> fs_t * steppable }
 
 (* following could be parameters *)
-let with_fs : (fs_t -> fs_t) -> (unit -> 'm) -> 'm = 
-  fun f k -> { step=(fun s -> f s, k ()) }
+let with_fs (f:fs_t -> fs_t) : (unit,'m)m_ = 
+  X_.with_state f (return ())
 
-let _ = with_fs
-
-let with_fs': (fs_t -> 'a * fs_t) -> ('a -> 'm) -> 'm = 
-  fun f k -> 
-    { step=(fun s -> 
-          f s |> fun (a,s) ->
-          s,k a) }
-
-let _ = with_fs'
-
-(* 'a comp is ('a -> 'm ) -> 'm  where 'm represents the computation *) 
-
-let ( >>= ) x f = fun k -> (x (fun rx -> f rx k))
-
-let bind f x = fun k -> (x (fun rx -> f rx k))
-
-let _ = bind
-
-let return x k = k x
+let with_fs' (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
+  X_.with_state' f (fun a -> return a)
 
 
 type ('e,'m) extra_ops = {
-  err: ' a. 'e -> ('a,'m)m_;
+  err: 'a. 'e -> ('a,'m)m_;
   new_did: unit -> (did,'m)m_;
   new_fid: unit -> (fid,'m)m_;
 }
@@ -122,9 +115,11 @@ type ('e,'m) extra_ops = {
 
 (* fs ops ----------------------------------------------------------- *)
 
+
 let is_fid = function
   | Fid _ -> true
   | _ -> false
+
 
 let is_did x = not (is_fid x)
 
@@ -333,20 +328,44 @@ let _ = mk_ops  (* NOTE the error cases are captured in the type *)
 
 exception E of [ `No_such_entry | `S of string ]
 
+type w = fs_t
+type ww = w -> w
+type 'a m = ('a -> ww) -> ww
+let err e = 
+  fun (g: 'a -> ww) ->
+  fun w ->
+    raise (E e)
 
-let extra = {
-  err=(fun e k -> {step=(fun s -> raise (E e)) });
-  new_did=(fun () k -> {step=(
-      fun s -> 
-        let s' = { s with max_did=(inc_did s.max_did) }in
-        let did = s'.max_did in
-        (s',k did))});
-  new_fid=(fun () k -> {step=(
-      fun s -> 
-        let s' = { s with max_fid=(inc_fid s.max_fid) } in
-        let fid = s'.max_fid in
-        (s',k fid))});
-}
+let new_did () = 
+  fun (g:did -> ww) ->
+  fun w ->
+    let w' = { w with max_did=(inc_did w.max_did) } in
+    let did = w'.max_did in
+    g did w'
+
+let new_fid () =
+  fun (g:fid -> ww) ->
+  fun w ->
+    let w' = { w with max_fid=(inc_fid w.max_fid) } in
+    let fid = w'.max_fid in
+    g fid w'
+      
+let extra = { err; new_did; new_fid }
 
 
-let ops = mk_ops ~extra  (* NOTE the error cases are captured in the type *)
+let ops = mk_ops ~extra ()  (* NOTE the error cases are captured in the type *)
+
+let _ = ops
+
+
+(* imperative ------------------------------------------------------- *)
+
+module W_ = struct
+  type w = fs_t
+end
+
+module Mk_state_passing_ = Mk_state_passing(W_)
+
+let ref_ = ref init_fs
+
+let imperative_ops = Mk_state_passing_.mk_imperative_ops ops init_fs
