@@ -2,9 +2,27 @@ open Minifs
 
 (* in-mem impl ------------------------------------------------------ *)
 
-type fid(* = int *)
-type did(* = int *)
-
+module Fid : sig
+  type fid
+  val fid0 : fid
+  val inc_fid : fid -> fid
+end = struct
+  type fid=int
+  let fid0=0
+let  inc_fid x = x+1
+end
+include Fid
+ 
+module Did : sig
+  type did 
+  val root_did : did
+  val inc_did : did -> did
+end = struct
+  type did = int
+  let root_did = 0
+  let inc_did x = x+1 
+end
+include Did
 
 module Map_fid = Map.Make(
   struct 
@@ -32,10 +50,13 @@ module Set_string = Set.Make(
 
 type id = Fid of fid | Did of did
 
+type dir = id Map_string.t
 
 type fs_t = {
   files: string Map_fid.t;
-  dirs: id Map_string.t Map_did.t;
+  max_fid: fid;
+  dirs: dir Map_did.t;
+  max_did: did;
 }
 
 
@@ -59,6 +80,9 @@ type buffer = bytes  (* or cstruct? *)
 
 (* explicit state passing, steppable, final result via state;
    errors via exception *)
+
+(* NOTE we aim for ('a,'m) m_ = ('a,steppable) m_ = ('a -> steppable) -> steppable)*)
+
 
 (* sort of co-inductive object *)
 type steppable = {step:fs_t -> fs_t * steppable }
@@ -89,21 +113,10 @@ let return x k = k x
 
 
 type ('e,'m) extra_ops = {
-  err: ' a. 'e -> ('a -> 'm) -> 'm;
-  new_did: unit -> (did -> 'm) -> 'm;
-  new_fid: unit -> (fid -> 'm) -> 'm;
+  err: ' a. 'e -> ('a,'m)m_;
+  new_did: unit -> (did,'m)m_;
+  new_fid: unit -> (fid,'m)m_;
 }
-
-
-(*
-let err x : ('a -> 'm) -> 'm = fun k -> raise x
-
-
-
-let new_did () : (did -> 'm) -> 'm = err "FIXME"
-
-let new_fid () : (fid -> 'm) -> 'm = err "FIXME"
-*)
 
 
 
@@ -118,17 +131,55 @@ let is_did x = not (is_fid x)
 
 let mk_ops ~extra () = 
 
-  let resolve_path : path -> ((did * id option -> 'm)) -> 'm = fun p -> failwith "" in
+  let resolve_did did = 
+    with_fs' (fun s ->
+        (Map_did.find did s.dirs,s))  (* ASSUME did valid *)
+  in
+
+  let resolve_name ~dir ~name : id option = 
+    match Map_string.find name dir with
+    | exception _ -> None
+    | x -> Some x
+  in
+
+  let rec resolve_names_1 ~parent_id ~names = 
+    resolve_did parent_id >>= fun parent -> resolve_names_2 ~parent_id ~parent ~names 
+  and resolve_names_2 ~parent_id ~parent ~names = 
+    match names with
+    | [] -> return @@ (parent_id,None)
+    | name::names -> 
+      begin
+        resolve_name ~dir:parent ~name |> function
+        | None -> (
+            match names with
+            | [] -> return @@ (parent_id,None)
+            | _ -> extra.err @@ `S __LOC__)
+        | Some (Fid fid) -> (
+            match names with 
+            | [] -> return @@ (parent_id,Some (Fid fid))
+            | _ -> extra.err @@ `S __LOC__)
+        | Some (Did did) -> (
+            match names with
+            | [] -> return @@ (parent_id,Some (Did did))
+            | _ -> resolve_names_1 ~parent_id:did ~names)
+      end
+  in
 
 
-  let resolve_dir_path (path:path) : (did -> 'm) -> 'm = 
+  let resolve_path : path -> (did * id option,'m) m_ = fun p -> 
+    String.split_on_char '/' p |> fun names ->
+    resolve_names_1 ~parent_id:root_did ~names
+  in
+
+
+  let resolve_dir_path (path:path) : (did,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Did did)) -> return did 
     | _ -> extra.err (`S __LOC__)
   in
 
 
-  let resolve_file_path (path:path) : (fid -> 'm) -> 'm = 
+  let resolve_file_path (path:path) : (fid,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Fid fid)) -> return fid 
     | _ -> extra.err (`S __LOC__)
@@ -153,7 +204,7 @@ let mk_ops ~extra () =
   in
 
 
-  let mkdir ~parent ~name : (unit -> 'm) -> 'm = 
+  let mkdir ~parent ~name : (unit,'m) m_ = 
     resolve_dir_path parent >>= fun parent ->
     extra.new_did () >>= fun (did:did) -> 
     with_fs 
@@ -172,7 +223,11 @@ let mk_ops ~extra () =
 
   let opendir path = 
     resolve_dir_path path >>= fun did ->
-    ["FIXME"] |> mk_dh ~did |> return 
+    with_fs' @@ fun s ->
+    s.dirs |> fun dirs ->
+    Map_did.find did dirs |> fun dir ->
+    Map_string.bindings dir |> List.map fst |> fun names ->
+    (mk_dh ~did names,s)      
   in
 
 
@@ -182,7 +237,7 @@ let mk_ops ~extra () =
   let closedir dh = return () in (* FIXME should we record which rd are valid? ie not closed *)
 
 
-  let create ~parent ~name : (unit -> 'm) -> 'm = 
+  let create ~parent ~name : (unit,'m) m_ = 
     resolve_dir_path parent >>= fun parent ->
     extra.new_fid () >>= fun (fid:fid) -> 
     with_fs 
@@ -251,7 +306,7 @@ let mk_ops ~extra () =
   in
 
 
-  let kind path : (st_kind -> 'm) -> 'm = 
+  let kind path : (st_kind,'m) m_ = 
     resolve_path path >>= fun (_,id) ->    
     id |> function 
     | None -> extra.err @@ `No_such_entry
@@ -283,13 +338,13 @@ let extra = {
   err=(fun e k -> {step=(fun s -> raise (E e)) });
   new_did=(fun () k -> {step=(
       fun s -> 
-        let s' = s in
-        let did = failwith "FIXME" in
+        let s' = { s with max_did=(inc_did s.max_did) }in
+        let did = s'.max_did in
         (s',k did))});
   new_fid=(fun () k -> {step=(
       fun s -> 
-        let s' = s in
-        let fid = failwith "FIXME" in
+        let s' = { s with max_fid=(inc_fid s.max_fid) } in
+        let fid = s'.max_fid in
         (s',k fid))});
 }
 

@@ -39,6 +39,8 @@ let wf_ops (type path dh fd buffer t m)
   let reset : unit -> (unit,m) m_ = reset in
   true[@@ocaml.warning "-26"]
 
+let _ = wf_ops
+
 let mk_ops 
     ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
   =
