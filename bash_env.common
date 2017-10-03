@@ -41,7 +41,7 @@ ocamldep="ocamlfind ocamldep $PKGS"
 
 # mls ----------------------------------------
 
-mls="tjr_monad.ml minifs.ml in_mem.ml mini_unix.ml mini_fuse.ml" # mini_nfs.ml"
+mls="mini_pervasives.ml tjr_monad.ml minifs.ml mini_nfs.ml mini_log.ml in_mem.ml mini_unix.ml mini_fuse.ml"
 # mls="tjr_monad.ml minifs.ml mini_unix.ml"
 
 cmos="${mls//.ml/.cmo}"
@@ -155,7 +155,7 @@ function clean() {
 
 function install() {
     # assumes packing
-	  ocamlfind install $libname META $libname.{cmi,cmo,cma}
+	  ocamlfind install $libname META $libname.{cmi,cmo,cma,cmxa,a} 
     # FIXME how to install cmt file for tjr_btree?
 }
 

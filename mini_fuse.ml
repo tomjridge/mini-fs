@@ -9,19 +9,20 @@ open Fuse
 
 open Minifs
 
+(* FIXME wrap operations so they return unix_error *)
 
-let default_stats = LargeFile.stat "."
-
+let default_file_stats = LargeFile.stat "tmp.txt"  (* ASSUMES this file is present *)
 
 let default_file_stats st_size = 
-  { default_stats with 
+  { default_file_stats with 
     st_nlink = 1;
     st_kind=Unix.S_REG;
     st_perm = 0o640;
     st_size
   }
 
-let default_dir_stats = default_stats
+let default_dir_stats = LargeFile.stat "."
+
 
 
 
@@ -103,32 +104,51 @@ let mk_fuse_ops (type path)
   in
 
 
-
   (* stat_file and kind combined in following *)
   let getattr path0 = 
+    print_endline @@ path0 ^ __LOC__;
     path0 |> string_to_path |> fun path ->
+    print_endline __LOC__;
+    (* FIXME kind needs to be wrapped so it throws a unix_error *)
     path |> kind |> function
-    | `File -> 
+    | `File -> (
+      print_endline __LOC__;
       stat_file path |> fun x -> 
-      x.sz |> Int64.of_int |> default_file_stats
-    | `Dir -> default_dir_stats
-    | _ -> raise @@ Unix_error (ENOENT,"getattr" ^ __LOC__,path0)
+      x.sz |> Int64.of_int |> default_file_stats)
+    | `Dir -> (
+      print_endline __LOC__;
+      default_dir_stats)
+    | _ -> (
+      print_endline __LOC__;
+      raise @@ Unix_error (ENOENT,"getattr" ^ __LOC__,path0))
   in
 
 
   { default_operations with 
-    unlink;
-    mkdir;    
-    readdir;
-    fopen;
-    read;
-    write;
-    truncate;
-    getattr;
+	  init = (fun () -> Printf.printf "filesystem started\n%!");
+   unlink;
+   mkdir;    
+   readdir;
+   fopen;
+	 mknod = (fun path mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* FIXME gets called instead of fopen to create a file *)
+   read;
+   write;
+   truncate;
+   getattr;
   } [@@ocaml.warning "-26"]
 
 
 let _ = mk_fuse_ops
+
+let in_mem_fuse_ops = In_mem.(
+    let path_to_string = fun s -> s in
+    let string_to_path = fun s -> s in
+    mk_fuse_ops
+      ~path_to_string
+      ~string_to_path
+      ~dirname_basename
+      ~run 
+      ~ops:(Mini_log.mk_logged_ops In_mem.ops))
 
 (* TODO 
 let unix_fuse_ops = 

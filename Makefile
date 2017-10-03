@@ -9,7 +9,10 @@ libname:=$(shell source bash_env.sh && echo $${libname})#
 all:
 	$$ocamlc -c $$mls
 	mk_cma
+	$$ocamlopt -c $$mls
+	mk_cmxa
 	$(MAKE) install
+	$(MAKE) -C bin
 
 install:
 	mk_meta

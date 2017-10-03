@@ -1,5 +1,5 @@
 (* mini network filesystem ------------------------------------------ *)
-open Tjr_monad
+(* open Tjr_monad *)
 open Minifs
 
 (* messages *)
@@ -12,18 +12,18 @@ type msg_buffer = string
 
 open Bin_prot.Std
 
-type length = int[@@deriving bin_io] (* FIXME in following *)
-type offset = int[@@deriving bin_io]
+type length = int[@@deriving bin_io, yojson] (* FIXME in following *)
+type offset = int[@@deriving bin_io, yojson]
 
 (* FIXME *)
-type path = Path of string [@@deriving bin_io]
-type dh = Dh of int [@@deriving bin_io]
-type fd = Fd of int [@@deriving bin_io]
+type path = string [@@deriving bin_io, yojson]
+type dh = int [@@deriving bin_io, yojson]
+type fd = int [@@deriving bin_io, yojson]
 
-type data = string[@@deriving bin_io]
-type file_stat = int [@@deriving bin_io]
+type data = string[@@deriving bin_io, yojson]
+type file_stat = int [@@deriving bin_io, yojson]
 
-type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io]
+type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]
 
 type msg_from_client = 
   | Unlink of path * string
@@ -40,7 +40,7 @@ type msg_from_client =
   | Stat_file of path
   | Kind of path 
   | Reset
-[@@deriving bin_io]
+[@@deriving bin_io, yojson]
                
 
 type msg_from_server' = 
@@ -51,7 +51,7 @@ type msg_from_server' =
   | Open' of fd
   | Pread' of data
   | Stat_file' of file_stat
-  | Kind' of st_kind [@@deriving bin_io]
+  | Kind' of st_kind [@@deriving bin_io, yojson]
 
 
 (* or just use error in monad? *)
@@ -60,6 +60,8 @@ type msg_from_server = Msg of msg_from_server' | Error of string
 type 'a m = ('a,string) Tjr_monad.m
 
 (* construct message, send, recv *)
+
+(*
 let mk_msg_ops (type t) 
     ~(call:msg_from_client -> msg_from_server' m)
     ~data_length
@@ -119,3 +121,4 @@ let mk_msg_ops (type t)
     ~stat_file ~kind ~reset);
   ()
 
+*)

@@ -178,7 +178,7 @@ module Mk_state_passing = functor(W: sig type w end) -> struct
 
     let run = { run=run_imperative } in
 
-    ops_to_imperative run ops
+    fun k -> k ~run ~ops:(ops_to_imperative run ops)
 
 end
 

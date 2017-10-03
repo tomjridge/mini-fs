@@ -1,0 +1,10 @@
+* Running fuse filesystem, mounting
+
+Run with:
+
+# -f ~ foreground; 1048756 = 2^20, 1M; allow_other ~ needed if run as
+# user, but losetup as root
+
+# -o max_write=1048576; /mnt/fuse ~ where we want the mount to appear
+
+./xxx -o allow_other /mnt/fuse

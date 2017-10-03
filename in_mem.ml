@@ -1,3 +1,4 @@
+open Mini_pervasives
 open Minifs
 
 (* in-mem impl ------------------------------------------------------ *)
@@ -85,8 +86,9 @@ type fd = fid
 type path = string
 
 
-type buffer = bytes  (* or cstruct? *)
 
+(* type buffer = bytes  (* or cstruct? *) *)
+type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 
 
 (* monad ops -------------------------------------------------------- *)
@@ -266,22 +268,23 @@ let mk_ops ~extra () =
     fid |> mk_fd |> return 
   in
 
-  let pread ~fd ~foff ~length ~buffer ~boff = 
+  let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     let fid = fd in
     with_fs' @@ fun s ->
     s.files |> fun map ->
     Map_fid.find fid map |> fun (contents:string) ->
-    Bytes.blit_string contents foff buffer boff length;
+    blit_string_to_bigarray ~src:contents ~soff:foff ~len:length ~dst:buffer ~doff:boff;
     (length,s)
   in
 
-  let pwrite ~fd ~foff ~length ~buffer ~boff = 
+  let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     let fid = fd in
     with_fs' @@ fun s ->
     s.files |> fun files ->
     Map_fid.find fid files |> fun contents ->
     let contents = Bytes.of_string contents in
-    Bytes.blit buffer boff contents foff length;  (* FIXME extend contents *)
+    blit_bigarray_to_bytes ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
+    (* FIXME extend contents *)
     Bytes.to_string contents |> fun contents ->
     Map_fid.add fid contents files |> fun files ->
     (length,{s with files})
@@ -380,4 +383,6 @@ module Mk_state_passing_ = Mk_state_passing(W_)
 
 let ref_ = ref init_fs
 
-let imperative_ops = Mk_state_passing_.mk_imperative_ops ops ref_
+let (run,imperative_ops) = 
+  Mk_state_passing_.mk_imperative_ops ops ref_ @@ fun ~run ~ops -> (run,ops)
+
