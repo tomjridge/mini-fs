@@ -6,10 +6,17 @@ open Mini_nfs
 let log (c:msg_from_client) : ('a,'m) m_ -> ('a,'m) m_ = 
   fun (x : ('a,'m) m_) ->
   fun (k : 'a -> 'm) ->
-    let k = fun a ->
-      c |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
-      |> print_endline;
-      k a
+    let k = 
+      fun a ->
+        try
+          c |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
+          |> print_endline;
+          let r = k a in
+          r 
+        with e -> (
+            Printexc.to_string e |> print_endline;
+            raise e)
+          
     in
     x k
 

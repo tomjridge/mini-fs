@@ -20,7 +20,7 @@ module Did : sig
   val inc_did : did -> did
 end = struct
   type did = int
-  let root_did = 0
+  let root_did = 1234
   let inc_did x = x+1 
 end
 include Did
@@ -126,7 +126,7 @@ let is_fid = function
 let is_did x = not (is_fid x)
 
 
-let mk_ops ~extra () = 
+let mk_ops ~extra = 
 
   let resolve_did did = 
     with_fs' (fun s ->
@@ -150,11 +150,11 @@ let mk_ops ~extra () =
         | None -> (
             match names with
             | [] -> return @@ (parent_id,None)
-            | _ -> extra.err @@ `S __LOC__)
+            | _ -> extra.err @@ `Error_no_entry name) (* FIXME give full path *)
         | Some (Fid fid) -> (
             match names with 
             | [] -> return @@ (parent_id,Some (Fid fid))
-            | _ -> extra.err @@ `S __LOC__)
+            | _ -> extra.err @@ `Error_not_directory)
         | Some (Did did) -> (
             match names with
             | [] -> return @@ (parent_id,Some (Did did))
@@ -164,6 +164,7 @@ let mk_ops ~extra () =
 
 
   let resolve_path : path -> (did * id option,'m) m_ = fun p ->     
+    print_endline @@ p ^ " " ^ __LOC__;
     String.split_on_char '/' p |> fun names ->
     (* remove head "" since paths are absolute, and any trailing "" *)
     assert(List.hd names = "");
@@ -180,14 +181,14 @@ let mk_ops ~extra () =
   let resolve_dir_path (path:path) : (did,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Did did)) -> return did 
-    | _ -> extra.err (`S __LOC__)
+    | _ -> extra.err (`Error_not_directory)
   in
 
 
   let resolve_file_path (path:path) : (fid,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Fid fid)) -> return fid 
-    | _ -> extra.err (`S __LOC__)
+    | _ -> extra.err (`Error_not_file)
   in
 
   let root : path = "/" in
@@ -247,15 +248,22 @@ let mk_ops ~extra () =
 
 
   let create ~parent ~name : (unit,'m) m_ = 
+    print_endline @@ "# create " ^":" ^parent ^":" ^name ^":" ^__LOC__;
     resolve_dir_path parent >>= fun parent ->
+    print_endline __LOC__;
     extra.new_fid () >>= fun (fid:fid) -> 
+    print_endline __LOC__;
     with_fs 
       (fun s -> 
          s.dirs |> fun dirs ->
          Map_did.find parent dirs |> fun pdir ->
          Map_string.add name (Fid fid) pdir |> fun pdir ->
          Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs})
+         {s with dirs} |> fun s ->
+         s.files |> fun files -> 
+         Map_fid.add fid "" files |> fun files ->
+         print_endline __LOC__;
+         {s with files})
     >>= fun () -> return () (* fid *)
   in
 
@@ -319,7 +327,7 @@ let mk_ops ~extra () =
   let kind path : (st_kind,'m) m_ = 
     resolve_path path >>= fun (_,id) ->    
     id |> function 
-    | None -> extra.err @@ `No_such_entry
+    | None -> extra.err @@ `Error_no_entry path
     | Some x -> x |> function
       | Fid fid -> return (`File:st_kind)
       | Did did -> return (`Dir:st_kind)
@@ -341,7 +349,15 @@ let mk_ops ~extra () =
 let _ = mk_ops  (* NOTE the error cases are captured in the type *)
 
 
-exception E of [ `No_such_entry | `S of string ]
+type exn_ = [ 
+    | `Error_no_entry of string 
+    | `Error_not_directory
+    | `Error_not_file
+] [@@deriving yojson]
+
+
+exception E of exn_
+
 
 type w = fs_t
 type ww = w -> w
@@ -368,7 +384,7 @@ let new_fid () =
 let extra = { err; new_did; new_fid }
 
 
-let ops = mk_ops ~extra ()  (* NOTE the error cases are captured in the type *)
+let ops = mk_ops ~extra  (* NOTE the error cases are captured in the type *)
 
 let _ = ops
 

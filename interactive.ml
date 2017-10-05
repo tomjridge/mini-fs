@@ -37,13 +37,17 @@ let _ =
 (* avoid fuse in top-level *)
 
 #require "tjr_lib";;
+#require "ppx_bin_prot";;
 
 (* extunix,extlib,Fuse,tjr_lib,core,ppx_bin_prot *)
 
-#mod_use "minifs.ml";;
-#mod_use "in_mem.ml";;
+#mod_use "mini_pervasives.ml";;
 
-open In_mem;;
+#mod_use "minifs.ml";;
+
+#mod_use "mini_in_mem.ml";;
+
+open Mini_in_mem;;
 
 let x = Minifs.dest_imperative_ops imperative_ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset -> (root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)
 
@@ -59,11 +63,17 @@ let _ = Minifs.readdir' ~ops:imperative_ops "/tmp"
 
 let _ = (!ref_).dirs |> Map_did.bindings;;
 
-let dir = (!ref_).dirs |> Map_did.bindings |> fun [(_,dir)] -> dir
+let dir = (!ref_).dirs |> Map_did.bindings |> fun ((_,dir)::_) -> dir
 
 let _ = Map_string.bindings dir
 
 let _ = (!ref_).files |> Map_fid.bindings;;
+
+let _ = create ~parent:"/" ~name:"tmp2"
+
+let _ = Minifs.readdir' ~ops:imperative_ops "/"
+
+let _ = stat_file "/tmp2"
 
 
 (*

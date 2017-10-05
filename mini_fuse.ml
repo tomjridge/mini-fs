@@ -27,8 +27,6 @@ let default_dir_stats = LargeFile.stat "."
 
 
 let mk_fuse_ops (type path) 
-    ~(path_to_string:path->string) ~(string_to_path:string->path) 
-    ~(dirname_basename: path -> path * string)
     ~run ~ops 
   = 
 
@@ -37,12 +35,12 @@ let mk_fuse_ops (type path)
 
 
   let unlink path = 
-    path |> string_to_path |> dirname_basename |> fun (parent,name) -> 
+    path |> dirname_basename |> fun (parent,name) -> 
     unlink ~parent ~name
   in
 
   let mkdir path _perms = 
-    path |> string_to_path |> dirname_basename |> fun (parent,name) -> 
+    path |> dirname_basename |> fun (parent,name) -> 
     mkdir ~parent ~name
   in
 
@@ -52,7 +50,7 @@ let mk_fuse_ops (type path)
 
   let readdir' = readdir' ~ops in
   let readdir path _ = 
-    path |> string_to_path |> fun path ->
+    path |> fun path ->
     readdir' path 
   in
 
@@ -60,23 +58,26 @@ let mk_fuse_ops (type path)
 
   (* FIXME tricky combining create with fopen *)
   let fopen (path:string) flags = 
-    path |> string_to_path |> fun path ->
+    print_endline @@ "fopen "^ path ^ " " ^__LOC__;
     Unix.(List.mem O_CREAT flags) |> function
     | true -> 
+      print_endline __LOC__;
       (* may be creating a file *)
       dirname_basename path |> fun (parent,name) ->
       create ~parent ~name;
+      print_endline __LOC__;
       None
     | false -> 
+      print_endline __LOC__;
       path |> kind |> function
       | `File -> None
-      | _ -> raise @@ Unix_error (ENOENT,"open",path|>path_to_string)
+      | _ -> raise @@ Unix_error (ENOENT,"open",path)
   in
 
 
   (* really worth making sure that buffer types match, or abstracting over *)
   let read path buf ofs _ : int = 
-    path |> string_to_path |> fun path ->
+    path |> fun path ->
     ofs |> Int64.to_int |> fun ofs -> (* FIXME ofs should be int64 *)
     let buf_size = Bigarray.Array1.dim buf in
     open_ path |> fun fd ->  (* FIXME cache fds in LRU? *)
@@ -87,7 +88,7 @@ let mk_fuse_ops (type path)
 
 
   let write path buf foff _ : int = 
-    path |> string_to_path |> fun path ->
+    path |> fun path ->
     foff |> Int64.to_int |> fun foff -> (* FIXME ofs should be int64 *)
     let buf_size = Bigarray.Array1.dim buf in
     open_ path |> fun fd ->
@@ -98,7 +99,7 @@ let mk_fuse_ops (type path)
 
 
   let truncate path length = 
-    path |> string_to_path |> fun path ->
+    path |> fun path ->
     length |> Int64.to_int |> fun length ->  (* FIXME *)
     truncate ~path ~length
   in
@@ -107,7 +108,7 @@ let mk_fuse_ops (type path)
   (* stat_file and kind combined in following *)
   let getattr path0 = 
     print_endline @@ path0 ^ __LOC__;
-    path0 |> string_to_path |> fun path ->
+    path0 |> fun path ->
     print_endline __LOC__;
     (* FIXME kind needs to be wrapped so it throws a unix_error *)
     path |> kind |> function
@@ -140,15 +141,35 @@ let mk_fuse_ops (type path)
 
 let _ = mk_fuse_ops
 
-let in_mem_fuse_ops = In_mem.(
-    let path_to_string = fun s -> s in
-    let string_to_path = fun s -> s in
+
+module Logged_in_mem_with_unix_errors = struct
+
+  open Mini_in_mem
+
+  let err e = fun (g: 'a -> ww) ->
+    fun w ->
+      (e |> exn__to_yojson |> Yojson.Safe.pretty_to_string |> print_endline);
+      print_endline __LOC__;
+      match e with
+      | `Error_no_entry _ -> raise @@ Unix_error(ENOENT, __LOC__,"")
+      | `Error_not_directory -> raise @@ Unix_error(ENOTDIR, __LOC__,"")
+      | `Error_not_file -> raise @@ Unix_error(ENOENT, __LOC__,"") 
+  (* FIXME Error_not_file could be a dir, in which case raise EISDIR *)
+
+  let extra = { err; new_did; new_fid }
+
+  let ops = mk_ops ~extra
+
+  let ops = Mini_log.mk_logged_ops ~ops
+end
+
+    
+
+
+let in_mem_fuse_ops = 
     mk_fuse_ops
-      ~path_to_string
-      ~string_to_path
-      ~dirname_basename
-      ~run 
-      ~ops:(Mini_log.mk_logged_ops In_mem.ops))
+      ~run:Mini_in_mem.run 
+      ~ops:Logged_in_mem_with_unix_errors.ops
 
 (* TODO 
 let unix_fuse_ops = 

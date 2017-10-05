@@ -1,5 +1,6 @@
 (* mini network filesystem ------------------------------------------ *)
 (* open Tjr_monad *)
+open Mini_pervasives
 open Minifs
 
 (* messages *)
@@ -16,7 +17,7 @@ type length = int[@@deriving bin_io, yojson] (* FIXME in following *)
 type offset = int[@@deriving bin_io, yojson]
 
 (* FIXME *)
-type path = string [@@deriving bin_io, yojson]
+(* type path = string [@@deriving bin_io, yojson] *)
 type dh = int [@@deriving bin_io, yojson]
 type fd = int [@@deriving bin_io, yojson]
 

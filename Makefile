@@ -14,6 +14,10 @@ all:
 	$(MAKE) install
 	$(MAKE) -C bin
 
+run: all
+	$(MAKE) -C bin run
+
+
 install:
 	mk_meta
 	-remove
@@ -23,4 +27,5 @@ install:
 clean:
 	clean
 	rm -f *.html
+	$(MAKE) -C bin clean
 

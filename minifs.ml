@@ -96,21 +96,22 @@ let wf_imperative_ops (type path dh fd buffer t)
 
 let ops_to_imperative run ops =
   dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+  let run f = try run.run f with e -> (Printexc.to_string e |> print_endline; raise e) in
   let root= root in
-  let unlink=(fun ~parent ~name -> run.run @@ unlink ~parent ~name) in
-  let mkdir=(fun ~parent ~name -> run.run @@ mkdir ~parent ~name) in
-  let opendir=(fun p -> run.run @@ opendir p) in
-  let readdir=(fun dh -> run.run @@ readdir dh) in
-  let closedir=(fun dh -> run.run @@ closedir dh) in
-  let create=(fun ~parent ~name -> run.run @@ create ~parent ~name) in
-  let open_=(fun path -> run.run @@ open_ path) in
-  let pread=(fun ~fd ~foff ~length ~buffer ~boff -> run.run @@ pread ~fd ~foff ~length ~buffer ~boff) in
-  let pwrite=(fun ~fd ~foff ~length ~buffer ~boff -> run.run @@ pwrite ~fd ~foff ~length ~buffer ~boff) in
-  let close=(fun fd -> run.run @@ close fd) in
-  let truncate=(fun ~path ~length -> run.run @@ truncate ~path ~length) in
-  let stat_file=(fun path -> run.run @@ stat_file path) in
-  let kind=(fun path -> run.run @@ kind path) in
-  let reset=(fun () -> run.run @@ reset ()) in
+  let unlink=(fun ~parent ~name -> run @@ unlink ~parent ~name) in
+  let mkdir=(fun ~parent ~name -> run @@ mkdir ~parent ~name) in
+  let opendir=(fun p -> run @@ opendir p) in
+  let readdir=(fun dh -> run @@ readdir dh) in
+  let closedir=(fun dh -> run @@ closedir dh) in
+  let create=(fun ~parent ~name -> run @@ create ~parent ~name) in
+  let open_=(fun path -> run @@ open_ path) in
+  let pread=(fun ~fd ~foff ~length ~buffer ~boff -> run @@ pread ~fd ~foff ~length ~buffer ~boff) in
+  let pwrite=(fun ~fd ~foff ~length ~buffer ~boff -> run @@ pwrite ~fd ~foff ~length ~buffer ~boff) in
+  let close=(fun fd -> run @@ close fd) in
+  let truncate=(fun ~path ~length -> run @@ truncate ~path ~length) in
+  let stat_file=(fun path -> run @@ stat_file path) in
+  let kind=(fun path -> run @@ kind path) in
+  let reset=(fun () -> run @@ reset ()) in
   assert(wf_imperative_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset);
   `Imperative_ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)  
 
@@ -280,7 +281,9 @@ let readdir' ~ops =
 
 (* following for strings *)
 let dirname_basename path = 
-  assert(Tjr_string.contains ~sub:"/" path);
-  Tjr_string.split_on_last ~sub:"/" path
+  ignore (Tjr_string.starts_with ~prefix:"/" path || failwith __LOC__);
+  Tjr_string.split_on_last ~sub:"/" path |> fun (p,c) -> 
+  (* the semantics is that dirname is an absolute path *)
+  (if p="" then "/" else p),c
 
 

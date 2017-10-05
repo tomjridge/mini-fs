@@ -1,4 +1,4 @@
-
+SHELL:=bash
 
 all: fuse_main.native
 
@@ -11,5 +11,8 @@ run: fuse_main.native
 	mkdir -p fuse_mount
 	./fuse_main.native -f -o allow_other ./fuse_mount
 
+
+clean: 
+	rm -f *.native a.out *.{cmi,cmx,o}
 
 FORCE:

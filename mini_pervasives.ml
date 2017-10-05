@@ -18,3 +18,9 @@ let blit_bigarray_to_bytes ~src ~soff ~len ~dst ~doff =
     Bytes.set dst (doff+i) (Bigarray.Array1.get src (soff+i));
     ()
   done
+
+
+(* fix this --------------------------------------------------------- *)
+open Bin_prot.Std
+type path = string [@@deriving bin_io, yojson]
+
