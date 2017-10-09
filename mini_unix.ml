@@ -1,3 +1,4 @@
+(*
 open Minifs
 
 (* to make integration with fuse easier; extunix supports this in module BA *)
@@ -204,3 +205,4 @@ let run = { run=run_imperative }
 let unix_imperative_ops = ops_to_imperative run unix_ops
 
 let readdir' = readdir' ~ops:unix_imperative_ops
+*)

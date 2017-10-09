@@ -9,7 +9,10 @@ fuse_main.native: FORCE
 
 run: fuse_main.native
 	mkdir -p fuse_mount
-	./fuse_main.native -f -o allow_other ./fuse_mount
+	./fuse_main.native -s -f -o allow_other ./fuse_mount 
+
+# -f is foreground
+# -s is single-threaded
 
 
 clean: 

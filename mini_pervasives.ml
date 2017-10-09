@@ -19,8 +19,10 @@ let blit_bigarray_to_bytes ~src ~soff ~len ~dst ~doff =
     ()
   done
 
+let thread_id () = Thread.(self () |> id)
 
-(* fix this --------------------------------------------------------- *)
+
+(* fix path --------------------------------------------------------- *)
 open Bin_prot.Std
 type path = string [@@deriving bin_io, yojson]
 

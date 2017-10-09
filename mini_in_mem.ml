@@ -94,23 +94,18 @@ type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Arr
 (* monad ops -------------------------------------------------------- *)
 
 
-module X_ = Mk_state_passing(struct type w = fs_t end)
-let ( >>= ) = X_.( >>= )
-let return = X_.return
+(* state passing with error *)
 
-
-(* following could be parameters *)
-let with_fs (f:fs_t -> fs_t) : (unit,'m)m_ = 
-  X_.with_state f (return ())
-
-let with_fs' (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
-  X_.with_state' f (fun a -> return a)
-
+type ('e,'w,'m) monad_ops = {
+  return: 'a. 'a -> ('a,'m)m_;
+  bind: 'a 'b. ('a,'m)m_ -> ('a -> ('b,'m)m_) -> ('b,'m)m_;
+  err: 'a. 'e -> ('a,'m)m_;
+}
 
 type ('e,'m) extra_ops = {
-  err: 'a. 'e -> ('a,'m)m_;
   new_did: unit -> (did,'m)m_;
   new_fid: unit -> (fid,'m)m_;
+  with_fs: 'a. (t -> 'a * t) -> ('a,'m)m_;  (* ASSUME-ed not to raise exception *)
 }
 
 
@@ -126,12 +121,20 @@ let is_fid = function
 let is_did x = not (is_fid x)
 
 
-let mk_ops ~extra = 
+(* logging, within the monad *)
+
+(* note the with_fs in the following forces 'm = ww *)
+let mk_ops ~monad_ops ~extra = 
+
+  let (bind,return,err) = (monad_ops.bind,monad_ops.return,monad_ops.err) in
+  let ( >>= ) = bind in
 
   let resolve_did did = 
-    with_fs' (fun s ->
-        (Map_did.find did s.dirs,s))  (* ASSUME did valid *)
+    extra.with_fs @@ fun s ->
+    (Map_did.find did s.dirs,s)  (* ASSUME did valid *)
   in
+
+  let _ = resolve_did in
 
   let resolve_name ~dir ~name : id option = 
     match Map_string.find name dir with
@@ -150,11 +153,11 @@ let mk_ops ~extra =
         | None -> (
             match names with
             | [] -> return @@ (parent_id,None)
-            | _ -> extra.err @@ `Error_no_entry name) (* FIXME give full path *)
+            | _ -> err @@ `Error_no_entry name) (* FIXME give full path *)
         | Some (Fid fid) -> (
             match names with 
             | [] -> return @@ (parent_id,Some (Fid fid))
-            | _ -> extra.err @@ `Error_not_directory)
+            | _ -> err @@ `Error_not_directory)
         | Some (Did did) -> (
             match names with
             | [] -> return @@ (parent_id,Some (Did did))
@@ -163,32 +166,38 @@ let mk_ops ~extra =
   in
 
 
-  let resolve_path : path -> (did * id option,'m) m_ = fun p ->     
-    print_endline @@ p ^ " " ^ __LOC__;
-    String.split_on_char '/' p |> fun names ->
-    (* remove head "" since paths are absolute, and any trailing "" *)
-    assert(List.hd names = "");
-    let names = List.tl names in
-    assert(names <> []);
-    let names = Tjr_list.(if last names = "" then butlast names else names) in
-    (* not sure about special casing root *)
+  let _ = resolve_names_1 in
+
+  let resolve_path : path -> (did * id option,'m) m_ = fun p -> 
+    extra.with_fs (fun s -> 
+        print_endline @@ "# resolve_path "^p ^ " l167";
+        String.split_on_char '/' p |> fun names ->
+        (* remove head "" since paths are absolute, and any trailing "" *)
+        assert(List.hd names = "");
+        let names = List.tl names in
+        assert(names <> []);
+        let names = Tjr_list.(if last names = "" then butlast names else names) in
+        (* not sure about special casing root *)
+        names,s) >>= fun names ->
     if names = [] 
     then return @@ (root_did,Some (Did root_did)) 
     else resolve_names_1 ~parent_id:root_did ~names
   in
 
+  let _ = resolve_path in
+
 
   let resolve_dir_path (path:path) : (did,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Did did)) -> return did 
-    | _ -> extra.err (`Error_not_directory)
+    | _ -> err (`Error_not_directory)
   in
 
 
   let resolve_file_path (path:path) : (fid,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Fid fid)) -> return fid 
-    | _ -> extra.err (`Error_not_file)
+    | _ -> err (`Error_not_file)
   in
 
   let root : path = "/" in
@@ -197,34 +206,32 @@ let mk_ops ~extra =
   (* FIXME or just allow unlink with no expectation of the kind? *)
   let unlink ~parent ~name = 
     resolve_dir_path parent >>= fun parent ->
-    with_fs 
-      (fun s ->
-         s.dirs |> fun dirs ->
-         Map_did.find parent dirs |> fun pdir ->
-         Map_string.find name pdir |> fun entry ->
-         (* FIXME here and elsewhere we need to take care about find etc when key not present *)
-         Map_string.remove name pdir |> fun pdir ->
-         Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs})
-    >>= fun () -> return ()
+    extra.with_fs (fun s ->
+        s.dirs |> fun dirs ->
+        Map_did.find parent dirs |> fun pdir ->
+        Map_string.find name pdir |> fun entry ->
+        (* FIXME here and elsewhere we need to take care about find etc when key not present *)
+        Map_string.remove name pdir |> fun pdir ->
+        Map_did.add parent pdir dirs |> fun dirs ->
+        (),{s with dirs})
   in
+
+  let _ = unlink in 
 
 
   let mkdir ~parent ~name : (unit,'m) m_ = 
     resolve_dir_path parent >>= fun parent ->
     extra.new_did () >>= fun (did:did) -> 
-    with_fs 
-      (fun s -> 
-         s.dirs |> fun dirs ->
-         (* add new empty dir to dirs *)
-         Map_did.add did empty_dir dirs |> fun dirs ->
-         (* add name to parent *)
-         Map_did.find parent s.dirs |> fun pdir ->
-         Map_string.add name (Did did) pdir |> fun pdir ->
-         (* update parent in dirs *)
-         Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs})
-    >>= fun () -> return () (* did *)
+    extra.with_fs (fun s -> 
+        s.dirs |> fun dirs ->
+        (* add new empty dir to dirs *)
+        Map_did.add did empty_dir dirs |> fun dirs ->
+        (* add name to parent *)
+        Map_did.find parent s.dirs |> fun pdir ->
+        Map_string.add name (Did did) pdir |> fun pdir ->
+        (* update parent in dirs *)
+        Map_did.add parent pdir dirs |> fun dirs ->
+        (),{s with dirs})
   in
 
 
@@ -233,11 +240,11 @@ let mk_ops ~extra =
 
   let opendir path = 
     resolve_dir_path path >>= fun did ->
-    with_fs' @@ fun s ->
-    s.dirs |> fun dirs ->
-    Map_did.find did dirs |> fun dir ->
-    Map_string.bindings dir |> List.map fst |> fun names ->
-    (mk_dh ~did names,s)      
+    extra.with_fs (fun s ->
+        s.dirs |> fun dirs ->
+        Map_did.find did dirs |> fun dir ->
+        Map_string.bindings dir |> List.map fst |> fun names ->
+        (mk_dh ~did names,s))
   in
 
 
@@ -248,23 +255,23 @@ let mk_ops ~extra =
 
 
   let create ~parent ~name : (unit,'m) m_ = 
-    print_endline @@ "# create " ^":" ^parent ^":" ^name ^":" ^__LOC__;
+    extra.with_fs (fun s ->
+        Printf.printf "# create p(%s) n(%s) l251\n" parent name;
+        (),s) >>= fun () ->
     resolve_dir_path parent >>= fun parent ->
-    print_endline __LOC__;
+    print_endline @@ "# l253";
     extra.new_fid () >>= fun (fid:fid) -> 
-    print_endline __LOC__;
-    with_fs 
-      (fun s -> 
-         s.dirs |> fun dirs ->
-         Map_did.find parent dirs |> fun pdir ->
-         Map_string.add name (Fid fid) pdir |> fun pdir ->
-         Map_did.add parent pdir dirs |> fun dirs ->
-         {s with dirs} |> fun s ->
-         s.files |> fun files -> 
-         Map_fid.add fid "" files |> fun files ->
-         print_endline __LOC__;
-         {s with files})
-    >>= fun () -> return () (* fid *)
+    print_endline @@ "# l255";
+    extra.with_fs (fun s -> 
+        s.dirs |> fun dirs ->
+        Map_did.find parent dirs |> fun pdir ->
+        Map_string.add name (Fid fid) pdir |> fun pdir ->
+        Map_did.add parent pdir dirs |> fun dirs ->
+        {s with dirs} |> fun s ->
+        s.files |> fun files -> 
+        Map_fid.add fid "" files |> fun files ->
+        print_endline @@ "# l265";
+        (),{s with files})
   in
 
 
@@ -278,56 +285,57 @@ let mk_ops ~extra =
 
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     let fid = fd in
-    with_fs' @@ fun s ->
-    s.files |> fun map ->
-    Map_fid.find fid map |> fun (contents:string) ->
-    blit_string_to_bigarray ~src:contents ~soff:foff ~len:length ~dst:buffer ~doff:boff;
-    (length,s)
+    extra.with_fs (fun s ->
+        s.files |> fun map ->
+        Map_fid.find fid map |> fun (contents:string) ->
+        blit_string_to_bigarray ~src:contents ~soff:foff ~len:length ~dst:buffer ~doff:boff;
+        (length,s))
   in
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     let fid = fd in
-    with_fs' @@ fun s ->
-    s.files |> fun files ->
-    Map_fid.find fid files |> fun contents ->
-    let contents = Bytes.of_string contents in
-    blit_bigarray_to_bytes ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
-    (* FIXME extend contents *)
-    Bytes.to_string contents |> fun contents ->
-    Map_fid.add fid contents files |> fun files ->
-    (length,{s with files})
+    extra.with_fs (fun s ->
+        s.files |> fun files ->
+        Map_fid.find fid files |> fun contents ->
+        let contents = Bytes.of_string contents in
+        blit_bigarray_to_bytes ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
+        (* FIXME extend contents *)
+        Bytes.to_string contents |> fun contents ->
+        Map_fid.add fid contents files |> fun files ->
+        (length,{s with files}))
   in
+
 
   let close fd = return () in (* FIXME record which are open? *)
 
 
   let truncate ~path ~length = 
     resolve_file_path path >>= fun fid ->
-    with_fs' @@ fun s ->
-    s.files |> fun files ->
-    Map_fid.find fid files |> fun contents ->
-    let contents' = Bytes.create length in
-    Bytes.blit_string contents 0 contents' 0 length;
-    Bytes.to_string contents' |> fun contents ->
-    Map_fid.add fid contents files |> fun files ->
-    ((),{s with files})
+    extra.with_fs (fun s ->
+        s.files |> fun files ->
+        Map_fid.find fid files |> fun contents ->
+        let contents' = Bytes.create length in
+        Bytes.blit_string contents 0 contents' 0 length;
+        Bytes.to_string contents' |> fun contents ->
+        Map_fid.add fid contents files |> fun files ->
+        ((),{s with files}))
   in
 
 
   let stat_file path = 
     resolve_file_path path >>= fun fid ->
-    with_fs' @@ fun s ->
-    s.files |> fun files ->
-    Map_fid.find fid files |> fun contents ->
-    String.length contents |> fun sz ->
-    ({ sz },s)
+    extra.with_fs (fun s ->
+        s.files |> fun files ->
+        Map_fid.find fid files |> fun contents ->
+        String.length contents |> fun sz ->
+        ({ sz },s))
   in
 
 
   let kind path : (st_kind,'m) m_ = 
     resolve_path path >>= fun (_,id) ->    
     id |> function 
-    | None -> extra.err @@ `Error_no_entry path
+    | None -> err @@ `Error_no_entry path
     | Some x -> x |> function
       | Fid fid -> return (`File:st_kind)
       | Did did -> return (`Dir:st_kind)
@@ -349,48 +357,56 @@ let mk_ops ~extra =
 let _ = mk_ops  (* NOTE the error cases are captured in the type *)
 
 
+(* instantiate monad ------------------------------------------------ *)
+
+
 type exn_ = [ 
     | `Error_no_entry of string 
     | `Error_not_directory
     | `Error_not_file
 ] [@@deriving yojson]
 
+module X_ = Mk_state_passing_with_error(struct
+    type w = fs_t
+    type e = exn_
+end)
 
-exception E of exn_
+
+open X_
+
+let monad_ops = X_.{
+  return;
+  bind=X_.( >>= );
+  err;
+}
 
 
-type w = fs_t
-type ww = w -> w
-type 'a m = ('a -> ww) -> ww
-let err e = 
-  fun (g: 'a -> ww) ->
-  fun w ->
-    raise (E e)
+let with_fs (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
+  X_.with_state' f (fun a -> return a)
 
-let new_did () = 
-  fun (g:did -> ww) ->
-  fun w ->
+
+let new_did () = with_fs (fun w ->
     let w' = { w with max_did=(inc_did w.max_did) } in
     let did = w'.max_did in
-    g did w'
+    did,w')
 
-let new_fid () =
-  fun (g:fid -> ww) ->
-  fun w ->
+let new_fid () = with_fs (fun w ->
     let w' = { w with max_fid=(inc_fid w.max_fid) } in
     let fid = w'.max_fid in
-    g fid w'
+    fid,w')
+
       
-let extra = { err; new_did; new_fid }
+let extra = { new_did; new_fid; with_fs }
 
 
-let ops = mk_ops ~extra  (* NOTE the error cases are captured in the type *)
+let ops = mk_ops ~monad_ops ~extra  (* NOTE the error cases are captured in the type *)
 
 let _ = ops
 
 
 (* imperative ------------------------------------------------------- *)
 
+(*
 module W_ = struct
   type w = fs_t
 end
@@ -401,4 +417,56 @@ let ref_ = ref init_fs
 
 let (run,imperative_ops) = 
   Mk_state_passing_.mk_imperative_ops ops ref_ @@ fun ~run ~ops -> (run,ops)
+*)
 
+
+(* logging ---------------------------------------------------------- *)
+
+open Msgs
+
+let log_return (x : ('a,ww)m_) : ('a,ww)m_ = 
+  fun (k:'a -> ww) ->
+  fun (w:exn_ option * fs_t) ->
+    x k w |> fun (e,fs) ->
+    let tid = thread_id () in
+    match e with 
+    | None -> 
+      Printf.printf "# thread_id(%d) returning l434\n" tid;
+      (e,fs)
+    | Some e ->
+      exn__to_yojson e |> Yojson.Safe.pretty_to_string |> fun e' ->
+      Printf.printf "# (thread_id %d) (exception %s)\n" tid e';
+      (Some e,fs)
+
+let _ = log_return
+
+let log_call c : (unit,ww)m_ = 
+  with_fs (fun s -> 
+      let tid = thread_id () in
+      c |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
+      |> fun c -> 
+      Printf.printf "# thread_id(%d) call(%s) mim.log l421\n" tid c;
+      (),s)  
+
+(* FIXME this logging depends on the exact nature and semantics of the
+   monad; here we assume no exceptions are thrown, ie working with e
+   option * w *)
+let log (c:msg_from_client) : ('a,ww) m_ -> ('a,ww) m_ = fun m ->
+  log_call c >>= (fun () -> m |> log_return)
+
+
+
+(* raising exceptions ----------------------------------------------- *)
+
+(*
+
+exception E of exn_
+
+
+let err e = 
+  fun (g: 'a -> ww) ->
+  fun w ->
+    raise (E e)
+
+
+*)

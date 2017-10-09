@@ -94,7 +94,7 @@ let wf_imperative_ops (type path dh fd buffer t)
   true[@@ocaml.warning "-26"]
 
 
-let ops_to_imperative run ops =
+let mk_imperative_ops ~run ~ops =
   dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
   let run f = try run.run f with e -> (Printexc.to_string e |> print_endline; raise e) in
   let root= root in
@@ -126,6 +126,7 @@ let dest_imperative_ops (`Imperative_ops(root,unlink,mkdir,opendir,readdir,close
 
 (* state passing, no error ------------------------------------------ *)
 
+(*
 module Mk_state_passing = functor(W: sig type w end) -> struct
   (* assume world state is 'w, so 'm = 'w -> 'w *)
 
@@ -182,6 +183,94 @@ module Mk_state_passing = functor(W: sig type w end) -> struct
     fun k -> k ~run ~ops:(ops_to_imperative run ops)
 
 end
+*)
+
+
+(* state passing, with error ------------------------------------------ *)
+
+module Mk_state_passing_with_error = functor(W: sig type w type e end) -> struct
+  (* assume world state is 'e option * 'w *)
+
+  module W = W
+  open W
+
+  type ew = e option * w
+
+  type ww = ew -> ew
+
+  type 'a m = ('a,ww) m_
+
+  (* NOTE following a bit hairy *)
+  let ( >>= ) (x:'a m) (f:'a -> 'b m) : 'b m = 
+    fun (g:'b -> ew -> ew) -> 
+    fun (w:ew) ->
+      if fst w <> None then w else 
+        let f' : 'a -> ww = fun a -> f a g in
+        let x' : ww = x f' in
+        let w' : ew = x' w in
+        w'
+
+  let bind = ( >>= )
+
+  let return (x: 'a) : 'a m = 
+    fun (g: 'a -> ww) -> g x
+
+
+  let err (e:e) : 'a m = 
+    fun (g: 'a -> ww) -> 
+    fun (w:ew) ->
+      assert(fst w = None);
+      (Some e,snd w)
+
+(*
+
+  (* change state before running remainder of computation *)
+  let with_state (f:w->w) (x:'a m) : 'a m = 
+    fun (g:'a -> ww) -> 
+    fun (w:ew) -> 
+      try
+        if fst w <> None then w else
+          let w' : w = f (snd w) in
+          x g (None,w')
+      with e ->
+        Printf.printf "!!! unexpected exception with_state, minifs l234\n";
+        failwith "minifs l234"
+*)
+
+  (* change state, and derive a parameter required for rest of computation *)
+  let with_state' (f:w -> 'b*w) (g:'b -> 'a m) : 'a m = 
+    fun (h:'a -> ww) ->
+    fun (w:ew) ->
+      try 
+        if fst w <> None then w else
+          let (b,w') = f (snd w) in
+          (g b) h (None,w')
+      with e ->
+        Printf.printf "!!! unexpected exception with_state;, minifs l247\n";
+        failwith "minifs l247"
+
+
+  (* FIXME used the run code in mini_fuse 
+  let mk_imperative_ops ops ref_ = 
+
+    (* some bug with ppx not working with local exceptions, so use
+       first class modules instead *)
+
+    let run_imperative (type a) (f:a m) : a = 
+      let f : (a -> ww) -> ww = f in
+      let module M = struct exception E of a end in
+      (* a -> ww is the type of the "rest of the computation" *)
+      let a_ww : a -> ww = fun a w -> ref_:=w; raise (M.E a) in
+      try ignore(f a_ww (!ref_)); failwith __LOC__
+      with M.E a -> a
+    in
+
+    let run = { run=run_imperative } in
+
+    fun k -> k ~run ~ops:(mk_imperative_ops run ops)
+  *)
+end
+
 
 
 

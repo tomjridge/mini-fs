@@ -30,7 +30,7 @@ let mk_fuse_ops (type path)
     ~run ~ops 
   = 
 
-  let ops = ops_to_imperative run ops in
+  let ops = mk_imperative_ops run ops in
   dest_imperative_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
 
 
@@ -58,17 +58,17 @@ let mk_fuse_ops (type path)
 
   (* FIXME tricky combining create with fopen *)
   let fopen (path:string) flags = 
-    print_endline @@ "fopen "^ path ^ " " ^__LOC__;
+    print_endline @@ "# fopen "^ path ^ " l61";
     Unix.(List.mem O_CREAT flags) |> function
     | true -> 
-      print_endline __LOC__;
+      print_endline @@ "# l64";
       (* may be creating a file *)
       dirname_basename path |> fun (parent,name) ->
       create ~parent ~name;
-      print_endline __LOC__;
+      print_endline @@ "# l68";
       None
     | false -> 
-      print_endline __LOC__;
+      print_endline @@ "# l71";
       path |> kind |> function
       | `File -> None
       | _ -> raise @@ Unix_error (ENOENT,"open",path)
@@ -107,21 +107,21 @@ let mk_fuse_ops (type path)
 
   (* stat_file and kind combined in following *)
   let getattr path0 = 
-    print_endline @@ path0 ^ __LOC__;
+    Printf.printf "# getattr (%s) mf.getattr l110\n" path0;
     path0 |> fun path ->
-    print_endline __LOC__;
+    print_endline @@ "# mf.getattr l112";
     (* FIXME kind needs to be wrapped so it throws a unix_error *)
     path |> kind |> function
     | `File -> (
-      print_endline __LOC__;
+      print_endline @@ "# mf.getattr l116";
       stat_file path |> fun x -> 
       x.sz |> Int64.of_int |> default_file_stats)
     | `Dir -> (
-      print_endline __LOC__;
+      print_endline @@ "# mf.getattr l120";
       default_dir_stats)
     | _ -> (
-      print_endline __LOC__;
-      raise @@ Unix_error (ENOENT,"getattr" ^ __LOC__,path0))
+      print_endline @@ "# getattr exception(ENOENT) mf.getattr l123";
+      raise @@ Unix_error (ENOENT,"getattr l124",path0))
   in
 
 
@@ -146,39 +146,50 @@ module Logged_in_mem_with_unix_errors = struct
 
   open Mini_in_mem
 
-  let err e = fun (g: 'a -> ww) ->
-    fun w ->
-      (e |> exn__to_yojson |> Yojson.Safe.pretty_to_string |> print_endline);
-      print_endline __LOC__;
-      match e with
-      | `Error_no_entry _ -> raise @@ Unix_error(ENOENT, __LOC__,"")
-      | `Error_not_directory -> raise @@ Unix_error(ENOTDIR, __LOC__,"")
-      | `Error_not_file -> raise @@ Unix_error(ENOENT, __LOC__,"") 
-  (* FIXME Error_not_file could be a dir, in which case raise EISDIR *)
+  let log_op : 'm Mini_log.log_op = Mini_log.{
+      log=Mini_in_mem.log
+    }
 
-  let extra = { err; new_did; new_fid }
+  let ops = Mini_log.mk_logged_ops ~log_op ~ops
 
-  let ops = mk_ops ~extra
+  let _ = ops
 
-  let ops = Mini_log.mk_logged_ops ~ops
+  (* need to convert errors to exceptions, and use imperative state *)
+
+  type ww = X_.ww
+
+  let ref_ = ref init_fs
+
+  (* target type: 'm run = 'a. (('a -> 'm) -> 'm) -> 'a, where 'm is ww *)
+
+  let mk_exn = function
+    | `Error_no_entry _ -> Unix_error(ENOENT, "154","")
+    | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
+    | `Error_not_file -> Unix_error(ENOENT, "156","") 
+
+
+  let run (type a) (aa:((a -> ww) -> ww)) : a = 
+    let module M = struct exception E of a end in
+    (* a -> ww is the type of the "rest of the computation" *)
+    let a_ww : a -> ww = 
+      fun a w -> 
+        let (e,w') = w in
+        ref_:=w'; 
+        match e with
+        | None -> raise (M.E a) 
+        | Some e' -> 
+          Printf.printf "# thread returning with exception mfuse l175\n";
+          raise (mk_exn e')
+    in
+    try ignore(aa a_ww (None,!ref_)); failwith "impossible, mfuse l169"
+    with (M.E a) -> a
+
+  let run : ww run = { run }
+
+  let imp_ops = Minifs.mk_imperative_ops ~run ~ops
+
 end
 
     
 
-
-let in_mem_fuse_ops = 
-    mk_fuse_ops
-      ~run:Mini_in_mem.run 
-      ~ops:Logged_in_mem_with_unix_errors.ops
-
-(* TODO 
-let unix_fuse_ops = 
-  mk_fuse_ops 
-    ~path_to_string:(fun s -> s) 
-    ~string_to_path:(fun s -> s)
-    ~dirname_basename
-    ~run:Mini_unix.run
-    ~ops:Mini_unix.unix_ops
-
-let _ : Fuse.operations = unix_fuse_ops
-*)
+let in_mem_fuse_ops = Logged_in_mem_with_unix_errors.(mk_fuse_ops ~run ~ops)
