@@ -131,7 +131,9 @@ let mk_ops ~monad_ops ~extra =
 
   let resolve_did did = 
     extra.with_fs @@ fun s ->
-    (Map_did.find did s.dirs,s)  (* ASSUME did valid *)
+    match Map_did.find did s.dirs with
+    | exception e -> failwith "!!!fatal error mim.l136"  (* ASSUME did valid *)
+    | dir -> (dir,s)
   in
 
   let _ = resolve_did in
@@ -171,11 +173,19 @@ let mk_ops ~monad_ops ~extra =
   let resolve_path : path -> (did * id option,'m) m_ = fun p -> 
     extra.with_fs (fun s -> 
         print_endline @@ "# resolve_path "^p ^ " l167";
+        ignore(String.contains p '/' || "!!!fatal resolve_path.l176" |> fun s ->
+              print_endline s; failwith s);
         String.split_on_char '/' p |> fun names ->
+
         (* remove head "" since paths are absolute, and any trailing "" *)
-        assert(List.hd names = "");
+        ignore(List.hd names = "" || 
+               "!!!fatal: hd names not empty mim.l176" |> fun s ->
+              print_endline s; failwith s);
         let names = List.tl names in
-        assert(names <> []);
+
+        ignore(names <> [] || 
+               "!!!fatal: assertion failure: names=[] mim.l178" |> fun s ->
+               print_endline s; failwith s);
         let names = Tjr_list.(if last names = "" then butlast names else names) in
         (* not sure about special casing root *)
         names,s) >>= fun names ->
@@ -382,7 +392,7 @@ let monad_ops = X_.{
 
 
 let with_fs (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
-  X_.with_state' f (fun a -> return a)
+  X_.with_state'' f (fun a -> return a)
 
 
 let new_did () = with_fs (fun w ->
@@ -431,11 +441,11 @@ let log_return (x : ('a,ww)m_) : ('a,ww)m_ =
     let tid = thread_id () in
     match e with 
     | None -> 
-      Printf.printf "# thread_id(%d) returning l434\n" tid;
+      Printf.printf "# thread %d returning mim.l434\n" tid;
       (e,fs)
     | Some e ->
       exn__to_yojson e |> Yojson.Safe.pretty_to_string |> fun e' ->
-      Printf.printf "# (thread_id %d) (exception %s)\n" tid e';
+      Printf.printf "# log_return thread %d returning exception %s mim.log_return.l438\n" tid e';
       (Some e,fs)
 
 let _ = log_return
@@ -445,7 +455,7 @@ let log_call c : (unit,ww)m_ =
       let tid = thread_id () in
       c |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
       |> fun c -> 
-      Printf.printf "# thread_id(%d) call(%s) mim.log l421\n" tid c;
+      Printf.printf "# log_call thread_id(%d) call(%s) mim.log_call.l421\n" tid c;
       (),s)  
 
 (* FIXME this logging depends on the exact nature and semantics of the

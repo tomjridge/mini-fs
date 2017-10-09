@@ -58,7 +58,7 @@ let mk_fuse_ops (type path)
 
   (* FIXME tricky combining create with fopen *)
   let fopen (path:string) flags = 
-    print_endline @@ "# fopen "^ path ^ " l61";
+    print_endline @@ "# fopen "^ path ^ " mfuse.fopen.l61";
     Unix.(List.mem O_CREAT flags) |> function
     | true -> 
       print_endline @@ "# l64";
@@ -107,20 +107,20 @@ let mk_fuse_ops (type path)
 
   (* stat_file and kind combined in following *)
   let getattr path0 = 
-    Printf.printf "# getattr (%s) mf.getattr l110\n" path0;
+    Printf.printf "# getattr (%s) mfuse.getattr.l110\n" path0;
     path0 |> fun path ->
-    print_endline @@ "# mf.getattr l112";
+    print_endline @@ "# mfuse.getattr.l112";
     (* FIXME kind needs to be wrapped so it throws a unix_error *)
     path |> kind |> function
     | `File -> (
-      print_endline @@ "# mf.getattr l116";
+      print_endline @@ "# mfuse.getattr.l116";
       stat_file path |> fun x -> 
       x.sz |> Int64.of_int |> default_file_stats)
     | `Dir -> (
-      print_endline @@ "# mf.getattr l120";
+      print_endline @@ "# mfuse.getattr.l120";
       default_dir_stats)
     | _ -> (
-      print_endline @@ "# getattr exception(ENOENT) mf.getattr l123";
+      print_endline @@ "# getattr exception(ENOENT) mfuse.getattr.l123";
       raise @@ Unix_error (ENOENT,"getattr l124",path0))
   in
 
@@ -175,13 +175,15 @@ module Logged_in_mem_with_unix_errors = struct
       fun a w -> 
         let (e,w') = w in
         ref_:=w'; 
+        print_endline "# mfuse.l178";
         match e with
-        | None -> raise (M.E a) 
-        | Some e' -> 
-          Printf.printf "# thread returning with exception mfuse l175\n";
-          raise (mk_exn e')
+        | None -> (print_endline "# mfuse.l180"; raise (M.E a))
+        | Some e' -> failwith "impossible mfuse.l178"
     in
-    try ignore(aa a_ww (None,!ref_)); failwith "impossible, mfuse l169"
+    try 
+      match aa a_ww (None,!ref_) with
+      | (None,w') -> failwith "impossible mfuse.run.l188"
+      | (Some e,w') -> ref_:=w'; raise (mk_exn e)
     with (M.E a) -> a
 
   let run : ww run = { run }

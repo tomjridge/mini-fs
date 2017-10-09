@@ -202,12 +202,16 @@ module Mk_state_passing_with_error = functor(W: sig type w type e end) -> struct
 
   (* NOTE following a bit hairy *)
   let ( >>= ) (x:'a m) (f:'a -> 'b m) : 'b m = 
-    fun (g:'b -> ew -> ew) -> 
+    fun (g:'b -> ww) -> 
     fun (w:ew) ->
-      if fst w <> None then w else 
+      let (e,w) = w in
+      match e with
+      | Some e' -> failwith "impossible, mfs.bind.l209"  (* should never pass on an exceptional state *)
+      | None -> 
+        let x : ('a -> ww) -> ww = x in
         let f' : 'a -> ww = fun a -> f a g in
         let x' : ww = x f' in
-        let w' : ew = x' w in
+        let w' : ew = x' (None,w) in
         w'
 
   let bind = ( >>= )
@@ -219,7 +223,7 @@ module Mk_state_passing_with_error = functor(W: sig type w type e end) -> struct
   let err (e:e) : 'a m = 
     fun (g: 'a -> ww) -> 
     fun (w:ew) ->
-      assert(fst w = None);
+      ignore(fst w = None || failwith "assertion failure: fst w = Some mfs.l226");
       (Some e,snd w)
 
 (*
@@ -238,16 +242,21 @@ module Mk_state_passing_with_error = functor(W: sig type w type e end) -> struct
 *)
 
   (* change state, and derive a parameter required for rest of computation *)
-  let with_state' (f:w -> 'b*w) (g:'b -> 'a m) : 'a m = 
+  let with_state'' (f:w -> 'b*w) (g:'b -> 'a m) : 'a m = 
     fun (h:'a -> ww) ->
     fun (w:ew) ->
       try 
         if fst w <> None then w else
           let (b,w') = f (snd w) in
           (g b) h (None,w')
-      with e ->
-        Printf.printf "!!! unexpected exception with_state;, minifs l247\n";
-        failwith "minifs l247"
+      with 
+      | Failure s -> (
+          Printf.printf "!!!fatal error with_state'' (%s) minifs.l247\n" s;
+          failwith "minifs l247")
+      | e -> (
+          Printf.printf "!!!fatal error with_state'' (%s) minifs.l257\n" (Printexc.to_string e);
+          failwith "minifs l257")
+
 
 
   (* FIXME used the run code in mini_fuse 
