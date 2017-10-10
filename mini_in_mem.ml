@@ -1,75 +1,92 @@
+open Tjr_map
 open Mini_pervasives
 open Minifs
 
 (* in-mem impl ------------------------------------------------------ *)
 
 module Fid : sig
-  type fid = int  (* FIXME hide *)
+  type fid = int[@@deriving yojson]  (* FIXME hide *)
   val fid0 : fid
   val inc_fid : fid -> fid
 end = struct
-  type fid=int
+  type fid=int[@@deriving yojson]
   let fid0=0
 let  inc_fid x = x+1
 end
 include Fid
  
 module Did : sig
-  type did = int (* FIXME hide *)
+  type did = int[@@deriving yojson] (* FIXME hide *)
   val root_did : did
   val inc_did : did -> did
 end = struct
-  type did = int
+  type did = int[@@deriving yojson]
   let root_did = 1234
   let inc_did x = x+1 
 end
 include Did
 
-module Map_fid = Map.Make(
+module Map_fid = Tjr_map.Make(
   struct 
     type t = fid let compare: t->t->int = Pervasives.compare 
   end)
 
 
-module Map_did = Map.Make(
+module Map_did = Tjr_map.Make(
   struct 
     type t = did let compare: t->t->int = Pervasives.compare 
   end)
 
 
-module Map_string = Map.Make(
+module Map_string = Tjr_map.Make(
   struct 
     type t = string let compare: t->t->int = Pervasives.compare 
   end)
 
 
-module Set_string = Set.Make(
+module Set_string = Tjr_set.Make(
   struct
     type t = string let compare: t->t->int = Pervasives.compare 
   end)
 
 
-type id = Fid of fid | Did of did
+type id = Fid of fid | Did of did[@@deriving yojson]
 
+type dir_carrier = id Map_string.Map_.t
+type dir_ops = (string,id,dir_carrier) map_ops
+let dir_ops : dir_ops = Map_string.map_ops
 
-type dir = id Map_string.t
+type files_carrier = string Map_fid.Map_.t
+type files_ops = (fid,string,files_carrier) map_ops
+let files_ops : files_ops = Map_fid.map_ops
 
+type dirs_carrier = dir_carrier Map_did.Map_.t
+type dirs_ops = (did,dir_carrier,dirs_carrier) map_ops
+let dirs_ops : dirs_ops = Map_did.map_ops
 
 type fs_t = {
-  files: string Map_fid.t;
+  files: files_carrier;
   max_fid: fid;
-  dirs: dir Map_did.t;
+  dirs: dirs_carrier;
   max_did: did;
 }
 
+module Fs_json = struct
+  (* an easily-jsonable version *)
+  type fs = {
+    files: (fid * string) list;
+    max_fid: fid;
+    dirs: (string * id) list;
+    max_did: did;
+  } [@@deriving yojson]
+end
 
-let empty_dir = Map_string.empty
+let empty_dir = dir_ops.map_empty
 
-
-let init_fs = {
-  files=Map_fid.empty;
+let init_fs () = {
+  files=files_ops.map_empty;
   max_fid=fid0;
-  dirs=(Map_did.empty |> Map_did.add root_did empty_dir);
+  dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did empty_dir);
   max_did=root_did;
 }
 
@@ -106,6 +123,7 @@ type ('e,'m) extra_ops = {
   new_did: unit -> (did,'m)m_;
   new_fid: unit -> (fid,'m)m_;
   with_fs: 'a. (t -> 'a * t) -> ('a,'m)m_;  (* ASSUME-ed not to raise exception *)
+  internal_err: 'a. string -> ('a,'m)m_;
 }
 
 
@@ -130,21 +148,18 @@ let mk_ops ~monad_ops ~extra =
   let ( >>= ) = bind in
 
   let resolve_did did = 
-    extra.with_fs @@ fun s ->
-    match Map_did.find did s.dirs with
-    | exception e -> failwith "!!!fatal error mim.l136"  (* ASSUME did valid *)
-    | dir -> (dir,s)
+    extra.with_fs (fun s ->
+        (dirs_ops.map_find did s.dirs,s)) >>= fun r -> 
+    match r with 
+    | None -> extra.internal_err "resolve_did, did not valid mim.l154"
+    | Some dir -> return dir
   in
 
   let _ = resolve_did in
 
-  let resolve_name ~dir ~name : id option = 
-    match Map_string.find name dir with
-    | exception _ -> None
-    | x -> Some x
-  in
+  let resolve_name ~dir ~name : id option = dir_ops.map_find name dir in
 
-  let rec resolve_names_1 ~parent_id ~names = 
+  let rec resolve_names_1 ~parent_id ~names : (did * id option,'m) m_ = 
     resolve_did parent_id >>= fun parent -> resolve_names_2 ~parent_id ~parent ~names 
   and resolve_names_2 ~parent_id ~parent ~names = 
     match names with
@@ -171,27 +186,22 @@ let mk_ops ~monad_ops ~extra =
   let _ = resolve_names_1 in
 
   let resolve_path : path -> (did * id option,'m) m_ = fun p -> 
-    extra.with_fs (fun s -> 
-        print_endline @@ "# resolve_path "^p ^ " l167";
-        ignore(String.contains p '/' || "!!!fatal resolve_path.l176" |> fun s ->
-              print_endline s; failwith s);
-        String.split_on_char '/' p |> fun names ->
-
-        (* remove head "" since paths are absolute, and any trailing "" *)
-        ignore(List.hd names = "" || 
-               "!!!fatal: hd names not empty mim.l176" |> fun s ->
-              print_endline s; failwith s);
-        let names = List.tl names in
-
-        ignore(names <> [] || 
-               "!!!fatal: assertion failure: names=[] mim.l178" |> fun s ->
-               print_endline s; failwith s);
-        let names = Tjr_list.(if last names = "" then butlast names else names) in
-        (* not sure about special casing root *)
-        names,s) >>= fun names ->
-    if names = [] 
-    then return @@ (root_did,Some (Did root_did)) 
-    else resolve_names_1 ~parent_id:root_did ~names
+    (if not @@ String.contains p '/' 
+     then extra.internal_err "resolve_path, no slash, mim.l189" 
+     else 
+       String.split_on_char '/' p |> fun names ->
+       if not (List.hd names = "")
+       then extra.internal_err "resolve_path, no leading slash, mim.194"
+       else 
+         let names = List.tl names in
+         if names=[] 
+         then extra.internal_err "resolve_path, names empty, impossible, mim.198"
+         else 
+           let names = Tjr_list.(if last names = "" then butlast names else names) in
+           (* not sure about special casing root *)
+           if names = [] 
+           then return @@ (root_did,Some (Did root_did)) 
+           else resolve_names_1 ~parent_id:root_did ~names)
   in
 
   let _ = resolve_path in
@@ -215,33 +225,45 @@ let mk_ops ~monad_ops ~extra =
 
   (* FIXME or just allow unlink with no expectation of the kind? *)
   let unlink ~parent ~name = 
-    resolve_dir_path parent >>= fun parent ->
+    resolve_dir_path parent >>= fun pid ->
     extra.with_fs (fun s ->
         s.dirs |> fun dirs ->
-        Map_did.find parent dirs |> fun pdir ->
-        Map_string.find name pdir |> fun entry ->
-        (* FIXME here and elsewhere we need to take care about find etc when key not present *)
-        Map_string.remove name pdir |> fun pdir ->
-        Map_did.add parent pdir dirs |> fun dirs ->
-        (),{s with dirs})
+        dirs_ops.map_find pid dirs |> fun pdir ->
+        match pdir with 
+        | None -> `Internal "impossible, parent not found, mim.233",s
+        | Some pdir -> 
+          dir_ops.map_find name pdir |> fun entry ->
+          match entry with
+          | None -> `Internal "no name in pdir, mim.237",s
+          | Some entry -> 
+            dir_ops.map_remove name pdir |> fun pdir ->
+            dirs_ops.map_add pid pdir dirs |> fun dirs ->
+            `Ok,{s with dirs}) >>= function 
+    | `Ok -> return ()
+    | `Internal s -> extra.internal_err s
   in
 
   let _ = unlink in 
 
 
   let mkdir ~parent ~name : (unit,'m) m_ = 
-    resolve_dir_path parent >>= fun parent ->
+    resolve_dir_path parent >>= fun pid ->
     extra.new_did () >>= fun (did:did) -> 
     extra.with_fs (fun s -> 
         s.dirs |> fun dirs ->
         (* add new empty dir to dirs *)
-        Map_did.add did empty_dir dirs |> fun dirs ->
+        dirs_ops.map_add did empty_dir dirs |> fun dirs ->
         (* add name to parent *)
-        Map_did.find parent s.dirs |> fun pdir ->
-        Map_string.add name (Did did) pdir |> fun pdir ->
-        (* update parent in dirs *)
-        Map_did.add parent pdir dirs |> fun dirs ->
-        (),{s with dirs})
+        dirs_ops.map_find pid s.dirs |> fun pdir ->
+        match pdir with 
+        | None -> `Internal "impossible, parent not found mim.l259",s
+        | Some pdir -> 
+          dir_ops.map_add name (Did did) pdir |> fun pdir ->
+          (* update parent in dirs *)
+          dirs_ops.map_add pid pdir dirs |> fun dirs ->
+          `Ok,{s with dirs}) >>= function
+    | `Ok -> return ()
+    | `Internal s -> extra.internal_err s
   in
 
 
@@ -252,9 +274,13 @@ let mk_ops ~monad_ops ~extra =
     resolve_dir_path path >>= fun did ->
     extra.with_fs (fun s ->
         s.dirs |> fun dirs ->
-        Map_did.find did dirs |> fun dir ->
-        Map_string.bindings dir |> List.map fst |> fun names ->
-        (mk_dh ~did names,s))
+        dirs_ops.map_find did dirs |> function
+        | None -> `Internal "opendir, impossible, dir not found mim.278",s
+        | Some dir -> 
+          dir_ops.map_bindings dir |> List.map fst |> fun names ->
+          `Ok(mk_dh ~did names),s) >>= function
+    | `Ok dh -> return dh
+    | `Internal s -> extra.internal_err s
   in
 
 
@@ -265,23 +291,21 @@ let mk_ops ~monad_ops ~extra =
 
 
   let create ~parent ~name : (unit,'m) m_ = 
-    extra.with_fs (fun s ->
-        Printf.printf "# create p(%s) n(%s) l251\n" parent name;
-        (),s) >>= fun () ->
     resolve_dir_path parent >>= fun parent ->
-    print_endline @@ "# l253";
     extra.new_fid () >>= fun (fid:fid) -> 
-    print_endline @@ "# l255";
     extra.with_fs (fun s -> 
         s.dirs |> fun dirs ->
-        Map_did.find parent dirs |> fun pdir ->
-        Map_string.add name (Fid fid) pdir |> fun pdir ->
-        Map_did.add parent pdir dirs |> fun dirs ->
-        {s with dirs} |> fun s ->
-        s.files |> fun files -> 
-        Map_fid.add fid "" files |> fun files ->
-        print_endline @@ "# l265";
-        (),{s with files})
+        dirs_ops.map_find parent dirs |> function
+        | None -> `Internal "create, impossible, dir not found mim.299",s
+        | Some pdir ->
+          dir_ops.map_add name (Fid fid) pdir |> fun pdir ->
+          dirs_ops.map_add parent pdir dirs |> fun dirs ->
+          {s with dirs} |> fun s ->
+          s.files |> fun files -> 
+          files_ops.map_add fid "" files |> fun files ->
+          `Ok,{s with files}) >>= function
+    | `Internal s -> extra.internal_err s
+    | `Ok -> return ()
   in
 
 
@@ -296,23 +320,34 @@ let mk_ops ~monad_ops ~extra =
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     let fid = fd in
     extra.with_fs (fun s ->
-        s.files |> fun map ->
-        Map_fid.find fid map |> fun (contents:string) ->
-        blit_string_to_bigarray ~src:contents ~soff:foff ~len:length ~dst:buffer ~doff:boff;
-        (length,s))
+        s.files |> fun files ->
+        files_ops.map_find fid files |> function
+        | None -> `Internal "pread, impossible, no file, mim.325",s
+        | Some(contents:string) ->
+          blit_string_to_bigarray 
+            ~src:contents ~soff:foff ~len:length 
+            ~dst:buffer ~doff:boff;
+          (`Ok length,s)) >>= function
+    | `Internal s -> extra.internal_err s
+    | `Ok l -> return l
   in
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     let fid = fd in
     extra.with_fs (fun s ->
         s.files |> fun files ->
-        Map_fid.find fid files |> fun contents ->
-        let contents = Bytes.of_string contents in
-        blit_bigarray_to_bytes ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
-        (* FIXME extend contents *)
-        Bytes.to_string contents |> fun contents ->
-        Map_fid.add fid contents files |> fun files ->
-        (length,{s with files}))
+        files_ops.map_find fid files |> function
+        | None -> `Internal "pwrite, impossible, no file, mim.339",s
+        | Some contents ->
+          let contents = Bytes.of_string contents in
+          blit_bigarray_to_bytes 
+            ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
+          (* FIXME extend contents *)
+          Bytes.to_string contents |> fun contents ->
+          files_ops.map_add fid contents files |> fun files ->
+          (`Ok length,{s with files})) >>= function
+    | `Internal s -> extra.internal_err s
+    | `Ok l -> return l
   in
 
 
@@ -323,12 +358,16 @@ let mk_ops ~monad_ops ~extra =
     resolve_file_path path >>= fun fid ->
     extra.with_fs (fun s ->
         s.files |> fun files ->
-        Map_fid.find fid files |> fun contents ->
-        let contents' = Bytes.create length in
-        Bytes.blit_string contents 0 contents' 0 length;
-        Bytes.to_string contents' |> fun contents ->
-        Map_fid.add fid contents files |> fun files ->
-        ((),{s with files}))
+        files_ops.map_find fid files |> function
+        | None -> `Internal "file not found mim.362",s
+        | Some contents ->
+          let contents' = Bytes.create length in
+          Bytes.blit_string contents 0 contents' 0 length;
+          Bytes.to_string contents' |> fun contents ->
+          files_ops.map_add fid contents files |> fun files ->
+          `Ok (),{s with files}) >>= function
+    | `Ok () -> return ()
+    | `Internal s -> extra.internal_err s
   in
 
 
@@ -336,9 +375,13 @@ let mk_ops ~monad_ops ~extra =
     resolve_file_path path >>= fun fid ->
     extra.with_fs (fun s ->
         s.files |> fun files ->
-        Map_fid.find fid files |> fun contents ->
-        String.length contents |> fun sz ->
-        ({ sz },s))
+        files_ops.map_find fid files |> function
+        | None -> `Internal "file not found mim.379",s
+        | Some contents ->
+          String.length contents |> fun sz ->
+          `Ok { sz },s) >>= function
+    | `Ok stat -> return stat
+    | `Internal s -> extra.internal_err s
   in
 
 
@@ -376,6 +419,7 @@ type exn_ = [
     | `Error_not_file
 ] [@@deriving yojson]
 
+(*
 module X_ = Mk_state_passing_with_error(struct
     type w = fs_t
     type e = exn_
@@ -479,4 +523,5 @@ let err e =
     raise (E e)
 
 
+*)
 *)
