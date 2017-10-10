@@ -419,21 +419,7 @@ type exn_ = [
     | `Error_not_file
 ] [@@deriving yojson]
 
-(*
-module X_ = Mk_state_passing_with_error(struct
-    type w = fs_t
-    type e = exn_
-end)
-
-
-open X_
-
-let monad_ops = X_.{
-  return;
-  bind=X_.( >>= );
-  err;
-}
-
+open Dn_monad
 
 let with_fs (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
   X_.with_state'' f (fun a -> return a)

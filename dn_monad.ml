@@ -4,9 +4,10 @@
 #require "tjr_lib";;
 *)
 
-(* 'a m = ('a -> ww) -> ww, where ww = list of (w -> w) *)
+(* 'a m = ('a -> ww) -> ww, where ww = (lazy)list of (w -> w) *)
 
-type 'w trans = ('w -> 'w) list
+(* coinductive *)
+type 'w trans = Finished | Step of ('w -> 'w * (unit -> 'w trans))
 
 type ('a,'w) m' = ('a -> 'w trans) -> 'w trans
 
@@ -26,11 +27,23 @@ end
 
 let return x : ('a,'w) m' = fun k -> k x
 
+(* FIXME *)
 let bind (x:('a,'w)m') (g:'a -> ('b,'w)m') : ('b,'w) m' = 
   fun (h : 'b -> 'w trans) ->  
     x @@ (fun a -> g a h)
 
 let ( >>= ) = bind
+
+(*
+let with_state f : (unit,'w) m' = fun (k:unit -> 'w trans) -> 
+  Step(fun w -> f w,k)
+*)
+
+let with_state (f:'w -> 'a * 'w) (g: 'a -> ('b,'w)m') : ('b,'w)m' = 
+  fun (h: 'b -> 'w trans) -> 
+  Step(fun w -> 
+      f w |> fun (w',a) ->
+      w',fun () -> g a h)
 
 
 (* example ---------------------------------------------------------- *)
@@ -45,19 +58,27 @@ module Example = functor (X_ : sig end) -> struct
       Printf.printf "incrementing %d" w;
       w+1
     in
-    [ww]@k()
+    Step (fun w -> ww w,k)
 
 
   (* FIXME note that for "with error" we stop when we hit an exceptional state *)
-  let run (comp:'a m) (w:w) = 
+  let run ~(state:w) ~(code:'a m) =
+    (code @@ fun a -> Finished) |> fun trans ->
+    let rec run ~(state:w) ~(trans:w trans) = 
+      match trans with
+      | Finished -> state
+      | Step(f) ->
+        f state |> fun (state,rest) -> run ~state ~trans:(rest())
+    in
+    run ~state ~trans
+  
+  let _ : state:w -> code:'a m -> w = run
 
-    (* ignore the final value; comp should take a unit m? *)
-    let xs : w trans = comp (fun (x:'a) -> []) in  
+  let code = inc >>= fun () -> inc >>= fun () -> inc
 
-    Tjr_list.with_each_elt ~step:(fun ~state f -> f state) ~init_state:w xs
+  let _ : unit m = code
 
-
-  let _ = run (inc >>= fun () -> inc >>= fun () -> inc) 0
+  let _ = run ~code ~state:0
 
 end
 
@@ -68,32 +89,27 @@ end
 
 module Example2 = functor (X_ : sig end) -> struct
 
-  type w = int
-  type 'a m = ('a -> w trans) -> w trans
+  module Example = Example(X_)
+  open Example
 
   (* the exceptional state *)
   let is_exceptional = fun w -> w = 1
 
-  let inc : unit m = fun (k:unit -> w trans) -> 
-    let ww = fun w -> 
-      Printf.printf "incrementing %d" w;
-      w+1
-    in
-    [ww]@k()
-
 
   (* FIXME note that for "with error" we stop when we hit an exceptional state *)
-  let run (comp:'a m) (w:w) = 
+  let run ~(state:w) ~(code:'a m) =
+    (code @@ fun a -> Finished) |> fun trans ->
+    let rec run ~(state:w) ~(trans:w trans) = 
+      match is_exceptional state with
+      | true -> state 
+      | false -> 
+        match trans with
+        | Finished -> state
+        | Step(f) ->
+          f state |> fun (state,rest) -> run ~state ~trans:(rest())
+    in
+    run ~state ~trans
 
-    (* ignore the final value; comp should take a unit m? *)
-    let xs : w trans = comp (fun (x:'a) -> []) in  
-
-    Tjr_list.with_each_elt 
-      ~step:(fun ~state f -> if is_exceptional state then state else f state)
-      ~init_state:w 
-      xs
-
-
-  let _ = run (inc >>= fun () -> inc >>= fun () -> inc) 0
+  let _ = run ~code ~state:0
 
 end
