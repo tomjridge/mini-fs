@@ -91,8 +91,6 @@ let init_fs () = {
 }
 
 
-type t = fs_t
-
 
 type dh = did * string list (* inefficient *)
 
@@ -122,7 +120,7 @@ type ('e,'w,'m) monad_ops = {
 type ('e,'m) extra_ops = {
   new_did: unit -> (did,'m)m_;
   new_fid: unit -> (fid,'m)m_;
-  with_fs: 'a. (t -> 'a * t) -> ('a,'m)m_;  (* ASSUME-ed not to raise exception *)
+  with_fs: 'a. (fs_t -> 'a * fs_t) -> ('a,'m)m_;  (* ASSUME-ed not to raise exception *)
   internal_err: 'a. string -> ('a,'m)m_;
 }
 
@@ -421,23 +419,43 @@ type exn_ = [
 
 open Dn_monad
 
+type t = { 
+  thread_error_state: exn_ option;  (* for current call *)
+  internal_error_state: string option;
+  fs: fs_t
+}
+
+
 let with_fs (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
-  X_.with_state'' f (fun a -> return a)
+  with_state (fun w -> f w.fs |> fun (x,fs') -> x,{w with fs=fs'}) (fun a -> return a)
 
+let _ = with_fs
 
-let new_did () = with_fs (fun w ->
-    let w' = { w with max_did=(inc_did w.max_did) } in
-    let did = w'.max_did in
-    did,w')
+let new_did () = with_fs (fun fs ->
+    { fs with max_did=(inc_did fs.max_did) } |> fun fs' ->
+    let did = fs'.max_did in
+    did,fs')
 
-let new_fid () = with_fs (fun w ->
-    let w' = { w with max_fid=(inc_fid w.max_fid) } in
-    let fid = w'.max_fid in
-    fid,w')
+let new_fid () = with_fs (fun fs ->
+    { fs with max_fid=(inc_fid fs.max_fid) } |> fun fs' ->
+    let fid = fs'.max_fid in
+    fid,fs')
 
-      
-let extra = { new_did; new_fid; with_fs }
+let _ = new_fid
 
+let internal_err s : ('a,t trans)m_ = 
+  fun (g: 'a -> t trans) ->
+    Step(fun w -> 
+        ({ w with internal_error_state=(Some s)}, fun () -> Finished))
+
+let extra = { new_did; new_fid; with_fs; internal_err }
+
+let err e : ('a,t trans)m_ = 
+  fun (g: 'a -> t trans) ->
+    Step(fun w -> 
+        ({ w with thread_error_state=(Some e)}, fun () -> Finished))
+
+let monad_ops = Dn_monad.{bind; return; err}
 
 let ops = mk_ops ~monad_ops ~extra  (* NOTE the error cases are captured in the type *)
 
@@ -462,6 +480,7 @@ let (run,imperative_ops) =
 
 (* logging ---------------------------------------------------------- *)
 
+(*
 open Msgs
 
 let log_return (x : ('a,ww)m_) : ('a,ww)m_ = 
@@ -496,18 +515,4 @@ let log (c:msg_from_client) : ('a,ww) m_ -> ('a,ww) m_ = fun m ->
 
 
 
-(* raising exceptions ----------------------------------------------- *)
-
-(*
-
-exception E of exn_
-
-
-let err e = 
-  fun (g: 'a -> ww) ->
-  fun w ->
-    raise (E e)
-
-
-*)
 *)

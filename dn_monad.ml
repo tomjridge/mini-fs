@@ -39,12 +39,14 @@ let with_state f : (unit,'w) m' = fun (k:unit -> 'w trans) ->
   Step(fun w -> f w,k)
 *)
 
-let with_state (f:'w -> 'a * 'w) (g: 'a -> ('b,'w)m') : ('b,'w)m' = 
-  fun (h: 'b -> 'w trans) -> 
+let with_state (type a w b) (f:w -> a * w) (g: a -> (b,w)m') : (b,w)m' = 
+  fun (h: b -> w trans) -> 
   Step(fun w -> 
-      f w |> fun (w',a) ->
+      f w |> fun (a,w') ->
       w',fun () -> g a h)
 
+
+let _ = with_state
 
 (* example ---------------------------------------------------------- *)
 
@@ -92,12 +94,8 @@ module Example2 = functor (X_ : sig end) -> struct
   module Example = Example(X_)
   open Example
 
-  (* the exceptional state *)
-  let is_exceptional = fun w -> w = 1
-
-
   (* FIXME note that for "with error" we stop when we hit an exceptional state *)
-  let run ~(state:w) ~(code:'a m) =
+  let run ~(is_exceptional:w -> bool) ~(state:w) ~(code:'a m) =
     (code @@ fun a -> Finished) |> fun trans ->
     let rec run ~(state:w) ~(trans:w trans) = 
       match is_exceptional state with
@@ -110,6 +108,10 @@ module Example2 = functor (X_ : sig end) -> struct
     in
     run ~state ~trans
 
+  (* the exceptional state *)
+  let is_exceptional = fun w -> w = 1
+
+  (* following stops when w is 1 *)
   let _ = run ~code ~state:0
 
 end
