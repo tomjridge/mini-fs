@@ -19,6 +19,9 @@ let blit_bigarray_to_bytes ~src ~soff ~len ~dst ~doff =
     ()
   done
 
+let blit_string_to_bytes  ~src ~soff ~len ~dst ~doff = 
+  Bytes.blit_string src soff dst doff len
+
 let thread_id () = Thread.(self () |> id)
 
 

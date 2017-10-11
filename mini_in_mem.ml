@@ -334,10 +334,20 @@ let mk_ops ~monad_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "pread, impossible, no file, mim.325",s
         | Some(contents:string) ->
-          blit_string_to_bigarray 
-            ~src:contents ~soff:foff ~len:length 
-            ~dst:buffer ~doff:boff;
-          (`Ok length,s)) >>= function
+          (* don't try to read more bytes than available *)
+          let max_length = String.length contents - foff in
+          let length = min max_length length in
+          let error_case = 
+            foff+length > String.length contents ||  (* should be impossible *)
+            boff+length > Bigarray.Array1.dim buffer  (* FIXME fuse prevents this? *)
+          in
+          match error_case with
+          | true -> `Internal "pread, invalid blit arguments, mim.342",s
+          | false -> 
+            blit_string_to_bigarray 
+              ~src:contents ~soff:foff ~len:length 
+              ~dst:buffer ~doff:boff;
+            (`Ok length,s)) >>= function
     | `Internal s -> extra.internal_err s
     | `Ok l -> return l
   in
@@ -349,13 +359,31 @@ let mk_ops ~monad_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
         | Some contents ->
-          let contents = Bytes.of_string contents in
-          blit_bigarray_to_bytes 
-            ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
-          (* FIXME extend contents *)
-          Bytes.to_string contents |> fun contents ->
-          files_ops.map_add fid contents files |> fun files ->
-          (`Ok length,{s with files})) >>= function
+          (* convert contents to bytes, and extend if necessary *)
+          let contents = 
+            if foff+length > String.length contents 
+            then 
+              Bytes.create (foff+length) |> fun contents' ->
+              blit_string_to_bytes
+                ~src:contents ~soff:0 ~len:(String.length contents) 
+                ~dst:contents' ~doff:0;
+              contents'
+            else Bytes.of_string contents 
+          in
+          let error_case = 
+            foff+length > Bytes.length contents ||   (* shouldn't happen *)
+            boff+length > Bigarray.Array1.dim buffer  (* presumably fuse prevents this *)
+          in
+          match error_case with
+          | true -> `Internal "pwrite, invalid blit arguments, mim.357",s
+          | false -> 
+            let contents = Bytes.of_string contents in
+            blit_bigarray_to_bytes 
+              ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
+            (* FIXME extend contents *)
+            Bytes.to_string contents |> fun contents ->
+            files_ops.map_add fid contents files |> fun files ->
+            (`Ok length,{s with files})) >>= function
     | `Internal s -> extra.internal_err s
     | `Ok l -> return l
   in
@@ -372,7 +400,7 @@ let mk_ops ~monad_ops ~extra =
         | None -> `Internal "file not found mim.362",s
         | Some contents ->
           let contents' = Bytes.create length in
-          Bytes.blit_string contents 0 contents' 0 length;
+          Bytes.blit_string contents 0 contents' 0 (min (Bytes.length contents) length);
           Bytes.to_string contents' |> fun contents ->
           files_ops.map_add fid contents files |> fun files ->
           `Ok (),{s with files}) >>= function
@@ -509,6 +537,8 @@ let _ = ops
 
 let is_exceptional w = w.thread_error_state <> None || w.internal_error_state <> None
 
+let log_state = ref false
+
 let rec run w (x:('a,'m)m_) = 
   match is_exceptional w with
   | true -> `Exceptional w
@@ -517,7 +547,7 @@ let rec run w (x:('a,'m)m_) =
     | Finished a -> `Finished(a,w)
     | Step f -> 
       f w |> fun (w',rest) ->
-      Printf.printf "run mim.511: result state: %s\n" (t_to_string w');
+      (if !log_state then Printf.printf "run mim.511: result state: %s\n" (t_to_string w'));
       if is_exceptional w' 
       then `Exceptional w' 
       else run w' (rest())
