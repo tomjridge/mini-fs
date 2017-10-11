@@ -26,9 +26,7 @@ let default_dir_stats = LargeFile.stat "."
 
 
 
-let mk_fuse_ops (type path) 
-    ~run ~ops 
-  = 
+let mk_fuse_ops (type path) ~run ~ops = 
 
   let ops = mk_imperative_ops run ops in
   dest_imperative_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->

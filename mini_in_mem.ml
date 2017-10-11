@@ -443,10 +443,12 @@ let new_fid () = with_fs (fun fs ->
 
 let _ = new_fid
 
-let internal_err s : ('a,t trans)m_ = 
-  fun (g: 'a -> t trans) ->
+let internal_err s : ('a,('a,t) trans)m_ = 
+  fun (g: 'a -> ('a,t) trans) ->
     Step(fun w -> 
-        ({ w with internal_error_state=(Some s)}, fun () -> Finished))
+        ({ w with internal_error_state=(Some s)}, fun () -> failwith "attempt to step exceptional state"))
+
+let _ = internal_err
 
 let extra = { new_did; new_fid; with_fs; internal_err }
 
