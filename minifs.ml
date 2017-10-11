@@ -13,7 +13,7 @@ let _ = assert(Sys.int_size = 63)
 type length = int (* FIXME in following *)
 type offset = int
 
-type ('a,'m) m_ = ('a -> 'm) -> 'm
+type ('a,'m) m_ = ('a,'m) Step_monad.m
 
 
 let wf_ops (type path dh fd buffer t m) 
@@ -27,7 +27,7 @@ let wf_ops (type path dh fd buffer t m)
   let opendir : path -> (dh,m) m_ = opendir in
   (* . and .. are returned *)
   let readdir : dh -> ((string list * is_finished),m) m_ = readdir in
-  let  closedir : dh -> (unit -> m) -> m = closedir in
+  let  closedir : dh -> (unit,m)m_ = closedir in
   let create : parent:path -> name:string -> (unit,m) m_ = create in
   let open_ : path -> (fd,m) m_ = open_ in
   let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,m) m_ = pread in
@@ -69,7 +69,7 @@ let opendir_readdir_closedir ops =
 
 
 type 'm run = {
-    run:'a. (('a -> 'm) -> 'm) -> 'a
+    run:'a. ('a,'m)m_ -> 'a
   }
 
 let wf_imperative_ops (type path dh fd buffer t)  
@@ -81,7 +81,7 @@ let wf_imperative_ops (type path dh fd buffer t)
   let opendir : path -> dh = opendir in
   (* . and .. are returned *)
   let readdir : dh -> (string list * is_finished) = readdir in
-  let  closedir : dh -> unit = closedir in
+  let closedir : dh -> unit = closedir in
   let create : parent:path -> name:string -> unit = create in
   let open_ : path -> fd = open_ in
   let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int = pread in

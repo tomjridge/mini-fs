@@ -140,56 +140,53 @@ let mk_fuse_ops (type path) ~run ~ops =
 let _ = mk_fuse_ops
 
 
-module Logged_in_mem_with_unix_errors = struct
+module In_mem_with_unix_errors = struct
 
   open Mini_in_mem
 
-  let log_op : 'm Mini_log.log_op = Mini_log.{
-      log=Mini_in_mem.log
-    }
-
-  let ops = Mini_log.mk_logged_ops ~log_op ~ops
-
-  let _ = ops
-
-  (* need to convert errors to exceptions, and use imperative state *)
-
-  type ww = X_.ww
-
-  let ref_ = ref init_fs
-
-  (* target type: 'm run = 'a. (('a -> 'm) -> 'm) -> 'a, where 'm is ww *)
+  let ops = ops
+  let init_t = init_t
 
   let mk_exn = function
     | `Error_no_entry _ -> Unix_error(ENOENT, "154","")
     | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
-    | `Error_not_file -> Unix_error(ENOENT, "156","") 
+    | `Error_not_file -> Unix_error(EINVAL, "156","") (* FIXME *)
 
 
-  let run (type a) (aa:((a -> ww) -> ww)) : a = 
-    let module M = struct exception E of a end in
-    (* a -> ww is the type of the "rest of the computation" *)
-    let a_ww : a -> ww = 
-      fun a w -> 
-        let (e,w') = w in
-        ref_:=w'; 
-        print_endline "# mfuse.l178";
-        match e with
-        | None -> (print_endline "# mfuse.l180"; raise (M.E a))
-        | Some e' -> failwith "impossible mfuse.l178"
-    in
-    try 
-      match aa a_ww (None,!ref_) with
-      | (None,w') -> failwith "impossible mfuse.run.l188"
-      | (Some e,w') -> ref_:=w'; raise (mk_exn e)
-    with (M.E a) -> a
+  let run ref_ : t run = {
+    run=(fun x -> Mini_in_mem.run (!ref_) x |> function
+      | `Exceptional w -> (
+          "Run resulted in exceptional state" |> fun s ->
+          print_endline s;
+          match w.internal_error_state with 
+          | None -> (
+              match w.thread_error_state with
+              | None -> 
+                "impossible, mfuse.161" |> fun s ->
+                print_endline s;
+                raise @@ Unix_error(EUNKNOWNERR 99, s, s)
+              | Some e ->
+                "mfuse.165, thread error: "^(Mini_in_mem.exn__to_string e) |> fun s ->
+                print_endline s;
+                raise @@ mk_exn e)
+          | Some s ->
+            "thread error mfuse.170: "^s) |> fun s ->
+          print_endline s;
+          raise @@ Unix_error(EUNKNOWNERR 99, s, s)
+      | `Finished(a,w) -> 
+        ref_:=w;
+        a)
+  }
 
-  let run : ww run = { run }
 
-  let imp_ops = Minifs.mk_imperative_ops ~run ~ops
+(*  
+let imp_ops () = Minifs.mk_imperative_ops ~run:(run (ref Mini_in_mem.init_t)) ~ops 
+*)
 
 end
 
     
 
-let in_mem_fuse_ops = Logged_in_mem_with_unix_errors.(mk_fuse_ops ~run ~ops)
+let in_mem_fuse_ops = In_mem_with_unix_errors.(
+    let run = run (ref init_t) in
+    mk_fuse_ops ~run ~ops)

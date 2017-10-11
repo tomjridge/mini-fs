@@ -71,19 +71,31 @@ type fs_t = {
   max_did: did;
 }
 
-module Fs_json = struct
+module X_ = struct
   (* an easily-jsonable version *)
-  type fs = {
+  type fs' = {
     files: (fid * string) list;
     max_fid: fid;
-    dirs: (string * id) list;
+    dirs: (did * (string*id) list) list;
     max_did: did;
   } [@@deriving yojson]
+
+  let from_fs (fs:fs_t) = {
+    files=files_ops.map_bindings fs.files;
+    max_fid=fs.max_fid;
+    dirs=
+      dirs_ops.map_bindings fs.dirs 
+      |> List.map (fun (did,dir) -> (did,dir_ops.map_bindings dir));
+    max_did=fs.max_did;
+  }
 end
+
+let fs_to_json fs = X_.(
+  from_fs fs |> fs'_to_yojson |> Yojson.Safe.pretty_to_string)
 
 let empty_dir = dir_ops.map_empty
 
-let init_fs () = {
+let init_fs = {
   files=files_ops.map_empty;
   max_fid=fid0;
   dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did empty_dir);
@@ -417,7 +429,10 @@ type exn_ = [
     | `Error_not_file
 ] [@@deriving yojson]
 
-open Dn_monad
+let exn__to_string e = 
+  e |> exn__to_yojson |> Yojson.Safe.pretty_to_string
+
+open Step_monad
 
 type t = { 
   thread_error_state: exn_ option;  (* for current call *)
@@ -425,6 +440,29 @@ type t = {
   fs: fs_t
 }
 
+let init_t = {
+  thread_error_state=None;
+  internal_error_state=None;
+  fs=init_fs
+}
+
+module Y_ = struct
+  open X_
+  type t' = {
+    thread_error_state: exn_ option;  (* for current call *)
+    internal_error_state: string option;
+    fs:fs' 
+  } [@@deriving yojson]
+
+  let from_t (t:t) = {
+    thread_error_state=t.thread_error_state;
+    internal_error_state=t.internal_error_state;
+    fs=X_.from_fs t.fs
+  }
+end
+
+let t_to_string t = Y_.(
+    t |> from_t |> t'_to_yojson |> Yojson.Safe.pretty_to_string)
 
 let with_fs (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
   with_state (fun w -> f w.fs |> fun (x,fs') -> x,{w with fs=fs'}) (fun a -> return a)
@@ -443,41 +481,65 @@ let new_fid () = with_fs (fun fs ->
 
 let _ = new_fid
 
-let internal_err s : ('a,('a,t) trans)m_ = 
-  fun (g: 'a -> ('a,t) trans) ->
-    Step(fun w -> 
-        ({ w with internal_error_state=(Some s)}, fun () -> failwith "attempt to step exceptional state"))
+let internal_err s : ('a,'m)m_ = 
+  Step(fun w -> 
+      ({ w with internal_error_state=(Some s)}, fun () -> 
+          "Fatal error: attempt to step internal errror state mim.449\n" |> fun s ->
+          print_endline s;
+          failwith s))
 
 let _ = internal_err
 
 let extra = { new_did; new_fid; with_fs; internal_err }
 
-let err e : ('a,t trans)m_ = 
-  fun (g: 'a -> t trans) ->
-    Step(fun w -> 
-        ({ w with thread_error_state=(Some e)}, fun () -> Finished))
+let err e : ('a,'m)m_ = 
+  Step(fun w -> 
+      ({ w with thread_error_state=(Some e)}, fun () -> 
+          "Fatal error: attempt to step thread errror state mim.460\n" |> fun s ->
+          print_endline s;
+          failwith s))
 
-let monad_ops = Dn_monad.{bind; return; err}
+let monad_ops = Step_monad.{bind; return; err}
 
 let ops = mk_ops ~monad_ops ~extra  (* NOTE the error cases are captured in the type *)
 
 let _ = ops
 
+(* running ---------------------------------------------------------- *)
+
+let is_exceptional w = w.thread_error_state <> None || w.internal_error_state <> None
+
+let rec run w (x:('a,'m)m_) = 
+  match is_exceptional w with
+  | true -> `Exceptional w
+  | false -> 
+    match x with
+    | Finished a -> `Finished(a,w)
+    | Step f -> 
+      f w |> fun (w',rest) ->
+      Printf.printf "run mim.511: result state: %s\n" (t_to_string w');
+      if is_exceptional w' 
+      then `Exceptional w' 
+      else run w' (rest())
+
 
 (* imperative ------------------------------------------------------- *)
 
-(*
-module W_ = struct
-  type w = fs_t
-end
 
-module Mk_state_passing_ = Mk_state_passing(W_)
+let imp_run ref_ : t run = {
+  run=(fun x -> run (!ref_) x |> function
+    | `Exceptional w -> 
+      "Run resulted in exceptional state" |> fun s ->
+      print_endline s;
+      failwith s
+    | `Finished(a,w) -> 
+      ref_:=w;
+      a)
+}
+  
 
-let ref_ = ref init_fs
-
-let (run,imperative_ops) = 
-  Mk_state_passing_.mk_imperative_ops ops ref_ @@ fun ~run ~ops -> (run,ops)
-*)
+let mk_imperative_ops ~ref_ =
+  Minifs.mk_imperative_ops ~run:(imp_run ref_) ~ops 
 
 
 (* logging ---------------------------------------------------------- *)
