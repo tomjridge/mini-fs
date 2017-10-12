@@ -1,5 +1,6 @@
 (* log calls and returns -------------------------------------------- *)
 
+(*
 open Mini_pervasives
 open Minifs
 open Mini_nfs
@@ -32,3 +33,4 @@ let mk_logged_ops (type m) ~log_op ~ops =
   let stat_file path = log_op.log (Stat_file(path)) (stat_file path) in
   let kind path = log_op.log (Kind(path)) (kind path) in
   Minifs.mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+*)

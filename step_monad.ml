@@ -9,6 +9,8 @@ let rec bind (x:('a,'w)m) (f:'a -> ('b,'w)m) : ('b,'w)m =
   | Finished a -> f a
   | Step g -> Step(fun w -> g w |> fun (w',rest) -> (w',fun () -> bind (rest()) f))
 
+let ( >>= ) = bind
+
 let with_state (type a w b) (f:w -> a*w) (g:a->(b,w)m) : (b,w)m = 
   Step(fun w ->
       f w |> fun (a,w') ->

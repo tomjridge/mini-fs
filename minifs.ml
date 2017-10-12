@@ -18,7 +18,7 @@ type ('a,'m) m_ = ('a,'m) Step_monad.m
 
 let wf_ops (type path dh fd buffer t m) 
     ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
-    ~create ~open_ ~pread ~pwrite ~close ~truncate 
+    ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate 
     ~stat_file ~kind ~reset    
   = 
   let root : path = root in
@@ -33,6 +33,7 @@ let wf_ops (type path dh fd buffer t m)
   let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,m) m_ = pread in
   let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> (int,m) m_ = pwrite in
   let close : fd -> (unit,m) m_ = close in
+  let rename : spath:path -> sname:string -> dpath:path -> dname:string -> (unit,m) m_ = rename in
   let truncate : path:path -> length:int -> (unit,m) m_ = truncate in
   let stat_file : path -> (file_stat,m) m_ = stat_file in
   let kind : path -> (st_kind,m) m_ = kind in
@@ -42,25 +43,25 @@ let wf_ops (type path dh fd buffer t m)
 let _ = wf_ops
 
 let mk_ops 
-    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
   =
   assert(wf_ops 
-    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset);
-  `Ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)
+    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset);
+  `Ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,rename,truncate,stat_file,kind,reset)
 
-let dest_ops (`Ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)) 
+let dest_ops (`Ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,rename,truncate,stat_file,kind,reset)) 
   =
-  assert(wf_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset);
+  assert(wf_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset);
   fun k -> 
-    k ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+    k ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
 
 let dest_ops' ops = dest_ops ops @@ 
-  fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset 
+  fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset 
   -> 
   (root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)
 
 let opendir_readdir_closedir ops =
-  dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+  dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset ->
   opendir,readdir,closedir
 
 
@@ -73,7 +74,7 @@ type 'm run = {
   }
 
 let wf_imperative_ops (type path dh fd buffer t)  
-    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset 
+    ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset 
   =
   let root : path = root in
   let unlink : parent:path -> name:string -> unit = unlink in
@@ -87,6 +88,7 @@ let wf_imperative_ops (type path dh fd buffer t)
   let pread : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int = pread in
   let pwrite : fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int = pwrite in
   let close : fd -> unit = close in
+  let rename : spath:path -> sname:string -> dpath:path -> dname:string -> unit = rename in
   let truncate : path:path -> length:int -> unit = truncate in
   let stat_file : path -> file_stat = stat_file in
   let kind : path -> st_kind = kind in
@@ -95,7 +97,7 @@ let wf_imperative_ops (type path dh fd buffer t)
 
 
 let mk_imperative_ops ~run ~ops =
-  dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+  dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset ->
   let run f = try run.run f with e -> (Printexc.to_string e |> print_endline; raise e) in
   let root= root in
   let unlink=(fun ~parent ~name -> run @@ unlink ~parent ~name) in
@@ -108,19 +110,20 @@ let mk_imperative_ops ~run ~ops =
   let pread=(fun ~fd ~foff ~length ~buffer ~boff -> run @@ pread ~fd ~foff ~length ~buffer ~boff) in
   let pwrite=(fun ~fd ~foff ~length ~buffer ~boff -> run @@ pwrite ~fd ~foff ~length ~buffer ~boff) in
   let close=(fun fd -> run @@ close fd) in
+  let rename=(fun ~spath ~sname ~dpath ~dname -> run @@ rename ~spath ~sname ~dpath ~dname) in
   let truncate=(fun ~path ~length -> run @@ truncate ~path ~length) in
   let stat_file=(fun path -> run @@ stat_file path) in
   let kind=(fun path -> run @@ kind path) in
   let reset=(fun () -> run @@ reset ()) in
-  assert(wf_imperative_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset);
-  `Imperative_ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)  
+  assert(wf_imperative_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset);
+  `Imperative_ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,rename,truncate,stat_file,kind,reset)  
 
 
-let dest_imperative_ops (`Imperative_ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)) 
+let dest_imperative_ops (`Imperative_ops(root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,rename,truncate,stat_file,kind,reset)) 
   =
-  assert(wf_imperative_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset);
+  assert(wf_imperative_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset);
   fun k -> 
-    k ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+    k ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
 
 
 
@@ -134,7 +137,7 @@ let dest_imperative_ops (`Imperative_ops(root,unlink,mkdir,opendir,readdir,close
 (* for small directories *)
 let readdir' ~ops = 
   dest_imperative_ops ops @@ 
-  fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+  fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset ->
   fun path ->
     let dh = opendir path in
     let es = ref [] in

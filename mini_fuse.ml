@@ -29,7 +29,7 @@ let default_dir_stats = LargeFile.stat "."
 let mk_fuse_ops (type path) ~run ~ops = 
 
   let ops = mk_imperative_ops run ops in
-  dest_imperative_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset ->
+  dest_imperative_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset ->
 
 
   let unlink path = 
@@ -47,10 +47,7 @@ let mk_fuse_ops (type path) ~run ~ops =
 
 
   let readdir' = readdir' ~ops in
-  let readdir path _ = 
-    path |> fun path ->
-    readdir' path 
-  in
+  let readdir path _ = readdir' path in
 
   let _ = kind in
 
@@ -95,6 +92,11 @@ let mk_fuse_ops (type path) ~run ~ops =
     n
   in
 
+  let rename src dst = 
+    src |> dirname_basename |> fun (spath,sname) ->
+    dst |> dirname_basename |> fun (dpath,dname) ->
+    rename ~spath ~sname ~dpath ~dname
+  in
 
   let truncate path length = 
     path |> fun path ->
@@ -123,17 +125,25 @@ let mk_fuse_ops (type path) ~run ~ops =
   in
 
 
+  (* hack to avoid errors for apps that expect chmod *)
+  let chmod path i = () in
+  let utime path atim mtim = () in
+
   { default_operations with 
 	  init = (fun () -> Printf.printf "filesystem started\n%!");
    unlink;
+   rmdir=unlink;
    mkdir;    
    readdir;
    fopen;
 	 mknod = (fun path mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* FIXME gets called instead of fopen to create a file *)
    read;
    write;
+   rename;
    truncate;
    getattr;
+   chmod;
+   utime;
   } [@@ocaml.warning "-26"]
 
 
@@ -151,6 +161,10 @@ module In_mem_with_unix_errors = struct
     | `Error_no_entry _ -> Unix_error(ENOENT, "154","")
     | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
     | `Error_not_file -> Unix_error(EINVAL, "156","") (* FIXME *)
+    | `Error_attempt_to_rename_dir_over_file -> Unix_error(EINVAL, "157","") (* FIXME *)
+    | `Error_attempt_to_rename_root -> Unix_error(EINVAL, "158","") (* FIXME *)
+    | `Error_attempt_to_rename_to_subdir -> Unix_error(EINVAL, "159","") (* FIXME *)
+    | `Error_no_src_entry -> Unix_error(ENOENT, "160","")
 
 
   let run ref_ : t run = {

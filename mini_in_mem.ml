@@ -52,16 +52,30 @@ module Set_string = Tjr_set.Make(
 
 type id = Fid of fid | Did of did[@@deriving yojson]
 
-type dir_carrier = id Map_string.Map_.t
-type dir_ops = (string,id,dir_carrier) map_ops
-let dir_ops : dir_ops = Map_string.map_ops
+
+type name_map_carrier = id Map_string.Map_.t
+type nm_ops = (string,id,name_map_carrier) map_ops
+let nm_ops = Map_string.map_ops
+
+type dir_with_parent = {
+  name_map:name_map_carrier;
+  parent:did
+}
+
+let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
+  let dir_empty ~parent = { name_map=nm_ops.map_empty; parent } in
+  let dir_find k t = nm_ops.map_find k t.name_map in
+  let dir_add k v t = {t with name_map=nm_ops.map_add k v t.name_map} in
+  let dir_remove k t = {t with name_map=nm_ops.map_remove k t.name_map} in
+  let dir_bindings t = nm_ops.map_bindings t.name_map in
+  (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
 
 type files_carrier = string Map_fid.Map_.t
 type files_ops = (fid,string,files_carrier) map_ops
 let files_ops : files_ops = Map_fid.map_ops
 
-type dirs_carrier = dir_carrier Map_did.Map_.t
-type dirs_ops = (did,dir_carrier,dirs_carrier) map_ops
+type dirs_carrier = dir_with_parent Map_did.Map_.t
+type dirs_ops = (did,dir_with_parent,dirs_carrier) map_ops
 let dirs_ops : dirs_ops = Map_did.map_ops
 
 type fs_t = {
@@ -76,7 +90,7 @@ module X_ = struct
   type fs' = {
     files: (fid * string) list;
     max_fid: fid;
-    dirs: (did * (string*id) list) list;
+    dirs: (did * ((string*id) list * did) ) list;
     max_did: did;
   } [@@deriving yojson]
 
@@ -85,7 +99,9 @@ module X_ = struct
     max_fid=fs.max_fid;
     dirs=
       dirs_ops.map_bindings fs.dirs 
-      |> List.map (fun (did,dir) -> (did,dir_ops.map_bindings dir));
+      |> List.map (fun (did,dir) -> 
+          dir.name_map |> nm_ops.map_bindings |> fun bs ->
+          (did,(bs,dir.parent)));
     max_did=fs.max_did;
   }
 end
@@ -93,12 +109,12 @@ end
 let fs_to_json fs = X_.(
   from_fs fs |> fs'_to_yojson |> Yojson.Safe.pretty_to_string)
 
-let empty_dir = dir_ops.map_empty
+let empty_dir ~parent = dir_empty ~parent
 
 let init_fs = {
   files=files_ops.map_empty;
   max_fid=fid0;
-  dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did empty_dir);
+  dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did (empty_dir ~parent:root_did));
   max_did=root_did;
 }
 
@@ -134,6 +150,8 @@ type ('e,'m) extra_ops = {
   new_fid: unit -> (fid,'m)m_;
   with_fs: 'a. (fs_t -> 'a * fs_t) -> ('a,'m)m_;  (* ASSUME-ed not to raise exception *)
   internal_err: 'a. string -> ('a,'m)m_;
+  dirs_add: did -> dir_with_parent -> (unit,'m)m_;
+  is_parent: parent:did -> child:dir_with_parent -> (bool,'m)m_;
 }
 
 
@@ -167,7 +185,7 @@ let mk_ops ~monad_ops ~extra =
 
   let _ = resolve_did in
 
-  let resolve_name ~dir ~name : id option = dir_ops.map_find name dir in
+  let resolve_name ~dir ~name : id option = dir_find name dir in
 
   let rec resolve_names_1 ~parent_id ~names : (did * id option,'m) m_ = 
     resolve_did parent_id >>= fun parent -> resolve_names_2 ~parent_id ~parent ~names 
@@ -220,14 +238,14 @@ let mk_ops ~monad_ops ~extra =
   let resolve_dir_path (path:path) : (did,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Did did)) -> return did 
-    | _ -> err (`Error_not_directory)
+    | _ -> err `Error_not_directory
   in
 
 
   let resolve_file_path (path:path) : (fid,'m) m_ = 
     resolve_path path >>= function
     | (_,Some (Fid fid)) -> return fid 
-    | _ -> err (`Error_not_file)
+    | _ -> err `Error_not_file
   in
 
   let root : path = "/" in
@@ -242,33 +260,35 @@ let mk_ops ~monad_ops ~extra =
         match pdir with 
         | None -> `Internal "impossible, parent not found, mim.233",s
         | Some pdir -> 
-          dir_ops.map_find name pdir |> fun entry ->
+          dir_find name pdir |> fun entry ->
           match entry with
-          | None -> `Internal "no name in pdir, mim.237",s
+          | None -> `Error_no_entry,s
           | Some entry -> 
-            dir_ops.map_remove name pdir |> fun pdir ->
+            dir_remove name pdir |> fun pdir ->
             dirs_ops.map_add pid pdir dirs |> fun dirs ->
             `Ok,{s with dirs}) >>= function 
     | `Ok -> return ()
     | `Internal s -> extra.internal_err s
+    | `Error_no_entry -> err @@ `Error_no_entry "unlink, mim.272"
   in
 
   let _ = unlink in 
 
 
+  (* FIXME check is already exists etc *)
   let mkdir ~parent ~name : (unit,'m) m_ = 
     resolve_dir_path parent >>= fun pid ->
     extra.new_did () >>= fun (did:did) -> 
     extra.with_fs (fun s -> 
         s.dirs |> fun dirs ->
         (* add new empty dir to dirs *)
-        dirs_ops.map_add did empty_dir dirs |> fun dirs ->
+        dirs_ops.map_add did (empty_dir ~parent:pid) dirs |> fun dirs ->
         (* add name to parent *)
         dirs_ops.map_find pid s.dirs |> fun pdir ->
         match pdir with 
         | None -> `Internal "impossible, parent not found mim.l259",s
         | Some pdir -> 
-          dir_ops.map_add name (Did did) pdir |> fun pdir ->
+          dir_add name (Did did) pdir |> fun pdir ->
           (* update parent in dirs *)
           dirs_ops.map_add pid pdir dirs |> fun dirs ->
           `Ok,{s with dirs}) >>= function
@@ -287,7 +307,7 @@ let mk_ops ~monad_ops ~extra =
         dirs_ops.map_find did dirs |> function
         | None -> `Internal "opendir, impossible, dir not found mim.278",s
         | Some dir -> 
-          dir_ops.map_bindings dir |> List.map fst |> fun names ->
+          dir_bindings dir |> List.map fst |> fun names ->
           `Ok(mk_dh ~did names),s) >>= function
     | `Ok dh -> return dh
     | `Internal s -> extra.internal_err s
@@ -306,9 +326,9 @@ let mk_ops ~monad_ops ~extra =
     extra.with_fs (fun s -> 
         s.dirs |> fun dirs ->
         dirs_ops.map_find parent dirs |> function
-        | None -> `Internal "create, impossible, dir not found mim.299",s
+        | None -> `Internal "create, impossible, parent did not found mim.299",s
         | Some pdir ->
-          dir_ops.map_add name (Fid fid) pdir |> fun pdir ->
+          dir_add name (Fid fid) pdir |> fun pdir ->
           dirs_ops.map_add parent pdir dirs |> fun dirs ->
           {s with dirs} |> fun s ->
           s.files |> fun files -> 
@@ -392,6 +412,62 @@ let mk_ops ~monad_ops ~extra =
   let close fd = return () in (* FIXME record which are open? *)
 
 
+  (* FIXME ddir and sdir may be the same, so we need to be careful to
+     always use indirection via did *)
+  let rename ~spath ~sname ~dpath ~dname = 
+    resolve_dir_path spath >>= fun sdir_did ->
+    resolve_dir_path dpath >>= fun ddir_did ->
+    resolve_did sdir_did >>= fun sdir ->
+    resolve_name ~dir:sdir ~name:sname |> function
+    | None -> err `Error_no_src_entry
+    | Some resolved_sname -> 
+      resolve_did ddir_did >>= fun ddir ->
+      resolve_name ~dir:ddir ~name:dname |> fun resolved_dname ->
+      let insert_and_remove id =
+        match sdir_did = ddir_did with
+        | true -> 
+          dir_add dname id ddir |> fun ddir ->
+          dir_remove sname ddir |> fun ddir ->
+          extra.dirs_add ddir_did ddir >>= fun () ->
+          return ()
+        | false -> 
+          dir_add dname id ddir |> fun ddir ->
+          dir_remove sname sdir |> fun sdir ->
+          extra.dirs_add sdir_did sdir >>= fun () ->
+          extra.dirs_add ddir_did ddir >>= fun () ->
+          return ()
+      in
+      match resolved_sname,resolved_dname with
+      | Fid fid,None -> insert_and_remove (Fid fid)
+      | Fid fid1,Some(Fid fid2) -> 
+        if fid1=fid2 
+        then return ()
+        else insert_and_remove (Fid fid1)
+      | Fid fid,Some(Did did) ->
+        extra.internal_err "FIXME rename f to d, d should be empty?"
+      | Did sdid,None -> 
+        (* check not root *)
+        if ddir_did=root_did 
+        then err `Error_attempt_to_rename_root
+        (* check not subdir *)
+        else extra.is_parent ~parent:sdid ~child:ddir >>= (function
+            | true -> err `Error_attempt_to_rename_to_subdir
+            | false -> 
+              (* FIXME other checks *)
+              resolve_did sdid >>= fun sdir -> 
+              (* new directory id *)
+              extra.new_did() >>= fun did ->
+              (* record new directory with updated parent *)
+              extra.dirs_add did { sdir with parent=ddir_did } >>= fun () ->
+              insert_and_remove (Did did))
+      | Did sdid,Some(Fid fid) -> 
+        err `Error_attempt_to_rename_dir_over_file  (* FIXME correct ? *)
+      | Did sdid,Some(Did ddid) ->
+        if sdid=ddid 
+        then return ()
+        else extra.internal_err "FIXME rename d to d, dst should be empty?"
+  in
+
   let truncate ~path ~length = 
     resolve_file_path path >>= fun fid ->
     extra.with_fs (fun s ->
@@ -414,7 +490,7 @@ let mk_ops ~monad_ops ~extra =
     extra.with_fs (fun s ->
         s.files |> fun files ->
         files_ops.map_find fid files |> function
-        | None -> `Internal "file not found mim.379",s
+        | None -> `Internal "file fid not found mim.379",s
         | Some contents ->
           String.length contents |> fun sz ->
           `Ok { sz },s) >>= function
@@ -443,7 +519,7 @@ let mk_ops ~monad_ops ~extra =
       ~stat_file ~kind ~reset    
   in
 
-  mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~truncate ~stat_file ~kind ~reset
+  mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
 
 let _ = mk_ops  (* NOTE the error cases are captured in the type *)
 
@@ -455,6 +531,10 @@ type exn_ = [
     | `Error_no_entry of string 
     | `Error_not_directory
     | `Error_not_file
+    | `Error_attempt_to_rename_dir_over_file
+    | `Error_attempt_to_rename_root
+    | `Error_attempt_to_rename_to_subdir
+    | `Error_no_src_entry
 ] [@@deriving yojson]
 
 let exn__to_string e = 
@@ -518,7 +598,35 @@ let internal_err s : ('a,'m)m_ =
 
 let _ = internal_err
 
-let extra = { new_did; new_fid; with_fs; internal_err }
+
+let dirs_find k =
+  with_fs (fun s ->
+      s.dirs |> fun dirs ->
+      dirs_ops.map_find k dirs |> fun v ->
+      v,s)
+
+  (* FIXME we could maintain a list of parents when resolving, of course *)
+let is_parent ~parent ~child = 
+  let open Step_monad in
+  let rec is_p (child:dir_with_parent) = 
+    if child.parent = parent then return true
+    else if child.parent = root_did then return false
+    else is_p' child.parent
+  and is_p' (child:did) =
+    dirs_find child >>= function
+    | None ->  internal_err "did not valid, mim.418"
+    | Some child -> is_p child
+  in
+  is_p child
+
+let dirs_add k v =
+  let open Step_monad in
+  with_fs (fun s ->
+      s.dirs |> fun dirs ->
+      dirs_ops.map_add k v dirs |> fun dirs ->
+      (),{s with dirs})
+
+let extra = { new_did; new_fid; with_fs; internal_err; is_parent; dirs_add }
 
 let err e : ('a,'m)m_ = 
   Step(fun w -> 
