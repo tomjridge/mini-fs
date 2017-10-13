@@ -149,6 +149,7 @@ let mk_serve
   let _ = serve' in
   serve'
 
+(*
 let mk_server
     ~serve
     ~(recv: unit -> (msg_from_client,'m) m)
@@ -156,7 +157,7 @@ let mk_server
   =
   (* read incoming call, process, and return *)
   recv () >>= serve >>= send
-
+*)
 
 (* example in-memory ------------------------------------------------ *)
 

@@ -181,7 +181,7 @@ module In_mem_with_unix_errors = struct
                 print_endline s;
                 raise @@ Unix_error(EUNKNOWNERR 99, s, s)
               | Some e ->
-                "mfuse.165, thread error: "^(Mini_in_mem.exn__to_string e) |> fun s ->
+                "mfuse.165, thread error: "^(Mini_error.exn__to_string e) |> fun s ->
                 print_endline s;
                 raise @@ mk_exn e)
           | Some s ->

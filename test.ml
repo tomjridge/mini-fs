@@ -1,4 +1,5 @@
 (* test; find all files below a given directory *)
+(*
 open Minifs
 
 let ( / ) dir n = dir^"/"^n
@@ -27,3 +28,4 @@ let unix_find =
   find ~kind ~readdir:readdir'
   
   
+*)

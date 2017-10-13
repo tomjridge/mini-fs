@@ -14,6 +14,8 @@ type fd = int [@@deriving bin_io, yojson]
 type data = string[@@deriving bin_io, yojson]
 type file_stat = Minifs.file_stat = { sz:int } [@@deriving bin_io, yojson]
 
+let _ = fun (x:file_stat) -> fun (y:Minifs.file_stat) -> x=y
+
 type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]
 
 type msg_from_client = 
@@ -47,4 +49,4 @@ type msg_from_server' =
 
 
 (* or just use error in monad? *)
-type msg_from_server = Msg of msg_from_server' | Error of string
+type msg_from_server = Msg of msg_from_server' | Error of Mini_error.exn_ [@@deriving bin_io, yojson]
