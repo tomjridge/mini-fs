@@ -43,6 +43,11 @@ module Map_string = Tjr_map.Make(
     type t = string let compare: t->t->int = Pervasives.compare 
   end)
 
+module Map_int = Tjr_map.Make(
+  struct 
+    type t = int let compare: t->t->int = Pervasives.compare 
+  end)
+
 
 module Set_string = Tjr_set.Make(
   struct
@@ -78,11 +83,19 @@ type dirs_carrier = dir_with_parent Map_did.Map_.t
 type dirs_ops = (did,dir_with_parent,dirs_carrier) map_ops
 let dirs_ops : dirs_ops = Map_did.map_ops
 
+type dh = int
+
+type dhandles_carrier = string list Map_int.Map_.t
+type dhandles_ops = (dh,string list,dhandles_carrier) map_ops
+let dhandles_ops : dhandles_ops = Map_int.map_ops
+
 type fs_t = {
   files: files_carrier;
   max_fid: fid;
   dirs: dirs_carrier;
   max_did: did;
+  dir_handles: dhandles_carrier;
+  max_dh: dh;
 }
 
 module X_ = struct
@@ -92,6 +105,7 @@ module X_ = struct
     max_fid: fid;
     dirs: (did * ((string*id) list * did) ) list;
     max_did: did;
+    (* FIXME dhandles *)
   } [@@deriving yojson]
 
   let from_fs (fs:fs_t) = {
@@ -116,18 +130,15 @@ let init_fs = {
   max_fid=fid0;
   dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did (empty_dir ~parent:root_did));
   max_did=root_did;
+  dir_handles=dhandles_ops.map_empty;
+  max_dh=0;
 }
-
-
-
-type dh = did * string list (* inefficient *)
 
 
 type fd = fid
 
 
 type path = string
-
 
 
 (* type buffer = bytes  (* or cstruct? *) *)
@@ -289,7 +300,7 @@ let mk_ops ~monad_ops ~extra =
   in
 
 
-  let mk_dh ~did es = (did,es) in
+  (* let mk_dh ~did es = (did,es) in *)
 
 
   let opendir path = 
@@ -300,13 +311,25 @@ let mk_ops ~monad_ops ~extra =
         | None -> `Internal "opendir, impossible, dir not found mim.278",s
         | Some dir -> 
           dir_bindings dir |> List.map fst |> fun names ->
-          `Ok(mk_dh ~did names),s) >>= function
+          1+s.max_dh |> fun dh ->
+          s.dir_handles |> fun handles ->
+          dhandles_ops.map_add dh names handles |> fun dir_handles ->
+          {s with dir_handles; max_dh=dh } |> fun s ->                            
+          `Ok(dh),s) >>= function
     | `Ok dh -> return dh
     | `Internal s -> extra.internal_err s
   in
 
 
-  let readdir dh = dh |> function (did,es) -> return (es,finished) in
+  let readdir dh = 
+    extra.with_fs (fun s ->
+        s.dir_handles |> fun handles ->
+        dhandles_ops.map_find dh handles |> function
+        | None -> `Internal "readdir, impossible, dh not found mim.328",s
+        | Some xs -> `Ok xs,s) >>= function
+    | `Ok xs -> return (xs,finished)
+    | `Internal s -> extra.internal_err s
+  in
 
 
   let closedir dh = return () in (* FIXME should we record which rd are valid? ie not closed *)

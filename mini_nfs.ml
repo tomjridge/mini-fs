@@ -57,7 +57,7 @@ let mk_client_ops (type t)
     | _ -> internal_err @@ "pread, "^ty_err^" mnfs.56"
   in
   let pwrite ~fd ~foff ~length ~buffer ~boff =
-    data_of_buffer buffer boff length |> fun data ->
+    data_of_buffer ~buffer ~boff ~length |> fun data ->
     Pwrite(fd,foff,data) |> call >>= function
     | Int nwritten -> return nwritten
     | _ -> internal_err @@ "pwrite, "^ty_err^" mnfs.62"
@@ -95,10 +95,12 @@ open S_
 
 (* serve requests using a backend ops *)
 
-let mk_server
+let mk_serve
     ~monad_ops
     ~backend
-    ~(recv:msg_from_client -> (msg_from_server','m) m)
+    ~data_of_buffer
+    ~buffer_of_data
+    ~mk_buffer
   =
   let (bind,return,err) = Step_monad.(monad_ops.bind,monad_ops.return,monad_ops.err) in
   let ( >>= ) = bind in
@@ -111,8 +113,17 @@ let mk_server
   let closedir dh = closedir dh >>= ret_unit in
   let create ~parent ~name = create ~parent ~name >>= ret_unit in
   let open_ p = open_ p >>= fun fd -> return @@ Open' fd in
-  let pread = failwith "" in
-  let pwrite = failwith "" in
+  let pread ~fd ~foff ~length = 
+    mk_buffer length |> fun buffer ->
+    pread ~fd ~foff ~length ~buffer ~boff:0 >>= fun nread -> 
+    data_of_buffer ~buffer ~len:nread |> fun data ->
+    return @@ Pread' data
+  in
+  let pwrite ~fd ~foff ~data = 
+    buffer_of_data data |> fun buffer ->
+    pwrite ~fd ~foff ~length:(String.length data) ~buffer ~boff:0 >>= fun nwritten ->
+    return @@ Int nwritten
+  in
   let close fd = close fd >>= ret_unit in
   let rename ~spath ~sname ~dpath ~dname = rename ~spath ~sname ~dpath ~dname >>= ret_unit in
   let truncate ~path ~length = truncate ~path ~length >>= ret_unit in
@@ -126,8 +137,8 @@ let mk_server
     | Closedir dh -> closedir dh
     | Create(parent,name) -> create ~parent ~name
     | Open p -> open_ p
-    | Pread(fd,foff,length) -> failwith "FIXME" (* pread ~fd ~foff ~length (* FIXME buffer boff *)*)
-    | Pwrite(fd,foff,length) -> failwith "FIXME"
+    | Pread(fd,foff,length) -> pread ~fd ~foff ~length
+    | Pwrite(fd,foff,data) -> pwrite ~fd ~foff ~data
     | Close fd -> close fd 
     | Rename(spath,sname,dpath,dname) -> rename ~spath ~sname ~dpath ~dname
     | Truncate(path,length) -> truncate ~path ~length 
@@ -135,5 +146,19 @@ let mk_server
     | Kind p -> kind p
     | Reset -> reset () >>= ret_unit
   in
-  ()
-  
+  let _ = serve' in
+  serve'
+
+let mk_server
+    ~serve
+    ~(recv: unit -> (msg_from_client,'m) m)
+    ~(send:msg_from_server' -> (unit,'m)m)
+  =
+  (* read incoming call, process, and return *)
+  recv () >>= serve >>= send
+
+
+(* example in-memory ------------------------------------------------ *)
+
+(* see bin/nfs_server.ml *)
+
