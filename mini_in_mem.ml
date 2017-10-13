@@ -682,39 +682,22 @@ let mk_imperative_ops ~ref_ =
 
 (* logging ---------------------------------------------------------- *)
 
-(*
-open Msgs
 
-let log_return (x : ('a,ww)m_) : ('a,ww)m_ = 
-  fun (k:'a -> ww) ->
-  fun (w:exn_ option * fs_t) ->
-    x k w |> fun (e,fs) ->
-    let tid = thread_id () in
-    match e with 
-    | None -> 
-      Printf.printf "# thread %d returning mim.l434\n" tid;
-      (e,fs)
-    | Some e ->
-      exn__to_yojson e |> Yojson.Safe.pretty_to_string |> fun e' ->
-      Printf.printf "# log_return thread %d returning exception %s mim.log_return.l438\n" tid e';
-      (Some e,fs)
+(* FIXME should also log exceptional returns *)
+let log msg (x:('a,'m) m_) = 
+  let call = msg |> Msgs.msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
+  let rec log_return = function
+    | Finished a -> 
+      Printf.printf "call %s returns\n" call;
+      Finished a
+    | Step(f) -> Step(
+        fun w -> f w |> fun (w',rest) -> (w',fun () -> log_return (rest())))
+  in
+  let log_call_and_return = Step(
+      fun w -> 
+        Printf.printf "call %s starts\n" call;
+        w,fun () -> log_return x)
+  in
+  log_call_and_return
 
-let _ = log_return
-
-let log_call c : (unit,ww)m_ = 
-  with_fs (fun s -> 
-      let tid = thread_id () in
-      c |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
-      |> fun c -> 
-      Printf.printf "# log_call thread_id(%d) call(%s) mim.log_call.l421\n" tid c;
-      (),s)  
-
-(* FIXME this logging depends on the exact nature and semantics of the
-   monad; here we assume no exceptions are thrown, ie working with e
-   option * w *)
-let log (c:msg_from_client) : ('a,ww) m_ -> ('a,ww) m_ = fun m ->
-  log_call c >>= (fun () -> m |> log_return)
-
-
-
-*)
+let log_op = Mini_log.{ log }

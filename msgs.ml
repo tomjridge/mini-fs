@@ -27,6 +27,7 @@ type msg_from_client =
   | Pread of fd * offset * int
   | Pwrite of fd * offset * data
   | Close of fd
+  | Rename of path * string * path * string
   | Truncate of path * length
   | Stat_file of path
   | Kind of path 

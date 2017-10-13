@@ -155,6 +155,7 @@ module In_mem_with_unix_errors = struct
   open Mini_in_mem
 
   let ops = ops
+  let ops = Mini_log.mk_logged_ops ~log_op ~ops
   let init_t = init_t
 
   let mk_exn = function
