@@ -12,7 +12,7 @@ type dh = int [@@deriving bin_io, yojson]
 type fd = int [@@deriving bin_io, yojson]
 
 type data = string[@@deriving bin_io, yojson]
-type file_stat = int [@@deriving bin_io, yojson]
+type file_stat = Minifs.file_stat = { sz:int } [@@deriving bin_io, yojson]
 
 type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]
 

@@ -17,3 +17,12 @@ let with_state (type a w b) (f:w -> a*w) (g:a->(b,w)m) : (b,w)m =
       w',fun () -> g a)
 
 
+
+(* state passing with error *)
+
+type ('e,'w,'m) monad_ops = {
+  return: 'a. 'a -> ('a,'m)m;
+  bind: 'a 'b. ('a,'m)m -> ('a -> ('b,'m)m) -> ('b,'m)m;
+  err: 'a. 'e -> ('a,'m)m;
+}
+

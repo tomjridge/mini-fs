@@ -137,14 +137,6 @@ type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Arr
 (* monad ops -------------------------------------------------------- *)
 
 
-(* state passing with error *)
-
-type ('e,'w,'m) monad_ops = {
-  return: 'a. 'a -> ('a,'m)m_;
-  bind: 'a 'b. ('a,'m)m_ -> ('a -> ('b,'m)m_) -> ('b,'m)m_;
-  err: 'a. 'e -> ('a,'m)m_;
-}
-
 type ('e,'m) extra_ops = {
   new_did: unit -> (did,'m)m_;
   new_fid: unit -> (fid,'m)m_;
@@ -172,7 +164,7 @@ let is_did x = not (is_fid x)
 (* note the with_fs in the following forces 'm = ww *)
 let mk_ops ~monad_ops ~extra = 
 
-  let (bind,return,err) = (monad_ops.bind,monad_ops.return,monad_ops.err) in
+  let (bind,return,err) = Step_monad.(monad_ops.bind,monad_ops.return,monad_ops.err) in
   let ( >>= ) = bind in
 
   let resolve_did did = 
