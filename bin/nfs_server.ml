@@ -5,7 +5,6 @@ open Lwt_unix
 open Tjr_connection
 open Tjr_minifs
 
-
 module Shared = struct
   let ip = Unix.inet_addr_of_string "127.0.0.1"
   let rport=4001
@@ -28,20 +27,10 @@ let ops = In_mem_with_unix_errors.ops
 let monad_ops = Mini_in_mem.monad_ops
 
 
-(* NOTE data is Msgs.data = string; buffer is mim.buffer = bigarray *)
-let data_of_buffer ~buffer ~len =
-  Mini_pervasives.bigarray_to_string ~src:buffer ~off:0 ~len
-
-let buffer_of_data d = Mini_pervasives.string_to_bigarray d
-  
-
 let serve = 
   Mini_nfs.mk_serve
     ~monad_ops
     ~backend:ops
-    ~data_of_buffer
-    ~buffer_of_data
-    ~mk_buffer:Bigarray_buffer.create
 
 let _ = serve
 

@@ -52,12 +52,12 @@ let mk_client_ops (type t)
   let pread ~fd ~foff ~length ~buffer ~boff =
     Pread(fd,foff,length) |> call >>= function
     | Pread' data -> 
-      blit_data_to_buffer data buffer boff;
+      blit_data_to_buffer ~data ~buffer ~boff;
       return (data_length data)
     | _ -> internal_err @@ "pread, "^ty_err^" mnfs.56"
   in
   let pwrite ~fd ~foff ~length ~buffer ~boff =
-    data_of_buffer ~buffer ~boff ~length |> fun data ->
+    data_of_buffer ~buffer ~off:boff ~len:length |> fun data ->
     Pwrite(fd,foff,data) |> call >>= function
     | Int nwritten -> return nwritten
     | _ -> internal_err @@ "pwrite, "^ty_err^" mnfs.62"
@@ -158,6 +158,41 @@ let mk_server
   (* read incoming call, process, and return *)
   recv () >>= serve >>= send
 *)
+
+(* aux -------------------------------------------------------------- *)
+
+
+(* NOTE data is Msgs.data = string; buffer is mim.buffer = bigarray *)
+let data_of_buffer ~buffer ~off ~len =
+  Mini_pervasives.bigarray_to_string ~src:buffer ~off ~len
+
+let buffer_of_data d = Mini_pervasives.string_to_bigarray d
+  
+let mk_buffer = Bigarray_buffer.create
+
+(* specialize mk_serve *)
+let mk_serve = 
+  mk_serve 
+    ~data_of_buffer:(fun ~buffer ~len -> data_of_buffer ~buffer ~off:0 ~len) 
+    ~buffer_of_data
+    ~mk_buffer
+
+let _ = mk_serve
+
+
+
+let data_length = String.length
+
+let blit_data_to_buffer ~data ~buffer ~boff = 
+  Bigarray_buffer.blit_string_to_bigarray ~src:data ~soff:0 ~len:(data_length data)
+    ~dst:buffer ~doff:boff
+
+(* specialize mk_client_ops *)
+let mk_client_ops = mk_client_ops 
+    ~data_length
+    ~data_of_buffer
+    ~blit_data_to_buffer
+
 
 (* example in-memory ------------------------------------------------ *)
 
