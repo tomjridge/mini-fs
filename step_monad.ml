@@ -1,3 +1,5 @@
+(* FIXME replace with tjr_lib *)
+
 (* similar to dn monad, but simpler *)
 
 type ('a,'w) m = Finished of 'a | Step of ('w -> 'w * (unit -> ('a,'w) m))
