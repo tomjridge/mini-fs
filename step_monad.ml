@@ -28,3 +28,15 @@ type ('e,'w,'m) monad_ops = {
   err: 'a. 'e -> ('a,'m)m;
 }
 
+let run ~dest_exceptional w x =
+  let rec run x = match x with
+    | Finished y -> y
+    | Step f -> 
+      dest_exceptional !w |> function
+      | None ->
+        f !w |> fun (w',rest) ->
+        w:=w';
+        run (rest())
+      | Some e -> failwith __LOC__
+  in
+  run x

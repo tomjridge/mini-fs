@@ -48,36 +48,38 @@ end
 let main () = 
   let w_ref = ref Mini_in_mem.init_t in
   print_endline "nfs_server accepting connections";
-  listen_accept ~quad:Shared.recvr >>= fun conn ->
-  let rec loop () = 
-    recv_string ~conn >>= fun s ->
-    let open Msgs in
-    let open Mini_in_mem in
-    string_to_msg s |> function
-    | Error e -> 
-      print_endline @@ "nfs_server.63, error unmarshalling string: "^e;
-      exit 1
-    | Ok msg -> 
-      serve msg |> fun x ->
-      Mini_in_mem.run (!w_ref) x |> function
-      | `Exceptional w -> (
-          w_ref:={!w_ref with fs=w.fs};  (* FIXME in exceptional case, fs unchanged?*)
-          match w.thread_error_state with
-          | None -> (
-            match w.internal_error_state with
-            | None -> 
-              print_endline @@ "nfs_server.74, impossible"; (* exceptional state *)
-              exit 1
-            | Some e ->
-              Printf.printf "nfs_server.65, internal error: %s\n" e;
-              exit 1)
-          | Some e -> 
-            send ~conn (Error e) >>= fun () -> loop())
-      | `Finished (a,w) -> 
-        w_ref:=w;
-        send ~conn (Msg a) >>= fun () -> loop ()
-  in
-  loop ()
+  listen_accept ~quad:Shared.recvr >>= function
+  | `Connection conn ->
+    let rec loop () = 
+      recv_string ~conn >>= fun s ->
+      let open Msgs in
+      let open Mini_in_mem in
+      string_to_msg s |> function
+      | Error e -> 
+        print_endline @@ "nfs_server.63, error unmarshalling string: "^e;
+        exit 1
+      | Ok msg -> 
+        serve msg |> fun x ->
+        Mini_in_mem.run (!w_ref) x |> function
+        | `Exceptional w -> (
+            w_ref:={!w_ref with fs=w.fs};  (* FIXME in exceptional case, fs unchanged?*)
+            match w.thread_error_state with
+            | None -> (
+                match w.internal_error_state with
+                | None -> 
+                  print_endline @@ "nfs_server.74, impossible"; (* exceptional state *)
+                  exit 1
+                | Some e ->
+                  Printf.printf "nfs_server.65, internal error: %s\n" e;
+                  exit 1)
+            | Some e -> 
+              send ~conn (Error e) >>= fun () -> loop())
+        | `Finished (a,w) -> 
+          w_ref:=w;
+          send ~conn (Msg a) >>= fun () -> loop ()
+    in
+    loop ()
+  | _ -> failwith __LOC__
 
 
 let _ = Lwt_main.run @@ main()
