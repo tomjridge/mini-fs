@@ -10,7 +10,7 @@ open Msgs
 
 module C_ = struct
 type ('e,'m) extra_ops = {
-  internal_err: 'a. string -> ('a,'m)m;
+  internal_err: 'a. string -> 'a m;
 }
 end
 open C_

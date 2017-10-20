@@ -141,9 +141,6 @@ type fd = fid
 type path = string
 
 
-(* type buffer = bytes  (* or cstruct? *) *)
-type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
-
 
 
 let is_fid = function
@@ -164,12 +161,19 @@ let is_did x = not (is_fid x)
 
 (* logging, within the monad *)
 
+module type MIM_BASE_TYPES = 
+  FS_BASE_TYPES with 
+  type path=string and type dh=int and type fd=int 
+                                   and type buffer=buffer
+
 module Make(M:MONAD) = struct
-  module M_ = M
+  module M = M
+  module F = Standard_base_types
+  module Minifs' = Minifs.Make(M)(F)
+  open Minifs'
   open M
 
-  module Minifs' = Minifs.Make(M)
-  open Minifs'
+  module Imp' = Minifs.Make_imp(M)(F)
 
   type 'e extra_ops = {
     err: 'a. 'e -> 'a m;
@@ -536,19 +540,8 @@ module Make(M:MONAD) = struct
 
     let reset () = return () in
 
-
-
-    let _ = wf_ops 
-        ~root ~unlink ~mkdir ~opendir ~readdir ~closedir 
-        ~create ~open_ ~pread ~pwrite ~close ~truncate 
-        ~stat_file ~kind ~reset    
-    in
-
-    mk_ops ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
-
-
-  let _ = mk_ops  (* NOTE the error cases are captured in the type *)
-
+    { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
+      pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
 end
 
@@ -557,7 +550,6 @@ end
 (* instantiate monad ------------------------------------------------ *)
 
 open Mini_error
-
 open Step_monad
 
 type t = { 
@@ -565,6 +557,14 @@ type t = {
   internal_error_state: string option;
   fs: fs_t
 }
+
+module Monad = struct
+  open Step_monad
+  type 'a m = ('a,t)Step_monad.M.m
+  let bind,return = Step_monad.(bind,return)
+end
+open Step_monad.M
+open Monad
 
 let init_t = {
   thread_error_state=None;
@@ -590,8 +590,8 @@ end
 let t_to_string t = Y_.(
     t |> from_t |> t'_to_yojson |> Yojson.Safe.pretty_to_string)
 
-let with_fs (f:fs_t -> 'a * fs_t) : ('a,'m)m_ = 
-  with_state (fun w -> f w.fs |> fun (x,fs') -> x,{w with fs=fs'}) (fun a -> return a)
+let with_fs (f:fs_t -> 'a * fs_t) : 'a m = 
+  Step_monad.with_state (fun w -> f w.fs |> fun (x,fs') -> x,{w with fs=fs'}) (fun a -> return a)
 
 let _ = with_fs
 
@@ -607,7 +607,7 @@ let new_fid () = with_fs (fun fs ->
 
 let _ = new_fid
 
-let internal_err s : ('a,'m)m_ = 
+let internal_err s : 'a m = 
   Step(fun w -> 
       ({ w with internal_error_state=(Some s)}, fun () -> 
           "Fatal error: attempt to step internal errror state mim.449\n" |> fun s ->
@@ -625,7 +625,6 @@ let dirs_find k =
 
 (* FIXME we could maintain a list of parents when resolving, of course *)
 let is_parent ~parent ~child = 
-  let open Step_monad in
   let rec is_p (child:dir_with_parent) = 
     if child.parent = parent then return true
     else if child.parent = root_did then return false
@@ -638,24 +637,24 @@ let is_parent ~parent ~child =
   is_p child
 
 let dirs_add k v =
-  let open Step_monad in
   with_fs (fun s ->
       s.dirs |> fun dirs ->
       dirs_ops.map_add k v dirs |> fun dirs ->
       (),{s with dirs})
 
-let extra = { new_did; new_fid; with_fs; internal_err; is_parent; dirs_add }
-
-let err e : ('a,'m)m_ = 
+let err e : 'a m = 
   Step(fun w -> 
       ({ w with thread_error_state=(Some e)}, fun () -> 
           "Fatal error: attempt to step thread errror state mim.460\n" |> fun s ->
           print_endline s;
           failwith s))
 
-let monad_ops = Step_monad.{bind; return; err}
+module Made = Make(Monad)
+open Made
 
-let ops = mk_ops ~monad_ops ~extra  (* NOTE the error cases are captured in the type *)
+let extra = { new_did; new_fid; with_fs; internal_err; is_parent; dirs_add; err }
+
+let ops = mk_ops ~extra  
 
 let _ = ops
 
@@ -665,7 +664,7 @@ let is_exceptional w = w.thread_error_state <> None || w.internal_error_state <>
 
 let log_state = ref false
 
-let rec run w (x:('a,'m)m_) = 
+let rec run w (x:'a m) = 
   match is_exceptional w with
   | true -> `Exceptional w
   | false -> 
@@ -681,8 +680,9 @@ let rec run w (x:('a,'m)m_) =
 
 (* imperative ------------------------------------------------------- *)
 
+open Made.Imp'.Imp
 
-let imp_run ref_ : t run = {
+let imp_run ref_ : run = {
   run=(fun x -> run (!ref_) x |> function
     | `Exceptional w -> 
       "Run resulted in exceptional state" |> fun s ->
@@ -694,22 +694,24 @@ let imp_run ref_ : t run = {
 }
 
 
-let mk_imperative_ops ~ref_ =
-  Minifs.mk_imperative_ops ~run:(imp_run ref_) ~ops 
+let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) ~ops 
+
 
 
 (* logging ---------------------------------------------------------- *)
 
 
 (* FIXME should also log exceptional returns *)
-let log msg (x:('a,'m) m_) = 
+let log msg (x:'a m) = 
   let call = msg |> Msgs.msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
   let rec log_return = function
     | Finished a -> 
       Printf.printf "call %s returns\n" call;
       Finished a
     | Step(f) -> Step(
-        fun w -> f w |> fun (w',rest) -> (w',fun () -> log_return (rest())))
+        fun w -> 
+          f w |> fun (w',rest) -> 
+          (w',fun () -> log_return (rest())))
   in
   let log_call_and_return = Step(
       fun w -> 
@@ -718,4 +720,7 @@ let log msg (x:('a,'m) m_) =
   in
   log_call_and_return
 
-let log_op = Mini_log.{ log }
+module Log' = Mini_log.Make(Monad)
+
+let log_op = Log'.{ log }
+
