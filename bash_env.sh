@@ -14,6 +14,4 @@ bytes=""
 
 source bash_env.common
 
-mls="bigarray_buffer.ml mini_error.ml minifs.ml mini_pervasives.ml msgs.ml step_monad.ml test.ml mini_log.ml mini_in_mem.ml mini_fuse.ml  mini_unix.ml mini_nfs.ml "
-
 

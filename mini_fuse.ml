@@ -160,18 +160,18 @@ module Make(M:MONAD) = struct (* ------------------------------------ *)
 
   module In_mem_with_unix_errors = struct (* ------------------------- *)
 
-    open Mini_in_mem
-
-    module Log' = Mini_log.Make(Mini_in_mem.Monad)
+    open Mini_in_mem.Made
+   
+    module Log' = Mini_in_mem.Log'
         
     (* Log'.M.m and This.M.m are the same, but it seems ocaml can't see this? *)
     let _ = fun 
       (x:'a Log'.M.m)
-      (y:'a Mini_in_mem.This.M.m) -> (x=y)
+      (y:'a Mini_in_mem.Monad.m) -> (x=y)
 
-    let ops = Mini_in_mem.This.
+    let log_op = Mini_in_mem.log_op
 
-
+    let ops = Mini_in_mem.ops
 
     let ops = Log'.mk_logged_ops ~log_op ~ops
     let init_t = init_t
