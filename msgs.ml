@@ -18,6 +18,7 @@ let _ = fun (x:file_stat) -> fun (y:Minifs.file_stat) -> x=y
 
 type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]
 
+
 type msg_from_client = 
   | Unlink of path * string
   | Mkdir of path * string
@@ -49,4 +50,6 @@ type msg_from_server' =
 
 
 (* or just use error in monad? *)
-type msg_from_server = Msg of msg_from_server' | Error of Mini_error.exn_ [@@deriving bin_io, yojson]
+type msg_from_server = 
+  | Msg of msg_from_server' 
+  | Error of Mini_error.exn_ [@@deriving bin_io, yojson]

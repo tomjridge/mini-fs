@@ -39,7 +39,7 @@ include struct
   open Msgs
   let send ~conn (m:msg_from_server) =
     m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
-    |> fun string_ -> send_string ~conn ~string_ 
+    |> fun s -> send_string ~conn s
       
   let string_to_msg s = s |> Yojson.Safe.from_string |> msg_from_client_of_yojson
 end
