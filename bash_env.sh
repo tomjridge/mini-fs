@@ -15,3 +15,16 @@ bytes=""
 source bash_env.common
 
 
+# clean generated 
+function clean_hook() {
+    rm -f msg_{lwt,unix,abstract}.ml
+}
+
+
+
+function link() {
+    ln -s generated/*.ml .
+}
+
+
+mls=`ls *.ml |sort|tr '\n' ' '`

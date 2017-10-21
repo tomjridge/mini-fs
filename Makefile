@@ -5,8 +5,12 @@ export BASH_ENV
 # shouldn't shell builtin source bash_env anyway?
 libname:=$(shell source bash_env.sh && echo $${libname})#
 
+generate: 
+	$$ocamlopt -linkpkg literate.mli literate.ml
+	./a.out .
 
 all:
+	$$ocamlc -c literate.mli
 	$$ocamlc -c $$mls
 	mk_cma
 	$$ocamlopt -c $$mls
@@ -17,6 +21,8 @@ all:
 run: all
 	$(MAKE) -C bin run
 
+link:
+	link
 
 install:
 	mk_meta

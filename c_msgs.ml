@@ -1,4 +1,5 @@
-open Mini_pervasives
+open A_error
+open C_base
 
 open Bin_prot.Std
 
@@ -9,14 +10,14 @@ type offset = int[@@deriving bin_io, yojson]
 (* FIXME *)
 (* type path = string [@@deriving bin_io, yojson] *)
 type dh = int [@@deriving bin_io, yojson]
+
+(* for messages going to server, fd is int *)
 type fd = int [@@deriving bin_io, yojson]
-
 type data = string[@@deriving bin_io, yojson]
-type file_stat = Minifs.file_stat = { sz:int } [@@deriving bin_io, yojson]
+type file_stat = C_base.file_stat = { sz:int } [@@deriving bin_io, yojson]
 
-let _ = fun (x:file_stat) -> fun (y:Minifs.file_stat) -> x=y
-
-type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]
+type st_kind = (* C_base.st_kind FIXME = *)
+  [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]
 
 
 type msg_from_client = 
@@ -52,4 +53,4 @@ type msg_from_server' =
 (* or just use error in monad? *)
 type msg_from_server = 
   | Msg of msg_from_server' 
-  | Error of Mini_error.exn_ [@@deriving bin_io, yojson]
+  | Error of exn_ [@@deriving bin_io, yojson]

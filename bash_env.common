@@ -149,7 +149,8 @@ function mk_doc() {
 # clean ----------------------------------------------------------------
 
 function clean() {
-	rm -f *.{cmi,cmo,cmx,o,cmt} a.out *.cma *.cmxa *.a *.byte *.native
+	rm -f *.{cmi,cmo,cmx,o,cmt,cmti} a.out *.cma *.cmxa *.a *.byte *.native
+  clean_hook
 }
 
 # ocamlfind install, remove, reinstall --------------------

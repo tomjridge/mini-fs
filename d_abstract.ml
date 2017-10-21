@@ -1,56 +1,56 @@
-(* minimal fs-like thing *)
-type st_kind = [`Dir | `File | `Symlink | `Other ]
-
-type file_stat = { sz:int }
-
-
-type is_finished = bool
-let finished = true
-
-(* ensure 64 bit system *)
-let _ = assert(Sys.int_size = 63)
-
-type length = int (* FIXME in following *)
-type offset = int
 
 
 
-module type MONAD = sig
+
+open C_base 
+
+
+
+
+
+module Base_types = Abstract_base_types 
+
+
+
+
+
+
+open Base_types
+
+module Mem_monad = C_in_mem.Monad
+
+module Lwt_monad = struct
+  type 'a m = 'a Lwt.t
+  let return = Lwt.return
+  let bind = Lwt.bind
+end
+
+module Unix_monad = struct
   type 'a m
-  val return : 'a -> 'a m
-  val bind: 'a m -> ('a -> 'b m) -> 'b m
+  let return : 'a -> 'a m = fun x -> failwith "FIXME"
+  let bind : 'a m -> ('a -> 'b m) -> 'b m = fun x -> failwith "FIXME"
 end
 
-module type FS_BASE_TYPES = sig
-  type path 
-  type dh 
-  type fd 
-  type buffer
-end
+module Abstract_monad = struct
+  type 'a m
+  let return : 'a -> 'a m = fun x -> failwith "FIXME"
+  let bind : 'a m -> ('a -> 'b m) -> 'b m = fun x -> failwith "FIXME"
+end  
 
 
-(* type buffer = bytes  (* or cstruct? *) *)
-module B = struct
-type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
-end
-include B
 
 
-module Standard_base_types = struct
-  type path=string 
-  type dh=int 
-  type fd=int 
-  type buffer=B.buffer
-end
 
 
-module type FS_BASE_TYPES' = FS_BASE_TYPES with type path=string and type dh=int 
 
-module Make = functor(M:MONAD)(F:FS_BASE_TYPES) -> struct
-  module F_ = F
-  open F_
-  module M_ = M
-  type 'a m = 'a M_.m
+module Monad = Abstract_monad 
+
+
+
+
+
+
+  open Monad
 
   type ops = {
     root: path;
@@ -75,47 +75,57 @@ module Make = functor(M:MONAD)(F:FS_BASE_TYPES) -> struct
     reset : unit -> unit m;
   }
 
-(*    
-  let mk_ops 
-      ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
-    =
+  (* convert to logged ops *)
+  type 'm log_op = {
+    log: 'a. C_msgs.msg_from_client -> 'a m -> 'a m
+  }
+
+  let dh' = -99
+
+  let mk_logged_ops (type m) ~log_op ~ops = 
+    let open C_msgs in
+    let root = ops.root in
+    let unlink ~parent ~name = 
+      log_op.log (Unlink(parent,name)) (ops.unlink ~parent ~name) in
+    let mkdir ~parent ~name = 
+      log_op.log (Mkdir(parent,name)) (ops.mkdir ~parent ~name) in
+    let opendir p = log_op.log (Opendir(p)) (ops.opendir p) in
+    let readdir dh = log_op.log (Readdir(dh')) (ops.readdir dh) in 
+    let closedir dh = log_op.log (Closedir(dh')) (ops.closedir dh) in
+    let create ~parent ~name = 
+      log_op.log (Create(parent,name)) (ops.create ~parent ~name) in
+    let open_ p = log_op.log (Open(p)) (ops.open_ p) in
+    let pread ~fd ~foff ~length ~buffer ~boff =
+      log_op.log 
+        (Pread(fd|>fd2int,foff,length)) 
+        (ops.pread ~fd ~foff ~length ~buffer ~boff) 
+    in
+    let pwrite ~fd ~foff ~length ~buffer ~boff =
+      log_op.log 
+        (Pwrite(fd|>fd2int,foff,"data???FIXME")) 
+        (ops.pwrite ~fd ~foff ~length ~buffer ~boff) 
+    in
+    let close fd = log_op.log (Close(fd|>fd2int)) (ops.close fd) in
+    let rename ~spath ~sname ~dpath ~dname = 
+      log_op.log 
+        (Rename(spath,sname,dpath,dname)) 
+        (ops.rename ~spath ~sname ~dpath ~dname) 
+    in
+    let truncate ~path ~length = 
+      log_op.log (Truncate(path,length)) (ops.truncate ~path ~length) in
+    (* FIXME log_op.log the rest as well *)
+    let stat_file path = log_op.log (Stat_file(path)) (ops.stat_file path) in
+    let kind path = log_op.log (Kind(path)) (ops.kind path) in
+    let reset = ops.reset in
     { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
       pread; pwrite; close; rename; truncate; stat_file; kind; reset }
-
-  let dest_ops ops
-    =
-    fun f -> 
-      let (root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,rename,truncate,stat_file,kind,reset)
-        = (ops.root,ops.unlink,ops.mkdir,ops.opendir,ops.readdir,ops.closedir,ops.create,ops.open_,ops.pread,ops.pwrite,ops.close,ops.rename,ops.truncate,ops.stat_file,ops.kind,ops.reset)
-      in
-      f ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset
-
-  let _ = dest_ops
-
-(*
-  let dest_ops' ops = dest_ops ops @@ 
-    fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset 
-    -> 
-    (root,unlink,mkdir,opendir,readdir,closedir,create,open_,pread,pwrite,close,truncate,stat_file,kind,reset)
-*)
-(*
-  let opendir_readdir_closedir ops =
-    dest_ops ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset ->
-    opendir,readdir,closedir
-*)
-
-*)
-
-end
-
-module Make_imp = functor(M:MONAD)(F:FS_BASE_TYPES) -> struct
-  include Make(M)(F)
-  open F
+    
 
 
-  (* imperative operations -------------------------------------------- *)
+
 
   module Imp = struct
+
     type run = {
       run:'a. 'a m -> 'a
     }
@@ -172,17 +182,8 @@ module Make_imp = functor(M:MONAD)(F:FS_BASE_TYPES) -> struct
       pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
 
-  end
-
-
-  (* extra stuff ----------------------------------------------------- *)
-
-  (* this is to make top-level interaction a bit smoother *)
-
-
   (* for small directories *)
   let readdir' ~ops = 
-    let open Imp in
     fun path ->
       let dh = ops.opendir path in
       let es = ref [] in
@@ -196,16 +197,8 @@ module Make_imp = functor(M:MONAD)(F:FS_BASE_TYPES) -> struct
       !es
 
 
-
-  (* following for strings *)
-  let dirname_basename path = 
-    ignore (Tjr_string.starts_with ~prefix:"/" path || failwith __LOC__);
-    Tjr_string.split_on_last ~sub:"/" path |> fun (p,c) -> 
-    (* the semantics is that dirname is an absolute path *)
-    (if p="" then "/" else p),c
+  end
 
 
-end
 
 
-  

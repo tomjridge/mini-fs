@@ -1,9 +1,4 @@
-(* FIXME replace with tjr_lib *)
-
-module M = struct
 type ('a,'w) m = Finished of 'a | Step of ('w -> 'w * (unit -> ('a,'w) m))
-end
-open M
 
 let return (x:'a) : ('a,'w) m = Finished x
 
