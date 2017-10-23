@@ -45,18 +45,7 @@ module type BASE_TYPES = sig
   val fd2int: fd -> int
 end
 
-module Mem_base_types = struct
-  type fd = int
-  type dh = int
-  let fd2int x = x
-end
-
-module Unix_base_types = struct
-  type fd=Unix.file_descr
-  type dh=Unix.dir_handle
-  let fd2int x = ExtUnix.All.int_of_file_descr x
-end
-
+(* FIXME move these to relevant d_ files *)
 module Lwt_base_types = struct
   type fd=Lwt_unix.file_descr
   type dh=Lwt_unix.dir_handle

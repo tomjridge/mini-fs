@@ -1,24 +1,11 @@
 open C_base
 
-(* to make integration with fuse easier; extunix supports this in module BA *)
-type fuse_buffer = Fuse.buffer
-
-type buffer = fuse_buffer
-
-
-(* unix impl -------------------------------------------------------- *)
-
-type path = string
-
-(*type t = state*)
-
-type dh = Unix.dir_handle
-
-type fd = Unix.file_descr
-
-
-(* exception No_such_entry *)
-
+module Unix_base_types = struct
+  type fd=Unix.file_descr
+  type dh=Unix.dir_handle
+  let fd2int x = ExtUnix.All.int_of_file_descr x
+end
+include Unix_base_types
 
 (* ops -------------------------------------------------------------- *)
 

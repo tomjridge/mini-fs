@@ -3,6 +3,14 @@ open C_base
 
 (* in-mem impl ------------------------------------------------------ *)
 
+
+module Mem_base_types = struct
+  type fd = int
+  type dh = int
+  let fd2int x = x
+end
+include Mem_base_types
+
 module Fid : sig
   type fid = int[@@deriving yojson]  (* FIXME hide *)
   val fid0 : fid
@@ -82,8 +90,6 @@ type dirs_carrier = dir_with_parent Map_did.Map_.t
 type dirs_ops = (did,dir_with_parent,dirs_carrier) map_ops
 let dirs_ops : dirs_ops = Map_did.map_ops
 
-type dh = int
-
 type dhandles_carrier = string list Map_int.Map_.t
 type dhandles_ops = (dh,string list,dhandles_carrier) map_ops
 let dhandles_ops : dhandles_ops = Map_int.map_ops
@@ -133,8 +139,6 @@ let init_fs = {
   max_dh=0;
 }
 
-
-type fd = fid
 
 type path = string
 
