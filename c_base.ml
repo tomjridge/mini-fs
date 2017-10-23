@@ -1,6 +1,8 @@
 
+(* access a_* b_* via this module *)
 include A_monad_type
 include A_error
+module Step_monad = B_step_monad
 
 (* following for strings *)
 let dirname_basename path = 
@@ -39,26 +41,31 @@ end
 
 module type BASE_TYPES = sig
   type fd
+  type dh
   val fd2int: fd -> int
 end
 
 module Mem_base_types = struct
   type fd = int
+  type dh = int
   let fd2int x = x
 end
 
 module Unix_base_types = struct
   type fd=Unix.file_descr
+  type dh=Unix.dir_handle
   let fd2int x = ExtUnix.All.int_of_file_descr x
 end
 
 module Lwt_base_types = struct
   type fd=Lwt_unix.file_descr
+  type dh=Lwt_unix.dir_handle
   let fd2int x = x|>Lwt_unix.unix_file_descr|>ExtUnix.All.int_of_file_descr
 end
 
 module Abstract_base_types = struct
   type fd
+  type dh
   let fd2int x = failwith __LOC__
 end
 

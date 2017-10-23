@@ -494,28 +494,32 @@ end
 
 (* logging ---------------------------------------------------------- *)
 
-module Msgs = C_msgs
 
-(* FIXME should also log exceptional returns *)
-let log msg (x:'a m) = 
-  let call = msg |> Msgs.msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
-  let rec log_return = function
-    | Finished a -> 
-      Printf.printf "call %s returns\n" call;
-      Finished a
-    | Step(f) -> Step(
+include struct
+  open C_msgs
+
+  (* FIXME should also log exceptional returns *)
+  let log msg (x:'a m) = 
+    let call = msg |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
+    let rec log_return = function
+      | Finished a -> 
+        Printf.printf "call %s returns\n" call;
+        Finished a
+      | Step(f) -> Step(
+          fun w -> 
+            f w |> fun (w',rest) -> 
+            (w',fun () -> log_return (rest())))
+    in
+    let log_call_and_return = Step(
         fun w -> 
-          f w |> fun (w',rest) -> 
-          (w',fun () -> log_return (rest())))
-  in
-  let log_call_and_return = Step(
-      fun w -> 
-        Printf.printf "call %s starts\n" call;
-        w,fun () -> log_return x)
-  in
-  log_call_and_return
+          Printf.printf "call %s starts\n" call;
+          w,fun () -> log_return x)
+    in
+    log_call_and_return
 
-let log_op = { log }
+  let log_op = { log }
 
 
-let logged_ops = mk_logged_ops ~ops ~log_op
+  let logged_ops = mk_logged_ops ~ops ~log_op
+
+end
