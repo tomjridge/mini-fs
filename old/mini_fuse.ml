@@ -7,8 +7,6 @@ open Fuse
 
 (* fuse ------------------------------------------------------------- *)
 
-open Minifs
-
 (* FIXME wrap operations so they return unix_error *)
 
 let default_file_stats = 
@@ -26,13 +24,9 @@ let default_file_stats st_size =
 let default_dir_stats = LargeFile.stat "."
 
 
-module Make(M:MONAD) = struct (* ------------------------------------ *)
+open Monad.Imp
 
-  module M = M
-  module F = Standard_base_types
-  module Minifs' = Minifs.Make(M)(F)
-  module Imp' = Minifs.Make_imp(M)(F)
-  open Imp'
+module Make(M:MONAD') = struct (* ------------------------------------ *)
 
   let mk_fuse_ops ~run ~ops = 
 

@@ -5,9 +5,9 @@ export BASH_ENV
 # shouldn't shell builtin source bash_env anyway?
 libname:=$(shell source bash_env.sh && echo $${libname})#
 
-generate: 
-	$$ocamlopt -linkpkg literate.mli literate.ml
-	./a.out .
+# generate: 
+# 	$$ocamlopt -linkpkg literate.mli literate.ml
+# 	./a.out .
 
 all:
 	$$ocamlc -c literate.mli

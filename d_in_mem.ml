@@ -1,5 +1,4 @@
 open Tjr_map
-open A_error
 open C_base
 
 (* in-mem impl ------------------------------------------------------ *)
@@ -150,8 +149,6 @@ let is_did x = not (is_fid x)
 
 (* monad ------------------------------------------------------------ *)
 
-open A_error
-open B_step_monad
 
 type t = { 
   thread_error_state: exn_ option;  (* for current call *)
@@ -159,11 +156,17 @@ type t = {
   fs: fs_t
 }
 
+let init_t = {
+  thread_error_state=None;
+  internal_error_state=None;
+  fs=init_fs
+}
+
 module Monad = struct
   type 'a m = ('a,t) B_step_monad.m
   let bind,return = B_step_monad.(bind,return)
 end
-
+include Monad
 
 
 module Y_ = struct
@@ -183,4 +186,19 @@ end
 
 let t_to_string t = Y_.(
     t |> from_t |> t'_to_yojson |> Yojson.Safe.pretty_to_string)
+
+
+(* generate types --------------------------------------------------- *)
+
+module Ops_type = C_post_msgs.Make_ops_type(Monad)(Mem_base_types)
+include Ops_type
+
+module Imp_ops_type = C_post_msgs.Make_imp_ops_type(
+    struct
+      include Monad
+      include Mem_base_types
+      include Ops_type
+    end)
+
+
 

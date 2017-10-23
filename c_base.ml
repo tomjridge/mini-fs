@@ -1,6 +1,6 @@
 
-
-
+include A_monad_type
+include A_error
 
 (* following for strings *)
 let dirname_basename path = 
@@ -28,14 +28,18 @@ type length = int (* FIXME in following *)
 type offset = int
 
 
-
-
-
-
 include struct
   open Bin_prot.Std
   type path=string [@@deriving bin_io, yojson]
   type dh=int
+end
+
+
+(* base types ------------------------------------------------------- *)
+
+module type BASE_TYPES = sig
+  type fd
+  val fd2int: fd -> int
 end
 
 module Mem_base_types = struct

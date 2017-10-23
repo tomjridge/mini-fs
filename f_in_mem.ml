@@ -3,9 +3,8 @@
 open Tjr_map
 open B_step_monad
 open C_base
-open C_in_mem
-open D_mem
-open Monad
+open C_post_msgs
+open D_in_mem
 
 type 'e extra_ops = {
   err: 'a. 'e -> 'a m;
@@ -474,22 +473,23 @@ let rec run w (x:'a m) =
 
 (* imperative ------------------------------------------------------- *)
 
-open D_mem.Imp
+include struct
+  open D_in_mem.Imp_ops_type
 
-let imp_run ref_ : run = {
-  run=(fun x -> run (!ref_) x |> function
-    | `Exceptional w -> 
-      "Run resulted in exceptional state" |> fun s ->
-      print_endline s;
-      failwith s
-    | `Finished(a,w) -> 
-      ref_:=w;
-      a)
-}
+  let imp_run ref_ : run = {
+    run=(fun x -> run (!ref_) x |> function
+      | `Exceptional w -> 
+        "Run resulted in exceptional state" |> fun s ->
+        print_endline s;
+        failwith s
+      | `Finished(a,w) -> 
+        ref_:=w;
+        a)
+  }
 
 
-let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) ~ops 
-
+  let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) ~ops 
+end
 
 
 (* logging ---------------------------------------------------------- *)
@@ -517,3 +517,5 @@ let log msg (x:'a m) =
 
 let log_op = { log }
 
+
+let logged_ops = mk_logged_ops ~ops ~log_op
