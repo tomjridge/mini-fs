@@ -143,44 +143,28 @@ let extra = { safely }
 let unix_ops = mk_ops ~extra 
 
 
-
-(* running ---------------------------------------------------------- *)
-
-FIXME need to add this to step_monad
-
-
 (* imperative ------------------------------------------------------- *)
+
+let dest_exceptional w = w.error_state 
 
 include struct
   open D_unix.Imp_ops_type
 
-  let imp_run ref_ : run = {
-    run=(fun x -> run (!ref_) x |> function
-      | `Exceptional w -> 
-        "Run resulted in exceptional state" |> fun s ->
-        print_endline s;
-        failwith s
-      | `Finished(a,w) -> 
-        ref_:=w;
-        a)
-  }
+  let run ref_ (x:'a m) = 
+    Step_monad.run ~dest_exceptional !ref_ x |> function
+    | `Finished (w,a) -> (ref_:=w; a)
+    | `Exceptional (e,w) -> 
+      e |> Printexc.to_string |> fun s->
+      Printf.printf "funix.162: run resulted in exceptional: %s\n" s;
+      raise e
+
+  let ref_ = ref initial_world
+      
+  let run x = run ref_ x
+
+  let run : run = { run }
+
+  let unix_imperative_ops = mk_imperative_ops ~run ~ops:unix_ops
 
 end
-
-let the_world = ref initial_world
-
-(* some bug with ppx not working with local exceptions, so use first
-   class modules instead *)
-let run_imperative (type a) (f:a m) : a = 
-  let module M = struct exception E of a end in
-  try ignore(f (fun a w -> raise (M.E a)) the_world); failwith __LOC__
-  with M.E a -> a
-
-let _ = run_imperative
-
-let run = { run=run_imperative }
-
-let unix_imperative_ops = ops_to_imperative run unix_ops
-
-let readdir' = readdir' ~ops:unix_imperative_ops
 

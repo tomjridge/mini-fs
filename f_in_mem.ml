@@ -452,23 +452,36 @@ let _ = ops
 
 (* running ---------------------------------------------------------- *)
 
-let is_exceptional w = w.thread_error_state <> None || w.internal_error_state <> None
+let dest_exceptional w = 
+  (match w.internal_error_state with
+   | None -> ()
+   | Some s ->  
+     Printf.printf "fmem.458: internal error state not none: %s\n" s;
+     failwith __LOC__);
+  w.thread_error_state
 
-let log_state = ref false
+let e2s = fun e -> e|>exn__to_string
 
-let rec run w (x:'a m) = 
-  match is_exceptional w with
-  | true -> `Exceptional w
-  | false -> 
+let print_logs = ref false
+
+(* don't reuse Step_monad.run, because we potentially want to log
+   calls and returns *)
+let rec run (w:t) (x:'a m) = 
+  match dest_exceptional w with
+  | Some e -> `Exn_ e
+  | None -> 
     match x with
     | Finished a -> `Finished(a,w)
     | Step f -> 
       f w |> fun (w',rest) ->
-      (if !log_state 
+      (if !print_logs 
        then Printf.printf "run mim.511: result state: %s\n" (t_to_string w'));
-      if is_exceptional w' 
-      then `Exceptional w' 
-      else run w' (rest())
+      match dest_exceptional w' with
+      | None -> run w' (rest())
+      | Some e -> `Exn_ e
+
+let _ = run
+let _ : t -> 'a m -> [> `Exn_ of exn_ | `Finished of 'a * t ] = run
 
 
 (* imperative ------------------------------------------------------- *)
@@ -478,10 +491,9 @@ include struct
 
   let imp_run ref_ : run = {
     run=(fun x -> run (!ref_) x |> function
-      | `Exceptional w -> 
-        "Run resulted in exceptional state" |> fun s ->
-        print_endline s;
-        failwith s
+      | `Exn_ e ->        
+        Printf.printf "fmem.495: run resulted in exn_: %s\n" (exn__to_string e);
+        failwith __LOC__
       | `Finished(a,w) -> 
         ref_:=w;
         a)
@@ -493,7 +505,6 @@ end
 
 
 (* logging ---------------------------------------------------------- *)
-
 
 include struct
   open C_msgs
