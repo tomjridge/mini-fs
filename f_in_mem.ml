@@ -468,7 +468,7 @@ let print_logs = ref false
    calls and returns *)
 let rec run (w:t) (x:'a m) = 
   match dest_exceptional w with
-  | Some e -> `Exn_ e
+  | Some e -> `Exn_ (e,w)
   | None -> 
     match x with
     | Finished a -> `Finished(a,w)
@@ -478,10 +478,10 @@ let rec run (w:t) (x:'a m) =
        then Printf.printf "run mim.511: result state: %s\n" (t_to_string w'));
       match dest_exceptional w' with
       | None -> run w' (rest())
-      | Some e -> `Exn_ e
+      | Some e -> `Exn_ (e,w)
 
 let _ = run
-let _ : t -> 'a m -> [> `Exn_ of exn_ | `Finished of 'a * t ] = run
+let _ : t -> 'a m -> [> `Exn_ of exn_ * t | `Finished of 'a * t ] = run
 
 
 (* imperative ------------------------------------------------------- *)
@@ -491,7 +491,7 @@ include struct
 
   let imp_run ref_ : run = {
     run=(fun x -> run (!ref_) x |> function
-      | `Exn_ e ->        
+      | `Exn_ (e,w) ->        
         Printf.printf "fmem.495: run resulted in exn_: %s\n" (exn__to_string e);
         failwith __LOC__
       | `Finished(a,w) -> 

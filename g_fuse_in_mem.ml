@@ -15,13 +15,15 @@ include struct
     | `Error_no_src_entry -> Unix_error(ENOENT, "160","")
 end
 
+
 include struct
   open Unix
   open D_in_mem
   open Imp_ops_type
+  (* similar to F_in_mem.imp_run, but translate errors *)
   let run ref_ : run = {
-    run=(fun x -> run (!ref_) x |> function
-      | `Exceptional w -> (
+    run=(fun x -> F_in_mem.run (!ref_) x |> function
+      | `Exn_ (e,w) -> (
           "Run resulted in exceptional state" |> fun s ->
           print_endline s;
           match w.internal_error_state with 
