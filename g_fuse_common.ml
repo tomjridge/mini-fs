@@ -46,6 +46,8 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     let _ = ops.kind in
 
     (* FIXME tricky combining create with fopen *)
+    (* NOTE that fuse keeps track of fds, so this just returns None;
+       read and write are via path *)
     let fopen (path:string) flags = 
       print_endline @@ "# fopen "^ path ^ " mfuse.fopen.l61";
       Unix.(List.mem O_CREAT flags) |> function
@@ -70,6 +72,7 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
       ofs |> Int64.to_int |> fun ofs -> (* FIXME ofs should be int64 *)
       let buf_size = Bigarray.Array1.dim buf in
       ops.open_ path |> fun fd ->  (* FIXME cache fds in LRU? *)
+      (* FIXME fd leak if pread errors *)
       ops.pread ~fd ~foff:ofs ~length:buf_size ~buffer:buf ~boff:0 |> fun n ->
       ops.close fd;
       n
@@ -81,6 +84,7 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
       foff |> Int64.to_int |> fun foff -> (* FIXME ofs should be int64 *)
       let buf_size = Bigarray.Array1.dim buf in
       ops.open_ path |> fun fd ->
+      (* FIXME fd leak *)
       ops.pwrite ~fd ~foff ~length:buf_size ~buffer:buf ~boff:0 |> fun n ->
       ops.close fd;
       n

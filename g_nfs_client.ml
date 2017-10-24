@@ -8,6 +8,8 @@ open D_functors
 module Make_client(O:OPS_TYPE) = struct
   open O
 
+  (* this is used to indicate that the result of a call was not what
+     was expected *)
   type extra_ops = {
     internal_err: 'a. string -> 'a m;
   }
@@ -17,6 +19,7 @@ module Make_client(O:OPS_TYPE) = struct
   (* construct message, send, recv *)
   let mk_client_ops (type t) 
       ~extra_ops
+      (* NOTE call returns errors in the monad *)
       ~(call:msg_from_client -> msg_from_server' m)
       ~data_length
       ~data_of_buffer
@@ -79,7 +82,6 @@ module Make_client(O:OPS_TYPE) = struct
       pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
 
-
   include struct
     open G_nfs_aux
     (* specialize mk_client_ops *)
@@ -89,5 +91,7 @@ module Make_client(O:OPS_TYPE) = struct
         ~blit_data_to_buffer
   end
 
+
+  let _ = mk_client_ops
 
 end
