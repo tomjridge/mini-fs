@@ -4,7 +4,7 @@
    below translates this to messages on the wire *)
 
 open C_base
-open C_post_msgs
+open D_functors
 
 module Make_client(O:OPS_TYPE) = struct
   open O

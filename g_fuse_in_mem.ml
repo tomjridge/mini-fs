@@ -1,6 +1,6 @@
-open F_in_mem
+open E_in_mem
 
-let init_t = D_in_mem.init_t
+let init_t = E_in_mem.init_t
 
 include struct
   open A_error
@@ -18,11 +18,10 @@ end
 
 include struct
   open Unix
-  open D_in_mem
   open Imp_ops_type
   (* similar to F_in_mem.imp_run, but translate errors *)
   let run ref_ : run = {
-    run=(fun x -> F_in_mem.run (!ref_) x |> function
+    run=(fun x -> E_in_mem.run (!ref_) x |> function
       | `Exn_ (e,w) -> (
           "Run resulted in exceptional state" |> fun s ->
           print_endline s;
@@ -49,13 +48,13 @@ end
 
 
 module Fuse' = G_fuse_common.Make_fuse(struct
-    include D_in_mem.Monad
-    include D_in_mem.Mem_base_types
-    include D_in_mem.Imp_ops_type
+    include Monad
+    include Mem_base_types
+    include Imp_ops_type
   end)
 
 include Fuse'
 
-let fuse_ops ~ref_ = mk_fuse_ops ~ops:(mk_imperative_ops ~ref_) ~readdir':D_in_mem.Imp_ops_type.readdir'
+let fuse_ops ~ref_ = mk_fuse_ops ~ops:(mk_imperative_ops ~ref_) ~readdir':Imp_ops_type.readdir'
 
-let _ : ref_:D_in_mem.t ref -> Fuse.operations = fuse_ops
+let _ : ref_:t ref -> Fuse.operations = fuse_ops

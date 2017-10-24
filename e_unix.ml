@@ -24,10 +24,10 @@ include Unix_monad
 
 (* generate types --------------------------------------------------- *)
 
-module Ops_type = C_post_msgs.Make_ops_type(Unix_monad)(Unix_base_types)
+module Ops_type = D_functors.Make_ops_type(Unix_monad)(Unix_base_types)
 include Ops_type
 
-module Imp_ops_type = C_post_msgs.Make_imp_ops_type(
+module Imp_ops_type = D_functors.Make_imp_ops_type(
   struct
     include Unix_monad
     include Unix_base_types

@@ -1,7 +1,7 @@
 (* bind an imperative ops to fuse ----------------------------------- *)
 open C_base
 
-module Make_fuse(I:C_post_msgs.IMP_OPS_TYPE) = struct
+module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
 
   open Unix
   open LargeFile

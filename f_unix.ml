@@ -1,5 +1,5 @@
 open C_base
-open D_unix
+open E_unix
 
 let return = Step_monad.return
 
@@ -148,7 +148,7 @@ let unix_ops = mk_ops ~extra
 let dest_exceptional w = w.error_state 
 
 include struct
-  open D_unix.Imp_ops_type
+  open E_unix.Imp_ops_type
 
   let run ref_ (x:'a m) = 
     Step_monad.run ~dest_exceptional !ref_ x |> function
