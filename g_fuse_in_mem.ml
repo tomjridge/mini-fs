@@ -1,7 +1,5 @@
 open E_in_mem
 
-let init_t = E_in_mem.init_t
-
 include struct
   open A_error
   open Unix
@@ -55,6 +53,7 @@ module Fuse' = G_fuse_common.Make_fuse(struct
 
 include Fuse'
 
-let fuse_ops ~ref_ = mk_fuse_ops ~ops:(mk_imperative_ops ~ref_) ~readdir':Imp_ops_type.readdir'
+let fuse_ops ~ref_ = 
+  mk_fuse_ops ~ops:(mk_imperative_ops ~ref_ ~ops:logged_ops) ~readdir':Imp_ops_type.readdir'
 
 let _ : ref_:t ref -> Fuse.operations = fuse_ops

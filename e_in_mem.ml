@@ -708,7 +708,7 @@ include struct
   }
 
 
-  let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) ~ops 
+  let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) 
 end
 
 
