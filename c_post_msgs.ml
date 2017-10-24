@@ -196,4 +196,19 @@ module Make_imp_ops_type(O:OPS_TYPE) = struct
     { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
       pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
+
+  (* for small directories *)
+  let readdir' ~ops = 
+    fun path ->
+      let dh = ops.opendir path in
+      let es = ref [] in
+      let finished = ref false in
+      while(not !finished) do
+        let (es',f) = ops.readdir dh in
+        es:=!es@es';
+        finished:=f;
+      done;
+      ops.closedir dh;
+      !es
+
 end

@@ -24,7 +24,7 @@ module Make_fuse(I:C_post_msgs.IMP_OPS_TYPE) = struct
 
   let default_dir_stats = LargeFile.stat "."
 
-  let mk_fuse_ops ~readdir' ~run ~ops = 
+  let mk_fuse_ops ~readdir' ~ops = 
 
     let unlink path = 
       path |> dirname_basename |> fun (parent,name) -> 

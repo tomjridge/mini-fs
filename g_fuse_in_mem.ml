@@ -46,3 +46,16 @@ include struct
         a)
   }
 end
+
+
+module Fuse' = G_fuse_common.Make_fuse(struct
+    include D_in_mem.Monad
+    include D_in_mem.Mem_base_types
+    include D_in_mem.Imp_ops_type
+  end)
+
+include Fuse'
+
+let fuse_ops ~ref_ = mk_fuse_ops ~ops:(mk_imperative_ops ~ref_) ~readdir':D_in_mem.Imp_ops_type.readdir'
+
+let _ : ref_:D_in_mem.t ref -> Fuse.operations = fuse_ops
