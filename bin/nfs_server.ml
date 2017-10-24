@@ -65,7 +65,8 @@ let main () =
         serve msg |> fun x ->
         E_in_mem.run (!w_ref) x |> function
         | `Exn_ (e,w) -> (
-            w_ref:={!w_ref with fs=w.fs};  (* FIXME in exceptional case, fs unchanged?*)
+            (* FIXME in exceptional case, fs unchanged?*)
+            w_ref:={!w_ref with fs=w.fs};  
             match w.thread_error_state with
             | None -> (
                 match w.internal_error_state with
@@ -76,6 +77,7 @@ let main () =
                   Printf.printf "nfs_server.65, internal error: %s\n" e;
                   exit 1)
             | Some e -> 
+              (* in the error case, we send the exception back *)
               send ~conn (Error e) >>= fun () -> loop())
         | `Finished (a,w) -> 
           w_ref:=w;
