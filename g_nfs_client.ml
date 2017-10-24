@@ -78,4 +78,16 @@ module Make_client(O:OPS_TYPE) = struct
     { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
       pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
+
+
+  include struct
+    open G_nfs_aux
+    (* specialize mk_client_ops *)
+    let mk_client_ops = mk_client_ops 
+        ~data_length
+        ~data_of_buffer
+        ~blit_data_to_buffer
+  end
+
+
 end

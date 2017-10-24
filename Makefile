@@ -10,7 +10,6 @@ libname:=$(shell source bash_env.sh && echo $${libname})#
 # 	./a.out .
 
 all:
-	$$ocamlc -c literate.mli
 	$$ocamlc -c $$mls
 	mk_cma
 	$$ocamlopt -c $$mls

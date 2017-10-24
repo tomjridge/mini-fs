@@ -79,4 +79,15 @@ let mk_server
   recv () >>= serve >>= send
 *)
 
+  include struct 
+    open G_nfs_aux
+    (* specialize mk_serve *)
+    let mk_serve = 
+      mk_serve 
+        ~data_of_buffer:(fun ~buffer ~len -> data_of_buffer ~buffer ~off:0 ~len) 
+        ~buffer_of_data
+        ~mk_buffer
+    let _ = mk_serve
+  end
+
 end
