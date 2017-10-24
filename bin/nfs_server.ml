@@ -6,13 +6,6 @@ open C_base
 open C_msgs
 open E_in_mem
 
-(* FIXME use functors etc *)
-let msg_lib = Tjr_connection.Unix_.mk_msg_lib ()
-
-let (listen_accept,connect,send_string,send_strings,recv_string,recv_strings) = 
-  msg_lib @@ fun ~listen_accept ~connect ~send_string ~send_strings ~recv_string ~recv_strings ->
-  (listen_accept,connect,send_string,send_strings,recv_string,recv_strings)
-
 
 module Shared = struct
   open Unix
@@ -44,6 +37,9 @@ let serve =
 let _ : msg_from_client -> msg_from_server' m = serve
 
 include struct
+  (* NOTE Tjr_connection.Unix_ has: 'a m = ('a,exn)result, which is not
+     the same as in_mem.m *)
+  open Tjr_connection.Unix_
   let send ~conn (m:msg_from_server) =
     m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
     |> fun s -> send_string ~conn s
@@ -53,22 +49,22 @@ end
 
 
 let main () = 
+  let open Tjr_connection.Unix_ in
+  let ( >>= ) = bind in
   let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad:Shared.recvr >>= function
   | `Connection conn ->
     let rec loop () = 
       recv_string ~conn >>= fun s ->
-      let open Msgs in
-      let open Mini_in_mem in
       string_to_msg s |> function
       | Error e -> 
         print_endline @@ "nfs_server.63, error unmarshalling string: "^e;
         exit 1
       | Ok msg -> 
         serve msg |> fun x ->
-        Mini_in_mem.run (!w_ref) x |> function
-        | `Exceptional w -> (
+        E_in_mem.run (!w_ref) x |> function
+        | `Exn_ (e,w) -> (
             w_ref:={!w_ref with fs=w.fs};  (* FIXME in exceptional case, fs unchanged?*)
             match w.thread_error_state with
             | None -> (
@@ -86,7 +82,7 @@ let main () =
           send ~conn (Msg a) >>= fun () -> loop ()
     in
     loop ()
-  | _ -> failwith __LOC__
+  | `Error_incorrect_peername | `Net_err _ -> failwith __LOC__
 
 
-let _ = Lwt_main.run @@ main()
+let _ = main()
