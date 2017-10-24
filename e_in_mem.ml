@@ -3,7 +3,6 @@ open C_base
 
 (* in-mem impl ------------------------------------------------------ *)
 
-
 module Mem_base_types = struct
   type fd = int
   type dh = int
@@ -197,12 +196,13 @@ let t_to_string t = Y_.(
 module Ops_type = D_functors.Make_ops_type(Monad)(Mem_base_types)
 include Ops_type
 
-module Imp_ops_type = D_functors.Make_imp_ops_type(
-    struct
+module Ops_type_plus = struct
       include Monad
       include Mem_base_types
       include Ops_type
-    end)
+    end
+
+module Imp_ops_type = D_functors.Make_imp_ops_type(Ops_type_plus)
 
 
 
@@ -586,7 +586,7 @@ let mk_ops ~extra =
     pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
 
-(* ------------------------------------------------------------------ *)
+(* extra ----------------------------------------------------------- *)
 
 module Step_monad = B_step_monad
 
@@ -697,16 +697,22 @@ let _ : t -> 'a m -> [> `Exn_ of exn_ * t | `Finished of 'a * t ] = run
 include struct
   open Imp_ops_type
 
-  let imp_run ref_ : run = {
+  (* NOTE this is the runtime exception that results from using
+     imperative operations with the in_mem impl *)
+  exception In_mem_runtime_exception of exn_*t
+
+  let imp_run ~ref_  : run = {
     run=(fun x -> run (!ref_) x |> function
       | `Exn_ (e,w) ->        
         Printf.printf "fmem.495: run resulted in exn_: %s\n" (exn__to_string e);
-        failwith __LOC__
+        (* ASSUME internal_error_state is None; don't record the
+           thread_error_state, since that is per call *)
+        ref_:={ !ref_ with fs=w.fs };  
+        raise (In_mem_runtime_exception(e,w))
       | `Finished(a,w) -> 
         ref_:=w;
         a)
   }
-
 
   let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) 
 end

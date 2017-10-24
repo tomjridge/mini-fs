@@ -45,7 +45,7 @@ module type BASE_TYPES = sig
   val fd2int: fd -> int
 end
 
-(* FIXME move these to relevant d_ files *)
+(* FIXME note that this is the only mention of Lwt - so move elsewhere and drop dependency? *)
 module Lwt_base_types = struct
   type fd=Lwt_unix.file_descr
   type dh=Lwt_unix.dir_handle

@@ -1,11 +1,21 @@
-(* remote fs server using lwt *)
+(* remote fs server using plain unix (could be lwt) *)
 
-open Lwt
-open Lwt_unix
 open Tjr_connection
 open Tjr_minifs
+open C_base
+open C_msgs
+open E_in_mem
+
+(* FIXME use functors etc *)
+let msg_lib = Tjr_connection.Unix_.mk_msg_lib ()
+
+let (listen_accept,connect,send_string,send_strings,recv_string,recv_strings) = 
+  msg_lib @@ fun ~listen_accept ~connect ~send_string ~send_strings ~recv_string ~recv_strings ->
+  (listen_accept,connect,send_string,send_strings,recv_string,recv_strings)
+
 
 module Shared = struct
+  open Unix
   let ip = Unix.inet_addr_of_string "127.0.0.1"
   let rport=4001
   let sport=4007
@@ -17,26 +27,23 @@ module Shared = struct
   let recvr = {local=r; remote=s }
 end
 
-
-module In_mem_with_unix_errors = Mini_fuse.In_mem_with_unix_errors
-
-
-let ops = In_mem_with_unix_errors.ops
-
-
-let monad_ops = Mini_in_mem.monad_ops
-
+module Server' = G_nfs_server.Make_server(Ops_type_plus)
+include Server'
 
 let serve = 
-  Mini_nfs.mk_serve
-    ~monad_ops
-    ~backend:ops
+  let id = fun x -> x in
+  mk_serve
+    ~ops:logged_ops
+    ~dh2i:id
+    ~i2dh:id
+    ~fd2i:id
+    ~i2fd:id
+    
 
-let _ = serve
-
+(* NOTE the errors are still in the monad *)
+let _ : msg_from_client -> msg_from_server' m = serve
 
 include struct
-  open Msgs
   let send ~conn (m:msg_from_server) =
     m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
     |> fun s -> send_string ~conn s
@@ -46,7 +53,7 @@ end
 
 
 let main () = 
-  let w_ref = ref Mini_in_mem.init_t in
+  let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad:Shared.recvr >>= function
   | `Connection conn ->

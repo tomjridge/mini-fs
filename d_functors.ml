@@ -165,10 +165,15 @@ module Make_imp_ops_type(O:OPS_TYPE) = struct
     reset : unit -> unit;
   }
 
+
+  (* NOTE the imperative operations may throw exceptions; if this
+     happens, it is perhaps not clear what the "state of the world"
+     (maybe captured in a reference) should be *)
   type run = {
     run:'a. 'a m -> 'a
   }
 
+  (* NOTE this at least logs any exceptions that are thrown *)
   let mk_imperative_ops ~(ops:O.ops) ~run =
     let run f = 
       try run.run f 

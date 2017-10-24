@@ -6,7 +6,7 @@
 open C_base
 open D_functors
 
-module Make_client(O:OPS_TYPE) = struct
+module Make_server(O:OPS_TYPE) = struct
   open O
 
   type extra_ops = {
