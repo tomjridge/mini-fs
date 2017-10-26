@@ -1,2 +1,2 @@
-PKG extlib extunix Fuse tjr_lib core ppx_bin_prot ppx_deriving_yojson
+PKG extlib extunix Fuse tjr_lib core ppx_bin_prot ppx_deriving_yojson tjr_net
 FLG -short-paths
