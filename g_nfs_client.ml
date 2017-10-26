@@ -11,7 +11,7 @@ module Make_client(O:OPS_TYPE) = struct
   (* this is used to indicate that the result of a call was not what
      was expected *)
   type extra_ops = {
-    internal_err: 'a. string -> 'a m;
+    internal_marshal_err: 'a. string -> 'a m;
   }
   
   open C_msgs
@@ -28,7 +28,7 @@ module Make_client(O:OPS_TYPE) = struct
       ~i2fd ~fd2i
     = 
     let ( >>= ) = bind in  
-    let internal_err = extra_ops.internal_err in
+    let internal_err = extra_ops.internal_marshal_err in
     let ty_err = "incorrect return return type from server" in
     let root : path = "/" in
     let ret_unit : msg_from_server' -> unit m = function

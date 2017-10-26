@@ -55,12 +55,18 @@ end
 
 module Imp_ops_type = D_functors.Make_imp_ops_type(Ops_type_plus)
 
+module Imp_ops_type_plus = struct
+  include Monad
+  include Base_types
+  include Imp_ops_type
+end
+
 module Client' = G_nfs_client.Make_client(Ops_type_plus)
 include Client'
 
 (* in order to call mk_client_ops, we need extra_ops *)
 let extra_ops = {
-  internal_err=(fun s -> Step_monad.Step(fun w -> 
+  internal_marshal_err=(fun s -> Step_monad.Step(fun w -> 
       {w with internal_error=Some s},fun () -> failwith __LOC__))
 }
 
@@ -139,7 +145,7 @@ module Main : sig val main: unit -> unit end = struct
     let run (type a) (a:a m) = 
       !w |> fun w' ->
       Step_monad.run ~dest_exceptional w' a |> function
-      | `Exceptional(e,w'') -> w:=w''; raise (A_error.mk_exn e)  (* FIXME? *)
+      | `Exceptional(e,w'') -> w:=w''; raise (A_error.mk_unix_exn e)  (* FIXME? *)
       | `Finished(w'',a) -> w:=w''; a
     in
     Imp_ops_type.mk_imperative_ops 
@@ -148,10 +154,12 @@ module Main : sig val main: unit -> unit end = struct
 
   let _ = imp_ops
 
-  let main () = 
-    let open Imp_ops_type in
-    let readdir' = Imp_ops_type.readdir' ~ops:imp_ops in
+  module Readdir' = D_functors.Make_readdir'(Imp_ops_type_plus)
 
+  open Imp_ops_type
+
+  let main () = 
+    let readdir' = Readdir'.readdir' ~ops:imp_ops in
     imp_ops.mkdir ~parent:"/" ~name:"tmp";
     readdir' "/" |> List.iter print_endline;
     ()
