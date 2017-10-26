@@ -1,13 +1,20 @@
 SHELL:=bash
+BASH_ENV=bash_env.sh
+export BASH_ENV
 
-all: fuse_main.native
+all: natives
+
+
+natives: fuse_main.native fuse_nfs_client.native nfs_server.native nfs_client.native
+	cp *.native /tmp
 
 
 fuse_main.native: FORCE
 	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs -linkpkg -o fuse_main.native fuse_main.ml
-	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs,tjr_net -linkpkg -o nfs_server.native nfs_server.ml
-	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs,tjr_net -linkpkg -o nfs_client.native nfs_client.ml
-	cp nfs*.native /tmp
+
+
+%.native: %.ml FORCE
+	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs,tjr_net -linkpkg -o $*.native $*.ml
 
 
 run: fuse_main.native
