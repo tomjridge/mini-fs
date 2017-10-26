@@ -64,7 +64,7 @@ module Make_ops_type(M:MONAD)(B:BASE_TYPES) = struct
 
   let dh' = -99
 
-  let mk_logged_ops (type m) ~log_op ~ops = 
+  let mk_logged_ops (type m) ~log_op ~ops ~fd2i = 
     let open C_msgs in
     let root = ops.root in
     let unlink ~parent ~name = 
@@ -79,15 +79,15 @@ module Make_ops_type(M:MONAD)(B:BASE_TYPES) = struct
     let open_ p = log_op.log (Open(p)) (ops.open_ p) in
     let pread ~fd ~foff ~length ~buffer ~boff =
       log_op.log 
-        (Pread(fd|>fd2int,foff,length)) 
+        (Pread(fd|>fd2i,foff,length)) 
         (ops.pread ~fd ~foff ~length ~buffer ~boff) 
     in
     let pwrite ~fd ~foff ~length ~buffer ~boff =
       log_op.log 
-        (Pwrite(fd|>fd2int,foff,"data???FIXME")) 
+        (Pwrite(fd|>fd2i,foff,"data???FIXME")) 
         (ops.pwrite ~fd ~foff ~length ~buffer ~boff) 
     in
-    let close fd = log_op.log (Close(fd|>fd2int)) (ops.close fd) in
+    let close fd = log_op.log (Close(fd|>fd2i)) (ops.close fd) in
     let rename ~spath ~sname ~dpath ~dname = 
       log_op.log 
         (Rename(spath,sname,dpath,dname)) 

@@ -6,9 +6,15 @@ open C_base
 module Mem_base_types = struct
   type fd = int
   type dh = int
-  let fd2int x = x
+
+  let fd2i x = x
+  let i2fd x = x
+  let dh2i x = x
+  let i2dh x = x
 end
 include Mem_base_types
+
+
 
 module Fid : sig
   type fid = int[@@deriving yojson]  (* FIXME hide *)
@@ -745,6 +751,6 @@ include struct
   let log_op = { log }
 
 
-  let logged_ops = mk_logged_ops ~ops ~log_op
+  let logged_ops = mk_logged_ops ~ops ~log_op ~fd2i
 
 end

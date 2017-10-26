@@ -6,6 +6,8 @@ open Tjr_connection
 open Tjr_minifs
 open C_base
 
+module Connection = Tjr_connection.Unix_
+
 module Shared = struct
   open Unix
   let ip = Unix.inet_addr_of_string "127.0.0.1"
@@ -33,7 +35,6 @@ type w = {
   conn: Unix.file_descr  (* ASSUMED valid *)
 }
 
-
 module Monad = struct
   type 'a m = ('a,w) Step_monad.m
   let return,bind = Step_monad.(return,bind)
@@ -52,6 +53,8 @@ module Ops_type_plus = struct
   include Ops_type
 end
 
+module Imp_ops_type = D_functors.Make_imp_ops_type(Ops_type_plus)
+
 module Client' = G_nfs_client.Make_client(Ops_type_plus)
 include Client'
 
@@ -64,7 +67,7 @@ let extra_ops = {
 (* we also need to implement call: msg_from_client->msg_from_server' m *)
 include struct
   open C_msgs
-  open Tjr_connection.Unix_
+  open Connection
   let send ~conn (m:msg_from_client) =
     m |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
     |> fun s -> send_string ~conn s
@@ -89,7 +92,7 @@ include struct
         m |> send ~conn |> function
         | Error e -> failwith __LOC__ 
         | Ok () -> 
-          Tjr_connection.Unix_.recv_string ~conn |> function
+          Connection.recv_string ~conn |> function
           | Error e -> failwith __LOC__
           | Ok s -> 
             s |> string_to_msg |> fun m -> 
@@ -101,45 +104,55 @@ end
 
 
 let conn = 
-  Lwt_main.run (Tjr_connection.connect ~quad:Shared.sender)
-  |> function
-  | `Connection c -> c
-  | _ -> failwith __LOC__
+  Connection.connect ~quad:Shared.sender
+  |> function 
+  | Ok x -> (x |> function
+    | `Connection c -> c
+    | `Net_err e -> raise e)
+  | Error e -> raise e  (* shouldn't happen, given that msg_lib uses catch  *)
 
 
 let call = call ~conn
 
+let client_ops = E_in_mem.(
+    Client'.mk_client_ops
+      ~extra_ops
+      ~call
+      ~i2dh ~dh2i
+      ~i2fd ~fd2i)
+
+
+let init_w = { thread_error=None; internal_error=None; conn }
+
 
 module Main : sig val main: unit -> unit end = struct
 
-  let client_ops = 
-    Mini_nfs.mk_client_ops
-      ~monad_ops
-      ~extra_ops
-      ~call
 
-  let _ = client_ops
+  let w : w ref = ref init_w
+  let dest_exceptional w = 
+    assert(w.internal_error=None);
+    w.thread_error
 
-  let w = ref None 
-  let dest_exceptional w = w 
+  let _ = dest_exceptional 
 
-  let run : 'a m -> 'a = Step_monad.(fun x -> run ~dest_exceptional w x)
+  let imp_ops = 
+    let run (type a) (a:a m) = 
+      !w |> fun w' ->
+      Step_monad.run ~dest_exceptional w' a |> function
+      | `Exceptional(e,w'') -> w:=w''; raise (A_error.mk_exn e)  (* FIXME? *)
+      | `Finished(w'',a) -> w:=w''; a
+    in
+    Imp_ops_type.mk_imperative_ops 
+      ~ops:client_ops
+      ~run:Imp_ops_type.{run}
 
-  let _ = run
-
-  let run = { Minifs.run=run }
-
-  let _ = run
-
-  let imp_ops = Minifs.mk_imperative_ops ~run ~ops:client_ops
+  let _ = imp_ops
 
   let main () = 
+    let open Imp_ops_type in
+    let readdir' = Imp_ops_type.readdir' ~ops:imp_ops in
 
-    Minifs.dest_imperative_ops imp_ops @@ fun ~root ~unlink ~mkdir ~opendir ~readdir ~closedir ~create ~open_ ~pread ~pwrite ~close ~rename ~truncate ~stat_file ~kind ~reset ->
-
-    let readdir' = Minifs.readdir' ~ops:imp_ops in
-
-    mkdir ~parent:"/" ~name:"tmp";
+    imp_ops.mkdir ~parent:"/" ~name:"tmp";
     readdir' "/" |> List.iter print_endline;
     ()
 

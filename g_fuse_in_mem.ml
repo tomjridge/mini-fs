@@ -1,18 +1,6 @@
 open E_in_mem
 
-include struct
-  open A_error
-  open Unix
-  let mk_exn = function
-    | `Error_no_entry _ -> Unix_error(ENOENT, "154","")
-    | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
-    | `Error_not_file -> Unix_error(EINVAL, "156","") (* FIXME *)
-    | `Error_attempt_to_rename_dir_over_file -> Unix_error(EINVAL, "157","") (* FIXME *)
-    | `Error_attempt_to_rename_root -> Unix_error(EINVAL, "158","") (* FIXME *)
-    | `Error_attempt_to_rename_to_subdir -> Unix_error(EINVAL, "159","") (* FIXME *)
-    | `Error_no_src_entry -> Unix_error(ENOENT, "160","")
-end
-
+let mk_exn = A_error.mk_exn
 
 include struct
   open Unix

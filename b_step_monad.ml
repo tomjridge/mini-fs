@@ -32,6 +32,11 @@ let rec run ~dest_exceptional w x =
   in
   run w x
 
+let _ : 
+  dest_exceptional:('a -> 'b option) -> 'a -> ('c, 'a) m -> 
+  [> `Exceptional of 'b * 'a | `Finished of 'a * 'c] 
+  = run
+
 
 (*
 (* if dest_exceptional<>None, raise an OCaml exception; otherwise
