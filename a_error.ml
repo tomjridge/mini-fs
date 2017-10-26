@@ -15,7 +15,7 @@ let exn__to_string e =
 
 include struct
   open Unix
-  let mk_exn = function
+  let mk_unix_exn = function
     | `Error_no_entry _ -> Unix_error(ENOENT, "154","")
     | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
     | `Error_not_file -> Unix_error(EINVAL, "156","") (* FIXME *)

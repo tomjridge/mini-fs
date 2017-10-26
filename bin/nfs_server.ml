@@ -56,7 +56,9 @@ let main () =
   listen_accept ~quad:Shared.recvr >>= function
   | `Connection conn ->
     let rec loop () = 
+      Printf.printf "nfs_server.59, loop\n";
       recv_string ~conn >>= fun s ->
+      print_endline s;
       string_to_msg s |> function
       | Error e -> 
         print_endline @@ "nfs_server.63, error unmarshalling string: "^e;

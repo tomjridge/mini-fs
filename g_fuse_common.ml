@@ -24,7 +24,9 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
 
   let default_dir_stats = LargeFile.stat "."
 
-  let mk_fuse_ops ~readdir' ~ops = 
+  module Readdir' = D_functors.Make_readdir'(I)
+      
+  let mk_fuse_ops ops = 
 
     let unlink path = 
       path |> dirname_basename |> fun (parent,name) -> 
@@ -40,7 +42,7 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     (* create combined with fopen *)
 
 
-    let readdir' = readdir' ~ops in
+    let readdir' = Readdir'.readdir' ~ops in
     let readdir path _ = readdir' path in
 
     let _ = ops.kind in

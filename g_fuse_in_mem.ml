@@ -1,11 +1,11 @@
 open E_in_mem
 
-let mk_exn = A_error.mk_exn
+let mk_unix_exn = A_error.mk_unix_exn
 
 include struct
   open Unix
   open Imp_ops_type
-  (* similar to F_in_mem.imp_run, but translate errors *)
+  (* similar to E_in_mem.imp_run, but translate errors *)
   let run ref_ : run = {
     run=(fun x -> E_in_mem.run (!ref_) x |> function
       | `Exn_ (e,w) -> (
@@ -21,7 +21,7 @@ include struct
               | Some e ->
                 "gfuse.165, thread error: "^(A_error.exn__to_string e) |> fun s ->
                 print_endline s;
-                raise @@ mk_exn e)
+                raise @@ mk_unix_exn e)
           | Some s ->
             "thread error gfuse.170: "^s) |> fun s ->
           print_endline s;
@@ -42,6 +42,6 @@ module Fuse' = G_fuse_common.Make_fuse(struct
 include Fuse'
 
 let fuse_ops ~ref_ = 
-  mk_fuse_ops ~ops:(mk_imperative_ops ~ref_ ~ops:logged_ops) ~readdir':Imp_ops_type.readdir'
+  mk_fuse_ops (mk_imperative_ops ~ref_ ~ops:logged_ops)
 
 let _ : ref_:t ref -> Fuse.operations = fuse_ops
