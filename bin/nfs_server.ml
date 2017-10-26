@@ -61,32 +61,24 @@ let main () =
       print_endline s;
       string_to_msg s |> function
       | Error e -> 
-        print_endline @@ "nfs_server.63, error unmarshalling string: "^e;
-        exit 1
+        "nfs_server.63, error unmarshalling string: "^e |> exit_1
       | Ok msg -> 
         serve msg |> fun x ->
         E_in_mem.run (!w_ref) x |> function
         | `Exn_ (e,w) -> (
             (* FIXME in exceptional case, fs unchanged?*)
             w_ref:={!w_ref with fs=w.fs};  
-            match w.thread_error_state with
-            | None -> (
-                match w.internal_error_state with
-                | None -> 
-                  print_endline @@ "nfs_server.74, impossible"; (* exceptional state *)
-                  exit 1
-                | Some e ->
-                  Printf.printf "nfs_server.65, internal error: %s\n" e;
-                  exit 1)
-            | Some e -> 
-              (* in the error case, we send the exception back *)
-              send ~conn (Error e) >>= fun () -> loop())
+            (* error is bound to e; FIXME ASSUMES
+               w.thread_error_state/internal_error_state is None? *)
+            (* in the error case, we send the exception back *)
+            send ~conn (Error e) >>= fun () -> loop())
         | `Finished (a,w) -> 
           w_ref:=w;
           send ~conn (Msg a) >>= fun () -> loop ()
     in
     loop ()
-  | `Error_incorrect_peername | `Net_err _ -> failwith __LOC__
+  | `Error_incorrect_peername | `Net_err _ -> exit_1 __LOC__
 
 
 let _ = main()
+

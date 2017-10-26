@@ -20,48 +20,45 @@ module Shared = struct
   let recvr = {local=r; remote=s }
 end
 
-(* module Main : sig val main: unit -> unit end = struct *)
+(* put all state in this module *)
+let conn = 
+  Connection.connect ~quad:Shared.sender
+  |> function 
+  | Ok x -> (x |> function
+    | `Connection c -> c
+    | `Net_err e -> raise e)
+  | Error e -> raise e  (* shouldn't happen, given that msg_lib uses catch  *)
 
-  (* put all state in this module *)
-  let conn = 
-    Connection.connect ~quad:Shared.sender
-    |> function 
-    | Ok x -> (x |> function
-      | `Connection c -> c
-      | `Net_err e -> raise e)
-    | Error e -> raise e  (* shouldn't happen, given that msg_lib uses catch  *)
+let call = call ~conn
 
-  let call = call ~conn
+let client_ops = E_in_mem.(
+    Client'.mk_client_ops
+      ~extra_ops
+      ~call
+      ~i2dh ~dh2i
+      ~i2fd ~fd2i)
 
-  let client_ops = E_in_mem.(
-      Client'.mk_client_ops
-        ~extra_ops
-        ~call
-        ~i2dh ~dh2i
-        ~i2fd ~fd2i)
+let w : w ref = ref (init_w conn)
 
-  let w : w ref = ref (init_w conn)
+let run = Imp_ops_type.{run=(fun a -> H_nfs_client_common.run ~w_ref:w a)}
 
-  let run = Imp_ops_type.{run=(fun a -> run ~w_ref:w a)}
+let imp_ops = 
+  Imp_ops_type.mk_imperative_ops
+    ~ops:client_ops
+    ~run
 
-  let imp_ops = 
-    Imp_ops_type.mk_imperative_ops 
-      ~ops:client_ops
-      ~run
+let _ = imp_ops
 
-  let _ = imp_ops
+open Imp_ops_type
 
-  open Imp_ops_type
-
-  module Fuse' = G_fuse_common.Make_fuse(Imp_ops_type_plus)
-  open Fuse'
-  let fuse_ops = mk_fuse_ops imp_ops
+module Fuse' = G_fuse_common.Make_fuse(Imp_ops_type_plus)
+open Fuse'
+let fuse_ops = mk_fuse_ops imp_ops
 let _ = fuse_ops
 
-let main () = Fuse.main Sys.argv fuse_ops
-
-(* end *)
-
+let main () = 
+  print_endline "Fuse_nfs_client starts";
+  Fuse.main Sys.argv fuse_ops
 
 let _ = main()
 

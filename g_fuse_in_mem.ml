@@ -41,7 +41,11 @@ module Fuse' = G_fuse_common.Make_fuse(struct
 
 include Fuse'
 
+let raise_ = {
+  raise_=(fun (e,_) -> e |> A_error.mk_unix_exn |> raise)
+}
+
 let fuse_ops ~ref_ = 
-  mk_fuse_ops (mk_imperative_ops ~ref_ ~ops:logged_ops)
+  mk_fuse_ops (mk_imperative_ops ~ref_ ~ops:logged_ops ~raise_)
 
 let _ : ref_:t ref -> Fuse.operations = fuse_ops

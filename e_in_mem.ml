@@ -618,9 +618,7 @@ let _ = new_fid
 let internal_err s : 'a m = 
   Step(fun w -> 
       ({ w with internal_error_state=(Some s)}, fun () -> 
-          "Fatal error: attempt to step internal errror state mim.449\n" |> fun s ->
-          print_endline s;
-          failwith s))
+          failwith_step_error __LOC__))
 
 let _ = internal_err
 
@@ -653,9 +651,7 @@ let dirs_add k v =
 let err e : 'a m = 
   Step(fun w -> 
       ({ w with thread_error_state=(Some e)}, fun () -> 
-          "Fatal error: attempt to step thread errror state mim.460\n" |> fun s ->
-          print_endline s;
-          failwith s))
+          failwith_step_error __LOC__))
 
 let extra = { new_did; new_fid; with_fs; internal_err; is_parent; dirs_add; err }
 
@@ -670,8 +666,7 @@ let dest_exceptional w =
   (match w.internal_error_state with
    | None -> ()
    | Some s ->  
-     Printf.printf "fmem.458: internal error state not none: %s\n" s;
-     failwith __LOC__);
+     Printf.sprintf "fmem.458: internal error state not none: %s\n" s |> exit_1);
   w.thread_error_state
 
 let e2s = fun e -> e|>exn__to_string
@@ -707,20 +702,24 @@ include struct
      imperative operations with the in_mem impl *)
   exception In_mem_runtime_exception of exn_*t
 
-  let imp_run ~ref_  : run = {
+  type raise_={
+    raise_:'a. exn_*t-> 'a
+  }
+
+  let imp_run ~ref_ ~raise_ : run = {
     run=(fun x -> run (!ref_) x |> function
       | `Exn_ (e,w) ->        
         Printf.printf "fmem.495: run resulted in exn_: %s\n" (exn__to_string e);
         (* ASSUME internal_error_state is None; don't record the
            thread_error_state, since that is per call *)
         ref_:={ !ref_ with fs=w.fs };  
-        raise (In_mem_runtime_exception(e,w))
+        raise_.raise_ (e,w)
       | `Finished(a,w) -> 
         ref_:=w;
         a)
   }
 
-  let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:(imp_run ref_) 
+  let mk_imperative_ops ~ref_ ~raise_ = mk_imperative_ops ~run:(imp_run ~ref_ ~raise_)
 end
 
 

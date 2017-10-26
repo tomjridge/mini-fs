@@ -179,7 +179,8 @@ let safely : 'a. (w -> 'a m) -> 'a m =
           match f w with
           | Finished a -> w,fun () -> Finished a
           | Step f' -> f' w
-        with e -> {w with error_state=Some e }, fun() -> failwith __LOC__)
+        with e -> {w with error_state=Some e }, fun() -> 
+            failwith_step_error __LOC__)
 (* NOTE we should never step a state that has an error *)
 
 let extra = { safely }

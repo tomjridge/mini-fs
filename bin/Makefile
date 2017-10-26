@@ -17,12 +17,19 @@ fuse_main.native: FORCE
 	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs,tjr_net -linkpkg -o $*.native $*.ml
 
 
-run: fuse_main.native
+# fuse options:
+# -f is foreground
+# -s is single-threaded
+
+fuse_mount_in_mem: fuse_main.native
 	mkdir -p fuse_mount
 	./fuse_main.native -s -f -o allow_other ./fuse_mount 
 
-# -f is foreground
-# -s is single-threaded
+
+fuse_mount_nfs_client: fuse_nfs_client.native
+	mkdir -p fuse_mount
+	./fuse_nfs_client.native -s -f -o allow_other ./fuse_mount 
+
 
 
 clean: 

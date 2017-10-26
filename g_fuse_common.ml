@@ -129,9 +129,31 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     let chmod path i = () in
     let utime path atim mtim = () in
 
+
+    (* notify when exception is thrown *)
+    let wrap f = 
+      try f ()
+      with e -> print_endline (Printexc.to_string e); raise e
+    in
+    let wrap1 f = fun a -> wrap @@ fun () -> f a in
+    let wrap2 f = fun a b -> wrap @@ fun () -> f a b in
+    let wrap3 f = fun a b c -> wrap @@ fun () -> f a b c in
+    let wrap4 f = fun a b c d -> wrap @@ fun () -> f a b c d in
+
+    let unlink = wrap1 unlink in
+    let rmdir = wrap1 rmdir in
+    let mkdir = wrap2 mkdir in
+    let readdir = wrap2 readdir in
+    let fopen = wrap2 fopen in
+    let read = wrap4 read in
+    let write = wrap4 write in
+    let rename = wrap2 rename in
+    let truncate = wrap2 truncate in
+    let getattr = wrap1 getattr in
+
     { default_operations with 
       init = (fun () -> Printf.printf "filesystem started\n%!");
-      unlink;
+      unlink=unlink;
       rmdir=unlink;
       mkdir;    
       readdir;

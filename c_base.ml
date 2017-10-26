@@ -4,6 +4,8 @@ include A_monad_type
 include A_error
 module Step_monad = B_step_monad
 
+let exit_1 = Step_monad.exit_1
+
 (* following for strings *)
 let dirname_basename path = 
   ignore (Tjr_string.starts_with ~prefix:"/" path || failwith __LOC__);
@@ -42,7 +44,6 @@ end
 module type BASE_TYPES = sig
   type fd
   type dh
-(*  val fd2int: fd -> int *)
 end
 
 (* FIXME note that this is the only mention of Lwt - so move elsewhere and drop dependency? *)
@@ -55,7 +56,6 @@ end
 module Abstract_base_types = struct
   type fd
   type dh
-(*  let fd2int x = failwith __LOC__ *)
 end
 
 

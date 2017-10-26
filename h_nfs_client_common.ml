@@ -64,26 +64,24 @@ include Client'
 
 (* in order to call mk_client_ops, we need extra_ops *)
 let extra_ops = {
-  internal_marshal_err=(fun s -> Step_monad.Step(fun w -> 
-      {w with internal_error=Some s},fun () -> failwith __LOC__))
+  internal_marshal_err=Step_monad.(fun s -> Step(fun w -> 
+      {w with internal_error=Some s},fun () -> failwith_step_error __LOC__))
 }
 
 
 (* we also need to implement call: msg_from_client->msg_from_server' m *)
 include struct
   open C_msgs
-  open Connection
-  let send ~conn (m:msg_from_client) =
+  let msg_to_string m = 
     m |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
-    |> fun s -> send_string ~conn s
 
-  let _ = send
-  
   let string_to_msg s = 
     s |> Yojson.Safe.from_string |> msg_from_server_of_yojson
     |> function
     | Ok x -> x
-    | Error e -> failwith __LOC__
+    | Error e -> 
+      exit_1 __LOC__
+        
 end
 
 
@@ -93,17 +91,23 @@ include struct
   open C_msgs
   let call ~conn (m:msg_from_client) : msg_from_server' m = 
     Step_monad.Step(fun w -> 
-        m |> send ~conn |> function
-        | Error e -> failwith __LOC__ 
+        m |> msg_to_string 
+        |> fun s -> Printf.printf "sending %s\n" s;  
+        s |> Connection.send_string ~conn |> function
+        | Error e -> exit_1 __LOC__ 
         | Ok () -> 
           Connection.recv_string ~conn |> function
-          | Error e -> failwith __LOC__
+          | Error e -> exit_1 __LOC__
           | Ok s -> 
+            Printf.printf "receiving %s\n" s;
             s |> string_to_msg |> fun m -> 
             match m with
             | Msg m -> (w,fun () -> Step_monad.Finished m)
             | Error (e:exn_) -> 
-              {w with thread_error=Some e},fun () -> failwith __LOC__)
+              {w with thread_error=Some e},fun () -> 
+                exit_1 "hncc: attempt to step exceptional state")
+
+
 end
 
 
@@ -111,7 +115,10 @@ let run (type a) ~w_ref (a:a m) =
   let w = w_ref in
   !w |> fun w' ->
   Step_monad.run ~dest_exceptional w' a |> function
-  | `Exceptional(e,w'') -> w:=w''; raise (A_error.mk_unix_exn e)  (* FIXME? *)
+  | `Exceptional(e,w'') -> 
+    (* NOTE we don't update w since conn is mutable, internal error is
+       None, and this error is just for the particular call *)
+    raise (A_error.mk_unix_exn e)  (* FIXME? *)
   | `Finished(w'',a) -> w:=w''; a
 
 
