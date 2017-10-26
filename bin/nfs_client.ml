@@ -35,6 +35,15 @@ type w = {
   conn: Unix.file_descr  (* ASSUMED valid *)
 }
 
+let init_w conn = { thread_error=None; internal_error=None; conn }
+
+let dest_exceptional w = 
+  assert(w.internal_error=None);
+  w.thread_error
+
+let _ = dest_exceptional 
+
+
 module Monad = struct
   type 'a m = ('a,w) Step_monad.m
   let return,bind = Step_monad.(return,bind)
@@ -60,6 +69,9 @@ module Imp_ops_type_plus = struct
   include Base_types
   include Imp_ops_type
 end
+
+module Readdir' = D_functors.Make_readdir'(Imp_ops_type_plus)
+      
 
 module Client' = G_nfs_client.Make_client(Ops_type_plus)
 include Client'
@@ -128,33 +140,25 @@ let client_ops = E_in_mem.(
       ~i2fd ~fd2i)
 
 
-let init_w = { thread_error=None; internal_error=None; conn }
-
+let run (type a) ~w_ref (a:a m) = 
+  let w = w_ref in
+  !w |> fun w' ->
+  Step_monad.run ~dest_exceptional w' a |> function
+  | `Exceptional(e,w'') -> w:=w''; raise (A_error.mk_unix_exn e)  (* FIXME? *)
+  | `Finished(w'',a) -> w:=w''; a
 
 module Main : sig val main: unit -> unit end = struct
 
+  let w : w ref = ref (init_w conn)
 
-  let w : w ref = ref init_w
-  let dest_exceptional w = 
-    assert(w.internal_error=None);
-    w.thread_error
-
-  let _ = dest_exceptional 
+  let run = Imp_ops_type.{run=(fun a -> run ~w_ref:w a)}
 
   let imp_ops = 
-    let run (type a) (a:a m) = 
-      !w |> fun w' ->
-      Step_monad.run ~dest_exceptional w' a |> function
-      | `Exceptional(e,w'') -> w:=w''; raise (A_error.mk_unix_exn e)  (* FIXME? *)
-      | `Finished(w'',a) -> w:=w''; a
-    in
     Imp_ops_type.mk_imperative_ops 
       ~ops:client_ops
-      ~run:Imp_ops_type.{run}
+      ~run
 
   let _ = imp_ops
-
-  module Readdir' = D_functors.Make_readdir'(Imp_ops_type_plus)
 
   open Imp_ops_type
 
