@@ -94,19 +94,20 @@ include struct
         m |> msg_to_string 
         |> fun s -> Printf.printf "sending %s\n" s;  
         s |> Connection.send_string ~conn |> function
-        | Error e -> exit_1 __LOC__ 
-        | Ok () -> 
-          Connection.recv_string ~conn |> function
-          | Error e -> exit_1 __LOC__
-          | Ok s -> 
-            Printf.printf "receiving %s\n" s;
-            s |> string_to_msg |> fun m -> 
-            match m with
-            | Msg m -> (w,fun () -> Step_monad.Finished m)
-            | Error (e:exn_) -> 
-              {w with thread_error=Some e},fun () -> 
-                exit_1 "hncc: attempt to step exceptional state")
-
+        | Ok `Send_string_write_error -> exit_1 __LOC__ 
+        | Ok `Ok -> (
+            Connection.recv_string ~conn |> function
+            | Error e -> exit_1 __LOC__
+            | Ok (`Err_recv_string) -> exit_1 __LOC__
+            | Ok (`Ok s) -> 
+              Printf.printf "receiving %s\n" s;
+              s |> string_to_msg |> fun m -> 
+              match m with
+              | Msg m -> (w,fun () -> Step_monad.Finished m)
+              | Error (e:exn_) -> 
+                {w with thread_error=Some e},fun () -> 
+                  exit_1 "hncc: attempt to step exceptional state")
+        | Error e -> exit_1 __LOC__)
 
 end
 

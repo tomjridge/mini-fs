@@ -24,10 +24,8 @@ end
 let conn = 
   Connection.connect ~quad:Shared.sender
   |> function 
-  | Ok x -> (x |> function
-    | `Connection c -> c
-    | `Net_err e -> raise e)
-  | Error e -> raise e  (* shouldn't happen, given that msg_lib uses catch  *)
+  | Ok fd -> fd
+  | Error (e,s1,s2) -> raise (Unix.Unix_error(e,s1,s2))
 
 let call = call ~conn
 
