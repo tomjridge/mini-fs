@@ -177,7 +177,9 @@ module Make_imp_ops_type(O:OPS_TYPE) = struct
   let mk_imperative_ops ~(ops:O.ops) ~run =
     let run f = 
       try run.run f 
-      with e -> (Printexc.to_string e |> print_endline; raise e) 
+      with e -> (
+          log_.log_lazy (fun () -> Printexc.to_string e); 
+          raise e) 
     in
     let root= ops.root in
     let unlink=(fun ~parent ~name -> run @@ ops.unlink ~parent ~name) in

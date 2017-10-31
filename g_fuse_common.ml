@@ -51,17 +51,17 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     (* NOTE that fuse keeps track of fds, so this just returns None;
        read and write are via path *)
     let fopen (path:string) flags = 
-      print_endline @@ "# fopen "^ path ^ " mfuse.fopen.l61";
+      (* log_.log @@ "# fopen "^ path ^ " mfuse.fopen.l61"; *)
       Unix.(List.mem O_CREAT flags) |> function
       | true -> 
-        print_endline @@ "# l64";
+        (* log_.log @@ "# l64"; *)
         (* may be creating a file *)
         dirname_basename path |> fun (parent,name) ->
         ops.create ~parent ~name;
-        print_endline @@ "# l68";
+        (* log_.log @@ "# l68"; *)
         None
       | false -> 
-        print_endline @@ "# l71";
+        (* log_.log @@ "# l71"; *)
         path |> ops.kind |> function
         | `File -> None
         | _ -> raise @@ Unix_error (ENOENT,"open",path)
@@ -107,20 +107,21 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
 
     (* stat_file and kind combined in following *)
     let getattr path0 = 
-      Printf.printf "# getattr (%s) mfuse.getattr.l110\n" path0;
+      log_.log_lazy (fun () -> 
+          Printf.sprintf "# getattr (%s) mfuse.getattr.l110\n" path0);
       path0 |> fun path ->
-      print_endline @@ "# mfuse.getattr.l112";
+      (* log_.log @@ "# mfuse.getattr.l112"; *)
       (* FIXME kind needs to be wrapped so it throws a unix_error *)
       path |> ops.kind |> function
       | `File -> (
-          print_endline @@ "# mfuse.getattr.l116";
+          (* log_.log @@ "# mfuse.getattr.l116"; *)
           ops.stat_file path |> fun x -> 
           x.sz |> Int64.of_int |> default_file_stats)
       | `Dir -> (
-          print_endline @@ "# mfuse.getattr.l120";
+          (* log_.log @@ "# mfuse.getattr.l120"; *)
           default_dir_stats)
       | _ -> (
-          print_endline @@ "# getattr exception(ENOENT) mfuse.getattr.l123";
+          (* log_.log @@ "# getattr exception(ENOENT) mfuse.getattr.l123";*)
           raise @@ Unix_error (ENOENT,"getattr l124",path0))
     in
 
@@ -133,7 +134,7 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     (* notify when exception is thrown *)
     let wrap f = 
       try f ()
-      with e -> print_endline (Printexc.to_string e); raise e
+      with e -> log_.log_lazy (fun () -> Printexc.to_string e); raise e
     in
     let wrap1 f = fun a -> wrap @@ fun () -> f a in
     let wrap2 f = fun a b -> wrap @@ fun () -> f a b in

@@ -28,7 +28,7 @@ module Main : sig val main: unit -> unit end = struct
     Connection.connect ~quad:Shared.sender
     |> function 
     | Ok fd -> fd
-    | Error (e,s1,s2) -> raise (Unix.Unix_error(e,s1,s2))
+    | Error _ -> exit_1 __LOC__
 
   let call = call ~conn
 
@@ -54,8 +54,10 @@ module Main : sig val main: unit -> unit end = struct
 
   let main () = 
     let readdir' = Readdir'.readdir' ~ops:imp_ops in
+    Printf.printf "calling mkdir tmp; mkdir tmp2\n";
     imp_ops.mkdir ~parent:"/" ~name:"tmp";
     imp_ops.mkdir ~parent:"/" ~name:"tmp2";
+    Printf.printf "calling readdir'\n";    
     readdir' "/" |> List.iter print_endline;
     ()
 

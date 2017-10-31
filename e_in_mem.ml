@@ -87,8 +87,13 @@ let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) =
   let dir_bindings t = nm_ops.map_bindings t.name_map in
   (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
 
-type files_carrier = string Map_fid.Map_.t
-type files_ops = (fid,string,files_carrier) map_ops
+type file_contents = Tjr_buffer.buf
+open Tjr_buffer
+let fc_ops = Tjr_buffer.mk_buf_ops()
+
+
+type files_carrier = file_contents Map_fid.Map_.t
+type files_ops = (fid,file_contents,files_carrier) map_ops
 let files_ops : files_ops = Map_fid.map_ops
 
 type dirs_carrier = dir_with_parent Map_did.Map_.t
@@ -119,7 +124,8 @@ module X_ = struct
   } [@@deriving yojson]
 
   let from_fs (fs:fs_t) = {
-    files=files_ops.map_bindings fs.files;
+    files=files_ops.map_bindings fs.files |> List.map (fun (fid,c) -> 
+        (fid,fc_ops.to_string c));
     max_fid=fs.max_fid;
     dirs=
       dirs_ops.map_bindings fs.dirs 
@@ -406,7 +412,7 @@ let mk_ops ~extra =
           dirs_ops.map_add parent pdir dirs |> fun dirs ->
           {s with dirs} |> fun s ->
           s.files |> fun files -> 
-          files_ops.map_add fid "" files |> fun files ->
+          files_ops.map_add fid (fc_ops.create 0) files |> fun files ->
           `Ok,{s with files}) >>= function
     | `Internal s -> extra.internal_err s
     | `Ok -> return ()
@@ -423,61 +429,66 @@ let mk_ops ~extra =
     fid |> mk_fd |> return 
   in
 
+  (* FIXME must account for reading beyond end of file *)
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+    buf_size_check length;
     let fid = fd2int fd in
     extra.with_fs (fun s ->
         s.files |> fun files ->
         files_ops.map_find fid files |> function
         | None -> `Internal "pread, impossible, no file, mim.325",s
-        | Some(contents:string) ->
-          (* don't try to read more bytes than available *)
-          let max_length = String.length contents - foff in
-          let length = min max_length length in
-          let error_case = 
-            foff+length > String.length contents ||  (* should be impossible *)
-            boff+length > Bigarray.Array1.dim buffer  (* FIXME fuse prevents this? *)
-          in
-          match error_case with
-          | true -> `Internal "pread, invalid blit arguments, mim.342",s
-          | false -> 
-            blit_string_to_bigarray 
-              ~src:contents ~soff:foff ~len:length 
-              ~dst:buffer ~doff:boff;
-            (`Ok length,s)) >>= function
+        | Some(contents) ->
+          (* NOTE we have some flexibility to choose length *)
+          let clen = fc_ops.len contents in
+          match () with
+          | _ when foff >= clen -> (`Ok 0,s)
+          | _ -> 
+            (* INVARIANT foff < clen *)
+            (* (Printf.sprintf "im.435: %d %d\n" clen foff |> log_.log); *)
+            let length = min (clen - foff) length in
+            (* INVARIANT foff+length <= clen ; length <= old_length *)
+            let error_case = 
+              boff+length > Bigarray.Array1.dim buffer  
+              (* FIXME fuse prevents this? *)
+            in
+            (* (Printf.sprintf "im.445: %d %d %d %d\n" clen length foff boff |> log_.log); *)
+            match error_case with
+            | true -> `Internal "pread, invalid blit arguments, mim.342",s
+            | false -> 
+              fc_ops.blit_buf_to_bigarray 
+                ~src:contents ~soff:foff ~len:length 
+                ~dst:buffer ~doff:boff;
+              (`Ok length,s)) >>= function
     | `Internal s -> extra.internal_err s
     | `Ok l -> return l
   in
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+    buf_size_check length;
     let fid = fd2int fd in
     extra.with_fs (fun s ->
         s.files |> fun files ->
         files_ops.map_find fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
         | Some contents ->
+          (* FIXME this is probably a performance bottleneck *)
           (* convert contents to bytes, and extend if necessary *)
           let contents = 
-            if foff+length > String.length contents 
-            then 
-              Bytes.create (foff+length) |> fun contents' ->
-              blit_string_to_bytes
-                ~src:contents ~soff:0 ~len:(String.length contents) 
-                ~dst:contents' ~doff:0;
-              contents'
-            else Bytes.of_string contents 
+            if foff+length > fc_ops.len contents 
+            then fc_ops.resize (foff+length) contents
+            else contents
           in
           let error_case = 
-            foff+length > Bytes.length contents ||   (* shouldn't happen *)
+            foff+length > fc_ops.len contents ||   (* shouldn't happen *)
             boff+length > Bigarray.Array1.dim buffer  (* presumably fuse prevents this *)
           in
           match error_case with
           | true -> `Internal "pwrite, invalid blit arguments, mim.357",s
           | false -> 
-            let contents = Bytes.of_string contents in
-            blit_bigarray_to_bytes 
-              ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff; 
+            fc_ops.blit_bigarray_to_buf
+              ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
+            |> fun contents ->
             (* FIXME extend contents *)
-            Bytes.to_string contents |> fun contents ->
             files_ops.map_add fid contents files |> fun files ->
             (`Ok length,{s with files})) >>= function
     | `Internal s -> extra.internal_err s
@@ -551,10 +562,7 @@ let mk_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "file not found mim.362",s
         | Some contents ->
-          let contents' = Bytes.create length in
-          Bytes.blit_string 
-            contents 0 contents' 0 (min (Bytes.length contents) length);
-          Bytes.to_string contents' |> fun contents ->
+          fc_ops.resize length contents  |> fun contents ->
           files_ops.map_add fid contents files |> fun files ->
           `Ok (),{s with files}) >>= function
     | `Ok () -> return ()
@@ -569,7 +577,7 @@ let mk_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "file fid not found mim.379",s
         | Some contents ->
-          String.length contents |> fun sz ->
+          fc_ops.len contents |> fun sz ->
           `Ok { sz },s) >>= function
     | `Ok stat -> return stat
     | `Internal s -> extra.internal_err s
@@ -671,8 +679,6 @@ let dest_exceptional w =
 
 let e2s = fun e -> e|>exn__to_string
 
-let print_logs = ref false
-
 (* don't reuse Step_monad.run, because we potentially want to log
    calls and returns *)
 let rec run (w:t) (x:'a m) = 
@@ -683,8 +689,7 @@ let rec run (w:t) (x:'a m) =
     | Finished a -> `Finished(a,w)
     | Step f -> 
       f w |> fun (w',rest) ->
-      (if !print_logs 
-       then Printf.printf "run mim.511: result state: %s\n" (t_to_string w'));
+      log_.log_lazy (fun () -> Printf.sprintf "run mim.511: result state: %s\n" "FIXMEremoved" (* (t_to_string w') *));
       match dest_exceptional w' with
       | None -> run w' (rest())
       | Some e -> `Exn_ (e,w)
@@ -709,7 +714,7 @@ include struct
   let imp_run ~ref_ ~raise_ : run = {
     run=(fun x -> run (!ref_) x |> function
       | `Exn_ (e,w) ->        
-        Printf.printf "fmem.495: run resulted in exn_: %s\n" (exn__to_string e);
+        log_.log_lazy (fun () -> Printf.sprintf "fmem.495: run resulted in exn_: %s\n" (exn__to_string e));
         (* ASSUME internal_error_state is None; don't record the
            thread_error_state, since that is per call *)
         ref_:={ !ref_ with fs=w.fs };  
@@ -733,7 +738,7 @@ include struct
     let call = msg |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
     let rec log_return = function
       | Finished a -> 
-        Printf.printf "call %s returns\n" call;
+        log_.log_lazy (fun () -> Printf.sprintf "call %s returns\n" call);
         Finished a
       | Step(f) -> Step(
           fun w -> 
@@ -742,7 +747,7 @@ include struct
     in
     let log_call_and_return = Step(
         fun w -> 
-          Printf.printf "call %s starts\n" call;
+          log_.log_lazy (fun () -> Printf.sprintf "call %s starts\n" call);
           w,fun () -> log_return x)
     in
     log_call_and_return

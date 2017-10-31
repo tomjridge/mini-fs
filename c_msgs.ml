@@ -54,3 +54,4 @@ type msg_from_server' =
 type msg_from_server = 
   | Msg of msg_from_server' 
   | Error of exn_ [@@deriving bin_io, yojson]
+(* FIXME Error is probably a bad choice of constructor - prefer Exn_ *)

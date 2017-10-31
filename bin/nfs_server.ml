@@ -31,7 +31,7 @@ let serve =
     ~i2dh:id
     ~fd2i:id
     ~i2fd:id
-    
+
 
 (* NOTE the errors are still in the monad *)
 let _ : msg_from_client -> msg_from_server' m = serve
@@ -43,7 +43,7 @@ include struct
   let send ~conn (m:msg_from_server) =
     m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
     |> fun s -> send_string ~conn s
-      
+
   let string_to_msg s = s |> Yojson.Safe.from_string |> msg_from_client_of_yojson
 end
 
@@ -54,13 +54,13 @@ let main () =
   let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad:Shared.recvr >>= function
-  | `Connection conn ->
+  | Error e -> exit_1 __LOC__
+  | Ok conn ->
     let rec loop () = 
-      Printf.printf "nfs_server.59, loop\n";
       recv_string ~conn >>= function
-      | `Err_recv_string -> exit_1 __LOC__
-      | `Ok s ->
-        print_endline s;
+      | Error () -> exit_1 __LOC__
+      | Ok s ->
+        log_.log s;
         string_to_msg s |> function
         | Error e -> 
           "nfs_server.63, error unmarshalling string: "^e |> exit_1
@@ -74,16 +74,15 @@ let main () =
                  w.thread_error_state/internal_error_state is None? *)
               (* in the error case, we send the exception back *)
               send ~conn (Error e) >>= function
-              | `Send_string_write_error -> exit_1 __LOC__
-              | `Ok -> loop())
+              | Error () -> exit_1 __LOC__
+              | Ok () -> loop())
           | `Finished (a,w) -> 
             w_ref:=w;
             send ~conn (Msg a) >>= function
-            | `Send_string_write_error -> exit_1 __LOC__
-            | `Ok -> loop ()
+            | Error () -> exit_1 __LOC__
+            | Ok () -> loop ()
     in
     loop ()
-  | `Listen_accept_incorrect_peername -> exit_1 __LOC__
 
 
 let _ = main()

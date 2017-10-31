@@ -25,7 +25,8 @@ let conn =
   Connection.connect ~quad:Shared.sender
   |> function 
   | Ok fd -> fd
-  | Error (e,s1,s2) -> raise (Unix.Unix_error(e,s1,s2))
+  | Error e -> 
+    exit_1 __LOC__
 
 let call = call ~conn
 

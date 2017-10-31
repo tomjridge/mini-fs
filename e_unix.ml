@@ -199,8 +199,11 @@ include struct
     Step_monad.run ~dest_exceptional !ref_ x |> function
     | `Finished (w,a) -> (ref_:=w; a)
     | `Exceptional (e,w) -> 
-      e |> Printexc.to_string |> fun s->
-      Printf.printf "funix.162: run resulted in exceptional: %s\n" s;
+      (fun () -> 
+         Printf.sprintf 
+           "funix.162: run resulted in exceptional: %s\n" 
+           (Printexc.to_string e))
+      |> log_.log_lazy;
       raise e
 
   let ref_ = ref initial_world

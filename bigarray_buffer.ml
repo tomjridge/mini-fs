@@ -29,9 +29,15 @@ let blit_string_to_bytes  ~src ~soff ~len ~dst ~doff =
 
 
 let bigarray_to_string ~src ~off ~len = 
-  Bytes.create len |> fun dst ->
-  blit_bigarray_to_bytes ~src ~soff:off ~len ~dst ~doff:0;
-  Bytes.unsafe_to_string dst
+  (* ASSUMES not (len < 0 or n > Sys.max_string_length) *)
+  match len < 0 || len > Sys.max_string_length with
+  | true -> 
+    (Printf.sprintf "bigarray_to_string: len is %d\n" len |> print_endline);
+    failwith __LOC__
+  | false ->
+    Bytes.create len |> fun dst ->
+    blit_bigarray_to_bytes ~src ~soff:off ~len ~dst ~doff:0;
+    Bytes.unsafe_to_string dst
 
 
 let string_to_bigarray s = 

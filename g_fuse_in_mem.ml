@@ -1,3 +1,4 @@
+open C_base
 open E_in_mem
 
 let mk_unix_exn = A_error.mk_unix_exn
@@ -9,22 +10,21 @@ include struct
   let run ref_ : run = {
     run=(fun x -> E_in_mem.run (!ref_) x |> function
       | `Exn_ (e,w) -> (
-          "Run resulted in exceptional state" |> fun s ->
-          print_endline s;
+          ("Run resulted in exceptional state" |> log_.log);
           match w.internal_error_state with 
           | None -> (
               match w.thread_error_state with
               | None -> 
                 "impossible, gfuse.161" |> fun s ->
-                print_endline s;
+                log_.log s;
                 raise @@ Unix_error(EUNKNOWNERR 99, s, s)
               | Some e ->
                 "gfuse.165, thread error: "^(A_error.exn__to_string e) |> fun s ->
-                print_endline s;
+                log_.log s;
                 raise @@ mk_unix_exn e)
           | Some s ->
             "thread error gfuse.170: "^s) |> fun s ->
-          print_endline s;
+          log_.log s;
           raise @@ Unix_error(EUNKNOWNERR 99, s, s)
       | `Finished(a,w) -> 
         ref_:=w;

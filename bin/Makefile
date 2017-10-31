@@ -27,6 +27,7 @@ fuse_mount_in_mem: fuse_main.native
 
 
 fuse_mount_nfs_client: fuse_nfs_client.native
+	-fusermount -u ./fuse_mount
 	mkdir -p fuse_mount
 	./fuse_nfs_client.native -s -f -o allow_other ./fuse_mount 
 

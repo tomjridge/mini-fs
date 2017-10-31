@@ -32,14 +32,23 @@ module Make_server(O:OPS_TYPE) = struct
     let create ~parent ~name = ops.create ~parent ~name >>= ret_unit in
     let open_ p = ops.open_ p >>= fun fd -> return @@ Open' (fd2i fd) in
     let pread ~fd ~foff ~length = 
+      (* ASSUMES length should not exceed Sys.max_string_length, since
+         strings/bytes are used in bigarray_buffer *)
+      (* FIXME how to make these sort of constraints across all impls? *)
+      buf_size_check length;
+      let length = min length Sys.max_string_length in
       mk_buffer length |> fun buffer ->
       ops.pread ~fd ~foff ~length ~buffer ~boff:0 >>= fun nread -> 
+      buf_size_check nread;
       data_of_buffer ~buffer ~len:nread |> fun data ->
       return @@ Pread' data
     in
     let pwrite ~fd ~foff ~data = 
+      let length = String.length data in
+      buf_size_check length;
+      let length = min length Sys.max_string_length in
       buffer_of_data data |> fun buffer ->
-      ops.pwrite ~fd ~foff ~length:(String.length data) ~buffer ~boff:0 >>= fun nwritten ->
+      ops.pwrite ~fd ~foff ~length ~buffer ~boff:0 >>= fun nwritten ->
       return @@ Int nwritten
     in
     let close fd = ops.close fd >>= ret_unit in

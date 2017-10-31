@@ -59,3 +59,20 @@ module Abstract_base_types = struct
 end
 
 
+(* logging ----------------------------------------------------------- *)
+
+include Tjr_log
+let log_ = mk_log_ops()
+
+(* let log_ = {log_ with log=fun s -> ()}  (* FIXME performance *) *)
+
+let () = at_exit log_.print_last_n
+
+
+(* buffers size check  ---------------------------------------------- *)
+
+let buf_size_check n = 
+  if n < 0 || n > Sys.max_string_length 
+  then (log_.log_now __LOC__; failwith __LOC__ )
+  else ()
+
