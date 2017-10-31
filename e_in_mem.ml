@@ -438,27 +438,22 @@ let mk_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "pread, impossible, no file, mim.325",s
         | Some(contents) ->
-          (* NOTE we have some flexibility to choose length *)
           let clen = fc_ops.len contents in
+          (* NOTE we have some flexibility to choose length *)
+          assert(length >= 0);
+          assert(foff >= 0);
+          assert(boff >= 0);
+          assert(boff+length <= Biga.length buffer);
+          (* following assures that foff+length<=clen *)
+          let length = if foff > clen then 0 else min length (clen - foff) in
           match () with
-          | _ when foff >= clen -> (`Ok 0,s)
+          (* NOTE foff may be > clen, but then length is 0 *)
+          | _ when length=0 -> (`Ok 0,s)
           | _ -> 
-            (* INVARIANT foff < clen *)
-            (* (Printf.sprintf "im.435: %d %d\n" clen foff |> log_.log); *)
-            let length = min (clen - foff) length in
-            (* INVARIANT foff+length <= clen ; length <= old_length *)
-            let error_case = 
-              boff+length > Bigarray.Array1.dim buffer  
-              (* FIXME fuse prevents this? *)
-            in
-            (* (Printf.sprintf "im.445: %d %d %d %d\n" clen length foff boff |> log_.log); *)
-            match error_case with
-            | true -> `Internal "pread, invalid blit arguments, mim.342",s
-            | false -> 
-              fc_ops.blit_buf_to_bigarray 
-                ~src:contents ~soff:foff ~len:length 
-                ~dst:buffer ~doff:boff;
-              (`Ok length,s)) >>= function
+            fc_ops.blit_buf_to_bigarray 
+              ~src:contents ~soff:foff ~len:length 
+              ~dst:buffer ~doff:boff;
+            (`Ok length,s)) >>= function
     | `Internal s -> extra.internal_err s
     | `Ok l -> return l
   in
@@ -471,24 +466,21 @@ let mk_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
         | Some contents ->
-          (* FIXME this is probably a performance bottleneck *)
-          (* convert contents to bytes, and extend if necessary *)
+          let blen = Biga.length buffer in
+          assert(length >= 0);
+          assert(foff >= 0);
+          assert(boff >= 0);
+          assert(boff+length <= blen);
+          (* we allow foff beyond EOF *)
           let contents = 
             if foff+length > fc_ops.len contents 
             then fc_ops.resize (foff+length) contents
             else contents
           in
-          let error_case = 
-            foff+length > fc_ops.len contents ||   (* shouldn't happen *)
-            boff+length > Bigarray.Array1.dim buffer  (* presumably fuse prevents this *)
-          in
-          match error_case with
-          | true -> `Internal "pwrite, invalid blit arguments, mim.357",s
-          | false -> 
-            fc_ops.blit_bigarray_to_buf
-              ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
+          assert(foff+length <= fc_ops.len contents);
+          fc_ops.blit_bigarray_to_buf
+            ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
             |> fun contents ->
-            (* FIXME extend contents *)
             files_ops.map_add fid contents files |> fun files ->
             (`Ok length,{s with files})) >>= function
     | `Internal s -> extra.internal_err s
