@@ -5,7 +5,7 @@ export BASH_ENV
 all: natives
 
 
-natives: fuse_main.native fuse_nfs_client.native nfs_server.native nfs_client.native
+natives: fuse_main.native fuse_nfs_client.native nfs_server_in_mem.native nfs_client.native
 	cp *.native /tmp
 
 

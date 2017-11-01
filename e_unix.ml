@@ -3,9 +3,19 @@ open C_base
 module Unix_base_types = struct
   type fd=Unix.file_descr
   type dh=Unix.dir_handle
-  let fd2int x = ExtUnix.All.int_of_file_descr x
+(*  let fd2int x = ExtUnix.All.int_of_file_descr x *)
 end
 include Unix_base_types
+
+module Unix_conversions = struct
+  open ExtUnix.All
+  let fd2i = int_of_file_descr
+  let i2fd = file_descr_of_int
+  (* NOTE the following uses dirfd which is fragile; better to
+     expose a version of the api that tracks a dh<->int bijection *)
+  let dh2i x = x |> dirfd |> fd2i
+end
+
 
 (* ops -------------------------------------------------------------- *)
 
@@ -27,12 +37,14 @@ include Unix_monad
 module Ops_type = D_functors.Make_ops_type(Unix_monad)(Unix_base_types)
 include Ops_type
 
-module Imp_ops_type = D_functors.Make_imp_ops_type(
-  struct
-    include Unix_monad
-    include Unix_base_types
-    include Ops_type
-  end)
+module Ops_type_plus = struct
+  include Unix_monad
+  include Unix_base_types
+  include Ops_type
+end
+      
+
+module Imp_ops_type = D_functors.Make_imp_ops_type(Ops_type_plus)
 
 
 
@@ -133,7 +145,9 @@ let mk_ops ~extra =
   (* FIXME record which are open? *)
 
 
-  let rename ~spath ~sname ~dpath ~dname = failwith "FIXME" in
+  let rename ~spath ~sname ~dpath ~dname = extra.safely @@ fun _ ->
+    (Unix.rename (spath^"/"^sname) (dpath^"/"^dname); return ())
+  in
 
   let truncate ~path ~length = 
     extra.safely @@ fun _ -> 

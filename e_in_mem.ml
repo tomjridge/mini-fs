@@ -89,7 +89,7 @@ let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) =
 
 type file_contents = Tjr_buffer.buf
 open Tjr_buffer
-let fc_ops = Tjr_buffer.mk_buf_ops()
+let contents_ops = Tjr_buffer.mk_buf_ops()
 
 
 type files_carrier = file_contents Map_fid.Map_.t
@@ -125,7 +125,7 @@ module X_ = struct
 
   let from_fs (fs:fs_t) = {
     files=files_ops.map_bindings fs.files |> List.map (fun (fid,c) -> 
-        (fid,fc_ops.to_string c));
+        (fid,contents_ops.to_string c));
     max_fid=fs.max_fid;
     dirs=
       dirs_ops.map_bindings fs.dirs 
@@ -400,6 +400,9 @@ let mk_ops ~extra =
   let closedir dh = return () in (* FIXME should we record which rd are valid? ie not closed *)
 
 
+  (* default size preallocated for a file *)
+  let internal_len = 1024 in 
+
   let create ~parent ~name : unit m = 
     resolve_dir_path parent >>= fun parent ->
     extra.new_fid () >>= fun (fid:fid) -> 
@@ -412,7 +415,7 @@ let mk_ops ~extra =
           dirs_ops.map_add parent pdir dirs |> fun dirs ->
           {s with dirs} |> fun s ->
           s.files |> fun files -> 
-          files_ops.map_add fid (fc_ops.create 0) files |> fun files ->
+          files_ops.map_add fid (contents_ops.create ~internal_len 0) files |> fun files ->
           `Ok,{s with files}) >>= function
     | `Internal s -> extra.internal_err s
     | `Ok -> return ()
@@ -431,14 +434,14 @@ let mk_ops ~extra =
 
   (* FIXME must account for reading beyond end of file *)
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    buf_size_check length;
+    (* buf_size_check length; *)
     let fid = fd2int fd in
     extra.with_fs (fun s ->
         s.files |> fun files ->
         files_ops.map_find fid files |> function
         | None -> `Internal "pread, impossible, no file, mim.325",s
         | Some(contents) ->
-          let clen = fc_ops.len contents in
+          let clen = contents_ops.len contents in
           (* NOTE we have some flexibility to choose length *)
           assert(length >= 0);
           assert(foff >= 0);
@@ -450,7 +453,7 @@ let mk_ops ~extra =
           (* NOTE foff may be > clen, but then length is 0 *)
           | _ when length=0 -> (`Ok 0,s)
           | _ -> 
-            fc_ops.blit_buf_to_bigarray 
+            contents_ops.blit_buf_to_bigarray 
               ~src:contents ~soff:foff ~len:length 
               ~dst:buffer ~doff:boff;
             (`Ok length,s)) >>= function
@@ -459,7 +462,7 @@ let mk_ops ~extra =
   in
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    buf_size_check length;
+    (* buf_size_check length; *)
     let fid = fd2int fd in
     extra.with_fs (fun s ->
         s.files |> fun files ->
@@ -473,12 +476,12 @@ let mk_ops ~extra =
           assert(boff+length <= blen);
           (* we allow foff beyond EOF *)
           let contents = 
-            if foff+length > fc_ops.len contents 
-            then fc_ops.resize (foff+length) contents
+            if foff+length > contents_ops.len contents 
+            then contents_ops.resize (foff+length) contents
             else contents
           in
-          assert(foff+length <= fc_ops.len contents);
-          fc_ops.blit_bigarray_to_buf
+          assert(foff+length <= contents_ops.len contents);
+          contents_ops.blit_bigarray_to_buf
             ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
             |> fun contents ->
             files_ops.map_add fid contents files |> fun files ->
@@ -554,7 +557,7 @@ let mk_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "file not found mim.362",s
         | Some contents ->
-          fc_ops.resize length contents  |> fun contents ->
+          contents_ops.resize length contents  |> fun contents ->
           files_ops.map_add fid contents files |> fun files ->
           `Ok (),{s with files}) >>= function
     | `Ok () -> return ()
@@ -569,7 +572,7 @@ let mk_ops ~extra =
         files_ops.map_find fid files |> function
         | None -> `Internal "file fid not found mim.379",s
         | Some contents ->
-          fc_ops.len contents |> fun sz ->
+          contents_ops.len contents |> fun sz ->
           `Ok { sz },s) >>= function
     | `Ok stat -> return stat
     | `Internal s -> extra.internal_err s
