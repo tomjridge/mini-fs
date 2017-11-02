@@ -1,3 +1,4 @@
+(*
 type ('a,'w) m = Finished of 'a | Step of ('w -> 'w * (unit -> ('a,'w) m))
 
 let return (x:'a) : ('a,'w) m = Finished x
@@ -45,3 +46,4 @@ let exit_1 s = print_endline s; exit (-1)
 
 let failwith_step_error loc = 
   Printf.sprintf "Attempt to step exceptional state: %s\n" loc |> exit_1 
+*)

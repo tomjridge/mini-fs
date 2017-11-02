@@ -8,6 +8,7 @@ type exn_ = [
     | `Error_attempt_to_rename_root
     | `Error_attempt_to_rename_to_subdir
     | `Error_no_src_entry
+    | `Error_path_resolution
 ] [@@deriving bin_io, yojson]
 
 let exn__to_string e = 

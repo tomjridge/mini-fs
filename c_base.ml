@@ -2,9 +2,9 @@
 (* access a_* b_* via this module *)
 include A_monad_type
 include A_error
-module Step_monad = B_step_monad
+module Step_monad = Tjr_step_monad 
 
-let exit_1 = Step_monad.exit_1
+let exit_1 = failwith  (* hopefully not be caught *)
 
 (* following for strings *)
 let dirname_basename path = 

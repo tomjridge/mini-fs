@@ -12,7 +12,9 @@ let _ = M_runtime_config.test()
 let quad = M_runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server -> client
 
-module Main : sig val main: unit -> unit end = struct
+module Main : sig 
+  val main: unit -> unit 
+end = struct
 
   (* put all state in this module *)
   let conn = 

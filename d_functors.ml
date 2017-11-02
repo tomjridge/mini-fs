@@ -1,29 +1,49 @@
 open C_base
 (* operations ------------------------------------------------------- *)
 
+(* FIXME the following should be refined *)
+type err_ = [ `EOTHER ]
+type unlink_err = err_
+type mkdir_err = err_
+type opendir_err = err_
+type readdir_err = err_
+type closedir_err = err_
+type create_err = err_
+type open_err = err_
+type pread_err = err_
+type pwrite_err = err_
+type close_err = err_ (* EBADF, but for valid fd, fd will be closed *)
+type rename_err = err_
+type truncate_err = err_
+type stat_file_err = err_
+type kind_err = err_
+
 module type OPS_TYPE = sig
   include MONAD
   include BASE_TYPES
   type ops = {
     root: path;
-    unlink : parent:path -> name:string -> unit m;
-    mkdir : parent:path -> name:string -> unit m;
-    opendir : path -> dh m;
+    unlink : parent:path -> name:string -> (unit,unlink_err)result m;
+    mkdir : parent:path -> name:string -> (unit,mkdir_err)result m;
+    opendir : path -> (dh,opendir_err)result m;
     (* . and .. are returned *)
-    readdir : dh -> (string list * is_finished) m;
-    closedir : dh -> unit m;
-    create : parent:path -> name:string -> unit m;
-    open_ : path -> fd m;
+    readdir : dh -> (string list * is_finished,readdir_err)result m;
+    closedir : dh -> (unit,closedir_err)result m;
+    create : parent:path -> name:string -> (unit,create_err)result m;
+    open_ : path -> (fd,open_err)result m;
     pread: 
-      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m; 
+      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
+      (int,pread_err)result m; 
     pwrite: 
-      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m;
-    close : fd -> unit m;
+      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
+      (int,pwrite_err)result m;
+    close : fd -> (unit,close_err)result m;
     rename: 
-      spath:path -> sname:string -> dpath:path -> dname:string -> unit m;
-    truncate : path:path -> length:int -> unit m;
-    stat_file : path -> file_stat m;
-    kind : path -> st_kind m;
+      spath:path -> sname:string -> dpath:path -> dname:string -> 
+      (unit,rename_err)result m;
+    truncate : path:path -> length:int -> (unit,truncate_err)result m;
+    stat_file : path -> (file_stat,stat_file_err)result m;
+    kind : path -> (st_kind,kind_err)result m;
     reset : unit -> unit m;
   }
 
@@ -37,24 +57,27 @@ module Make_ops_type(M:MONAD)(B:BASE_TYPES) = struct
   open B
   type ops = {
     root: path;
-    unlink : parent:path -> name:string -> unit m;
-    mkdir : parent:path -> name:string -> unit m;
-    opendir : path -> dh m;
+    unlink : parent:path -> name:string -> (unit,unlink_err)result m;
+    mkdir : parent:path -> name:string -> (unit,mkdir_err)result m;
+    opendir : path -> (dh,opendir_err)result m;
     (* . and .. are returned *)
-    readdir : dh -> (string list * is_finished) m;
-    closedir : dh -> unit m;
-    create : parent:path -> name:string -> unit m;
-    open_ : path -> fd m;
+    readdir : dh -> (string list * is_finished,readdir_err)result m;
+    closedir : dh -> (unit,closedir_err)result m;
+    create : parent:path -> name:string -> (unit,create_err)result m;
+    open_ : path -> (fd,open_err)result m;
     pread: 
-      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m; 
+      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
+      (int,pread_err)result m; 
     pwrite: 
-      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> int m;
-    close : fd -> unit m;
+      fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
+      (int,pwrite_err)result m;
+    close : fd -> (unit,close_err)result m;
     rename: 
-      spath:path -> sname:string -> dpath:path -> dname:string -> unit m;
-    truncate : path:path -> length:int -> unit m;
-    stat_file : path -> file_stat m;
-    kind : path -> st_kind m;
+      spath:path -> sname:string -> dpath:path -> dname:string -> 
+      (unit,rename_err)result m;
+    truncate : path:path -> length:int -> (unit,truncate_err)result m;
+    stat_file : path -> (file_stat,stat_file_err)result m;
+    kind : path -> (st_kind,kind_err)result m;
     reset : unit -> unit m;
   }
 
@@ -134,7 +157,7 @@ module type IMP_OPS_TYPE = sig
   }
 
   type run = {
-    run:'a. 'a m -> 'a
+    run:'a 'e. ('a,'e)result m -> 'a
   }
 end
 
@@ -170,7 +193,7 @@ module Make_imp_ops_type(O:OPS_TYPE) = struct
      happens, it is perhaps not clear what the "state of the world"
      (maybe captured in a reference) should be *)
   type run = {
-    run:'a. 'a m -> 'a
+    run:'a 'e. ('a,'e)result m -> 'a
   }
 
   (* NOTE this at least logs any exceptions that are thrown *)
@@ -199,7 +222,7 @@ module Make_imp_ops_type(O:OPS_TYPE) = struct
     let truncate=(fun ~path ~length -> run @@ ops.truncate ~path ~length) in
     let stat_file=(fun path -> run @@ ops.stat_file path) in
     let kind=(fun path -> run @@ ops.kind path) in
-    let reset=(fun () -> run @@ ops.reset ()) in
+    let reset=(fun () -> run @@ bind (ops.reset ()) (fun x -> return (Ok x)) ) in
     { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
       pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
