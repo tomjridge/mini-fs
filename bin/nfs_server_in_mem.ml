@@ -7,18 +7,8 @@ open C_msgs
 open E_in_mem
 
 
-module Shared = struct
-  open Unix
-  let ip = Unix.inet_addr_of_string "127.0.0.1"
-  let rport=4001
-  let sport=4007
-
-  let s = ADDR_INET(ip,sport)
-  let r = ADDR_INET(ip,rport)
-
-  let sender = { local=s; remote=r }
-  let recvr = {local=r; remote=s }
-end
+let quad = M_runtime_config.get_config ~filename:"config.json" @@ 
+  fun ~client ~server -> server
 
 module Server' = G_nfs_server.Make_server(Ops_type_plus)
 include Server'
@@ -53,7 +43,7 @@ let main () =
   let ( >>= ) = bind in
   let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
-  listen_accept ~quad:Shared.recvr >>= function
+  listen_accept ~quad >>= function
   | Error e -> exit_1 __LOC__
   | Ok conn ->
     let rec loop () = 

@@ -1,3 +1,4 @@
+(*
 (* version of unix that keeps track of an int<->fd/dh map *)
 
 (* when we allocate an fd or dh, we tag it with a genint, then insert
@@ -65,3 +66,4 @@ let mk_ops () =
 
   
   ()
+*)

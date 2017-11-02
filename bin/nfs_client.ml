@@ -7,25 +7,16 @@ open Tjr_minifs
 open C_base
 open H_nfs_client_common
 
-module Shared = struct
-  open Unix
-  let ip = Unix.inet_addr_of_string "127.0.0.1"
-  let rport=4001
-  let sport=4007
+let _ = M_runtime_config.test()
 
-  let s = ADDR_INET(ip,sport)
-  let r = ADDR_INET(ip,rport)
-
-  let sender = { local=s; remote=r }
-  let recvr = {local=r; remote=s }
-end
-
+let quad = M_runtime_config.get_config ~filename:"config.json" @@ 
+  fun ~client ~server -> client
 
 module Main : sig val main: unit -> unit end = struct
 
   (* put all state in this module *)
   let conn = 
-    Connection.connect ~quad:Shared.sender
+    Connection.connect ~quad
     |> function 
     | Ok fd -> fd
     | Error _ -> exit_1 __LOC__
