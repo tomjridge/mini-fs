@@ -1,3 +1,4 @@
+open Tjr_either
 open C_base
 
 module Unix_base_types = struct
@@ -27,8 +28,9 @@ type w = {
 let initial_world : w = { error_state=None; world_state=() }
 
 module Unix_monad = struct
-  type 'a m = ('a,w)Step_monad.m
-  let bind,return = Step_monad.(bind,return)
+  open Step_monad
+  type 'a m = ('a,w)step_monad
+  let bind,return = bind,return
 end
 include Unix_monad
 
@@ -59,16 +61,24 @@ open C_base
 
 let return = Step_monad.return
 
+include struct
+  open Unix
+  type unix_error = Unix_error_ of error*string*string
+end
+
 type extra_ops = {
-  safely: 'a. (w -> 'a m) -> 'a m;  (* this delays until receives a world *)
+  safely: 'a 'e. (unix_error -> 'e) -> (w -> 'a m) -> ('a,'e)result m;  (* this delays until receives a world *)
 }
 
 let mk_ops ~extra = 
+
   let root : path = "/" in
 
+  (* FIXME refine - at the moment we wrap all exns as EOTHER *)
+  let safely a = extra.safely (fun e -> `EOTHER) a in
 
-  let unlink ~parent ~name : unit m = 
-    extra.safely @@ fun _ ->
+  let unlink ~parent ~name = 
+    safely @@ fun _ ->
     Unix.unlink @@ parent^"/"^name ;
     return ()
   in
@@ -78,7 +88,7 @@ let mk_ops ~extra =
 
 
   let mkdir ~parent ~name = 
-    extra.safely @@ fun _ -> 
+    safely @@ fun _ -> 
     Unix.mkdir (parent^"/"^name) default_perm;
     return ()
   in
@@ -87,25 +97,25 @@ let mk_ops ~extra =
   let mk_dh ~path = Unix.opendir path in
 
   let opendir path = 
-    extra.safely @@ fun _ -> return (mk_dh path)
+    safely @@ fun _ -> return (mk_dh path)
   in
 
 
   let readdir dh = 
-    extra.safely @@ fun _ -> (* safely is just to delay till world available *)
+    safely @@ fun _ -> (* safely is just to delay till world available *)
     try Unix.readdir dh |> fun e -> return ([e],not finished)
     with _ -> return ([],finished)
   in
 
 
   let closedir dh = 
-    extra.safely @@ fun _ -> Unix.closedir dh; return ()
+    safely @@ fun _ -> Unix.closedir dh; return ()
   in  
   (* FIXME should we record which dh are valid? ie not closed *)
 
 
   let create ~parent ~name = 
-    extra.safely @@ fun _ -> 
+    safely @@ fun _ -> 
     let open Unix in
     openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
     close fd;
@@ -114,7 +124,7 @@ let mk_ops ~extra =
 
 
   let mk_fd path = 
-    extra.safely @@ fun _ ->
+    safely @@ fun _ ->
     Unix.(openfile path [O_RDWR] default_perm) |> return
   in
 
@@ -122,7 +132,7 @@ let mk_ops ~extra =
 
 
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    extra.safely @@ fun _ ->
+    safely @@ fun _ ->
     (* bigarray pread has no boff, and length is taken from array, so
        resort to slicing *)
     Bigarray.Array1.sub buffer boff length |> fun buffer -> 
@@ -132,32 +142,32 @@ let mk_ops ~extra =
 
 
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
-    extra.safely @@ fun _ ->
+    safely @@ fun _ ->
     Bigarray.Array1.sub buffer boff length |> fun buffer -> 
     ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
     return n
   in
 
 
-  let close fd = extra.safely @@ fun _ ->
+  let close fd = safely @@ fun _ ->
     (Unix.close fd; return ()) 
   in 
   (* FIXME record which are open? *)
 
 
-  let rename ~spath ~sname ~dpath ~dname = extra.safely @@ fun _ ->
+  let rename ~spath ~sname ~dpath ~dname = safely @@ fun _ ->
     (Unix.rename (spath^"/"^sname) (dpath^"/"^dname); return ())
   in
 
   let truncate ~path ~length = 
-    extra.safely @@ fun _ -> 
+    safely @@ fun _ -> 
     Unix.truncate path length; 
     return ()
   in
 
 
   let stat_file path = 
-    extra.safely @@ fun _ -> 
+    safely @@ fun _ -> 
     let open Unix in
     stat path |> fun st ->
     st.st_size |> fun sz ->        
@@ -166,7 +176,7 @@ let mk_ops ~extra =
 
 
   let kind path = 
-    extra.safely @@ fun _ ->
+    safely @@ fun _ ->
     let open Unix in
     stat path |> fun st ->
     st.st_kind 
@@ -184,23 +194,28 @@ let mk_ops ~extra =
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat_file; kind; reset }
 
+let (>>=) = bind
 
-let safely : 'a. (w -> 'a m) -> 'a m = 
+let safely : 'a 'e. (unix_error -> 'e) -> (w -> 'a m) -> ('a,'e)result m = 
   let open Step_monad in
-  fun f -> 
+  fun g f -> 
     Step(fun w -> 
         try 
-          match f w with
-          | Finished a -> w,fun () -> Finished a
-          | Step f' -> f' w
-        with e -> {w with error_state=Some e }, fun() -> 
-            failwith_step_error __LOC__)
-(* NOTE we should never step a state that has an error *)
+          f w |> fun a ->
+          w,Inr (fmap (fun a -> Ok a) a)
+        with 
+        | Unix.Unix_error(e,s1,s2) -> (w,Inl (Error(g (Unix_error_(e,s1,s2))))))
+
+let _ = safely
 
 let extra = { safely }
 
 let unix_ops = mk_ops ~extra 
 
+let rec run (w:w) (x:'a m) = 
+  (Step_monad.run ~dest_exceptional:(fun x -> None) w x) |> function
+  | Ok (w,a) -> (w,a)
+  | Error e -> failwith "impossible since no state is exceptional"
 
 (* imperative ------------------------------------------------------- *)
 
@@ -209,24 +224,20 @@ let dest_exceptional w = w.error_state
 include struct
   open Imp_ops_type
 
-  let run ref_ (x:'a m) = 
-    Step_monad.run ~dest_exceptional !ref_ x |> function
-    | `Finished (w,a) -> (ref_:=w; a)
-    | `Exceptional (e,w) -> 
-      (fun () -> 
-         Printf.sprintf 
-           "funix.162: run resulted in exceptional: %s\n" 
-           (Printexc.to_string e))
-      |> log_.log_lazy;
-      raise e
+  let run ~ref_ a = run (!ref_) a |> fun (w,a) -> ref_:=w; a |> function
+    | Ok a -> a
+    | Error e -> failwith __LOC__
+
 
   let ref_ = ref initial_world
       
-  let run x = run ref_ x
+  let run x = run ~ref_ x
 
   let run : run = { run }
 
   let unix_imperative_ops = mk_imperative_ops ~run ~ops:unix_ops
+
+  let _ : imp_ops = unix_imperative_ops
 
 end
 
