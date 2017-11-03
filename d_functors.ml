@@ -157,7 +157,7 @@ module type IMP_OPS_TYPE = sig
   }
 
   type run = {
-    run:'a 'e. ('a,'e)result m -> 'a
+    run:'a 'e. ('a,'e)result m -> 'a  (* errors get thrown? *)
   }
 end
 
