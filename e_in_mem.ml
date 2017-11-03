@@ -705,28 +705,48 @@ let dest_exceptional w =
 *)
 
 
-let e2s = fun e -> e|>exn__to_string
+(* let e2s = fun e -> e|>exn__to_string *)
 
-(* don't reuse Step_monad.run, because we potentially want to log
-   calls and returns *)
-let rec run (w:t) (x:'a m) = 
-  (Step_monad.run ~dest_exceptional:(fun x -> None) w x) |> function
-  | Ok (w,a) -> (w,a)
-  | Error e -> failwith "impossible since no state is exceptional"
+module Run_pure = struct 
 
-let _ = run
+  (* NOTE don't attempt to step if this is Some _ *)
+  let dest_exceptional x = x.internal_error_state
 
+  let rec run (w:t) (x:'a m) = 
+    w |> dest_exceptional |> function
+    | None -> (
+      Step_monad.run ~dest_exceptional w x
+      |> function
+      | Ok (w,a) -> (w,a)
+      | Error (`Attempt_to_step_exceptional_state w) -> 
+        failwith __LOC__ (* impossible *))
+    | Some s -> 
+      (* for internal errors, just fail *)
+      failwith s
+
+  let _ = run
+end
 
 (* imperative ------------------------------------------------------- *)
 
-include struct
-  open Imp_ops_type
+module Run_imperative = struct
+  open Run_pure  
 
+  (* specialize to result type, and throw an exception in error case *)
   let run ~ref_ a = run (!ref_) a |> fun (w,a) -> ref_:=w; a |> function
     | Ok a -> a
-    | Error e -> failwith __LOC__
+    | Error e -> failwith __LOC__  (* FIXME discards too much info? *)
 
-  let mk_imperative_ops ~ref_ = mk_imperative_ops ~run:{run=(fun x -> run ~ref_ x)}
+end
+
+include struct
+  open Imp_ops_type
+  open Run_imperative
+  let mk_imperative_ops ~ref_ = 
+    mk_imperative_ops ~run:{run=(fun x -> run ~ref_ x)}
+
+end
+
 (*
   (* NOTE this is the runtime exception that results from using
      imperative operations with the in_mem impl *)
@@ -752,7 +772,6 @@ include struct
   let mk_imperative_ops ~ref_ ~raise_ = mk_imperative_ops ~run:(imp_run ~ref_ ~raise_)
 
 *)
-end
 
 
 (* logging ---------------------------------------------------------- *)

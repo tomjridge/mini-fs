@@ -1,16 +1,24 @@
 open C_base
 open E_in_mem
 
+(* we want to call mk_fuse_ops, on an imperative version of in_mem ops;  *)
+
 let mk_unix_exn = A_error.mk_unix_exn
 
+(*
 include struct
   open Unix
   open Imp_ops_type
   (* similar to E_in_mem.imp_run, but translate errors *)
+
   let run ref_ : run = {
-    run=(fun x -> E_in_mem.run (!ref_) x |> function
-      | `Exn_ (e,w) -> (
-          ("Run resulted in exceptional state" |> log_.log);
+    run=(fun x -> E_in_mem.Run_pure.run (!ref_) x |> function
+      | (w',a) -> 
+        ref_:=w';
+        a |> function
+        | Ok a -> a
+        | Error e -> 
+          ("Run resulted in error" |> log_.log);
           match w.internal_error_state with 
           | None -> (
               match w.thread_error_state with
@@ -31,7 +39,7 @@ include struct
         a)
   }
 end
-
+*)
 
 module Fuse' = G_fuse_common.Make_fuse(struct
     include Monad

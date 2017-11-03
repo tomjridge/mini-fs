@@ -130,6 +130,10 @@ end
 
 (* imperative operations -------------------------------------------- *)
 
+(* NOTE we change these to include the error value *)
+
+FIXME change following return type
+
 module type IMP_OPS_TYPE = sig
   include MONAD
   include BASE_TYPES
