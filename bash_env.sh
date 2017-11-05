@@ -29,4 +29,6 @@ function mk_links() {
 }
 
 
-mls=`ls *.ml |sort|tr '\n' ' '`
+#mls=`test -f links && (ls *.ml |sort|tr '\n' ' ')`
+
+#echo "mls are: $mls"
