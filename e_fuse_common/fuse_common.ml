@@ -1,7 +1,8 @@
 (* bind an imperative ops to fuse ----------------------------------- *)
-open C_base
 
-module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
+open Base_
+
+module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
 
   open Unix
   open LargeFile
@@ -24,13 +25,23 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
 
   let default_dir_stats = LargeFile.stat "."
 
-  module Readdir' = D_functors.Make_readdir'(I)
-      
-  let mk_fuse_ops ops = 
+  (* module Readdir' = Readdir'.Make_readdir'(I)  *)
+
+  let ( >>=) = I.bind
+
+  (* propagate errors *)
+  let ( >>=| ) a b = a >>= function Error e -> return (Error e) | Ok a -> b a
+
+  type co_eta = {
+    co_eta: 'a. 'a m -> 'a
+  }
+
+  let mk_fuse_ops ~readdir' ~ops ~co_eta = 
+    let co_eta = co_eta.co_eta in
 
     let unlink path = 
       path |> dirname_basename |> fun (parent,name) -> 
-      ops.unlink ~parent ~name
+      ops.unlink ~parent ~name 
     in
 
     let mkdir path _perms = 
@@ -42,7 +53,7 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     (* create combined with fopen *)
 
 
-    let readdir' = Readdir'.readdir' ~ops in
+    (* let readdir' = Readdir'.readdir' ~ops in *)
     let readdir path _ = readdir' path in
 
     let _ = ops.kind in
@@ -53,43 +64,42 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     let fopen (path:string) flags = 
       (* log_.log @@ "# fopen "^ path ^ " mfuse.fopen.l61"; *)
       Unix.(List.mem O_CREAT flags) |> function
-      | true -> 
-        (* log_.log @@ "# l64"; *)
-        (* may be creating a file *)
-        dirname_basename path |> fun (parent,name) ->
-        ops.create ~parent ~name;
-        (* log_.log @@ "# l68"; *)
-        None
+      | true -> (
+          (* log_.log @@ "# l64"; *)
+          (* may be creating a file *)
+          dirname_basename path |> fun (parent,name) ->
+          ops.create ~parent ~name >>=| fun () ->
+            (* log_.log @@ "# l68"; *)
+          return (Ok None))
       | false -> 
         (* log_.log @@ "# l71"; *)
-        path |> ops.kind |> function
-        | `File -> None
-        | _ -> raise @@ Unix_error (ENOENT,"open",path)
+        (path |> ops.kind) >>=| function
+        | `File -> return (Ok None)
+        | _ -> return (Error `ENOENT)
     in
 
 
     (* really worth making sure that buffer types match, or abstracting over *)
-    let read path buf ofs _ : int = 
-      path |> fun path ->
+    let read path buf ofs _ = 
       ofs |> Int64.to_int |> fun ofs -> (* FIXME ofs should be int64 *)
       let buf_size = Bigarray.Array1.dim buf in
-      ops.open_ path |> fun fd ->  (* FIXME cache fds in LRU? *)
+      ops.open_ path >>=| fun fd ->  
+      (* FIXME cache fds in LRU? *)
       (* FIXME fd leak if pread errors *)
-      ops.pread ~fd ~foff:ofs ~length:buf_size ~buffer:buf ~boff:0 |> fun n ->
-      ops.close fd;
-      n
+      ops.pread ~fd ~foff:ofs ~length:buf_size ~buffer:buf ~boff:0 >>=| fun n ->
+      ops.close fd >>=| fun () ->
+      return (Ok n)
     in
 
 
-    let write path buf foff _ : int = 
-      path |> fun path ->
+    let write path buf foff _ = 
       foff |> Int64.to_int |> fun foff -> (* FIXME ofs should be int64 *)
       let buf_size = Bigarray.Array1.dim buf in
-      ops.open_ path |> fun fd ->
+      ops.open_ path >>=| fun fd ->
       (* FIXME fd leak *)
-      ops.pwrite ~fd ~foff ~length:buf_size ~buffer:buf ~boff:0 |> fun n ->
-      ops.close fd;
-      n
+      ops.pwrite ~fd ~foff ~length:buf_size ~buffer:buf ~boff:0 >>=| fun n ->
+      ops.close fd >>=| fun () ->
+      return (Ok n)
     in
 
     let rename src dst = 
@@ -112,17 +122,17 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
       path0 |> fun path ->
       (* log_.log @@ "# mfuse.getattr.l112"; *)
       (* FIXME kind needs to be wrapped so it throws a unix_error *)
-      path |> ops.kind |> function
+      path |> ops.kind >>=| function
       | `File -> (
           (* log_.log @@ "# mfuse.getattr.l116"; *)
-          ops.stat_file path |> fun x -> 
-          x.sz |> Int64.of_int |> default_file_stats)
+          ops.stat_file path >>=| fun x -> 
+          x.sz |> Int64.of_int |> default_file_stats |> fun st -> return (Ok st))
       | `Dir -> (
           (* log_.log @@ "# mfuse.getattr.l120"; *)
-          default_dir_stats)
+          return (Ok default_dir_stats))
       | _ -> (
           (* log_.log @@ "# getattr exception(ENOENT) mfuse.getattr.l123";*)
-          raise @@ Unix_error (ENOENT,"getattr l124",path0))
+          return (Error `ENOENT))
     in
 
 
@@ -131,18 +141,30 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     let utime path atim mtim = () in
 
 
+    (* FIXME refine following *)
+    let err2unix = function
+      | `EOTHER -> Unix.Unix_error(EUNKNOWNERR 999,"FIXME","FIXME")
+      | `ENOENT -> Unix.Unix_error(ENOENT,"FIXME","FIXME")
+    in
+
+    let maybe_raise a = a |> co_eta |> function
+      | Ok a -> a
+      | Error e -> raise (err2unix e)
+    in
+    let _ = maybe_raise in
+
     (* notify when exception is thrown *)
     let wrap f = 
       try f ()
       with e -> log_.log_lazy (fun () -> Printexc.to_string e); raise e
     in
-    let wrap1 f = fun a -> wrap @@ fun () -> f a in
-    let wrap2 f = fun a b -> wrap @@ fun () -> f a b in
-    let wrap3 f = fun a b c -> wrap @@ fun () -> f a b c in
-    let wrap4 f = fun a b c d -> wrap @@ fun () -> f a b c d in
+    let wrap1 f = fun a -> wrap @@ fun () -> f a |> maybe_raise in
+    let wrap2 f = fun a b -> wrap @@ fun () -> f a b |> maybe_raise in
+    let wrap3 f = fun a b c -> wrap @@ fun () -> f a b c |> maybe_raise in
+    let wrap4 f = fun a b c d -> wrap @@ fun () -> f a b c d |> maybe_raise in
 
     let unlink = wrap1 unlink in
-    let rmdir = wrap1 rmdir in
+    let rmdir = unlink in
     let mkdir = wrap2 mkdir in
     let readdir = wrap2 readdir in
     let fopen = wrap2 fopen in
@@ -151,6 +173,7 @@ module Make_fuse(I:D_functors.IMP_OPS_TYPE) = struct
     let rename = wrap2 rename in
     let truncate = wrap2 truncate in
     let getattr = wrap1 getattr in
+
 
     { default_operations with 
       init = (fun () -> Printf.printf "filesystem started\n%!");

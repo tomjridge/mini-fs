@@ -1,5 +1,5 @@
-open A_error
-open C_base
+open Error_
+open Base_
 
 open Bin_prot.Std
 
@@ -14,7 +14,7 @@ type dh = int [@@deriving bin_io, yojson]
 (* for messages going to server, fd is int *)
 type fd = int [@@deriving bin_io, yojson]
 type data = string[@@deriving bin_io, yojson]
-type file_stat = C_base.file_stat = { sz:int } [@@deriving bin_io, yojson]
+type file_stat = Base_.file_stat = { sz:int } [@@deriving bin_io, yojson]
 
 type st_kind = (* C_base.st_kind FIXME = *)
   [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io, yojson]

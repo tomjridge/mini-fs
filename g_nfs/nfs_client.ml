@@ -2,8 +2,8 @@
 
 (* the client makes network calls, which potentially could be in lwt.m
    or unix.m; so we parameterize over ops *)
-open C_base
-open D_functors
+open Base
+open Ops_types
 
 module Make_client(O:OPS_TYPE) = struct
   open O

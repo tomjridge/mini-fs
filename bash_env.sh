@@ -24,7 +24,9 @@ function clean_links() {
 
 
 function mk_links() {
-    ln -s {a_,d_,e_,f_,g_,h_,m_}*/*.ml .
+#    ln -s {a_,d_,e_,f_,g_,h_,m_}*/*.ml .
+    ln -s {a_,d_,e_}*/*.ml .
+#    ln -s {a_,d_}*/*.ml .
     touch links
 }
 

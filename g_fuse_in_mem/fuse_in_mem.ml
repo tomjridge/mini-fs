@@ -1,5 +1,5 @@
-open C_base
-open E_in_mem
+open Base
+open In_mem
 
 (* we want to call mk_fuse_ops, on an imperative version of in_mem ops;  *)
 

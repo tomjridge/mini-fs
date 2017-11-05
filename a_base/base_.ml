@@ -1,7 +1,7 @@
 
 (* access a_* b_* via this module *)
-include Monad_type
-include Error
+include Monad_type_
+include Error_
 module Step_monad = Tjr_step_monad 
 
 let exit_1 = failwith  (* hopefully not be caught *)

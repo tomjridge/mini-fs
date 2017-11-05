@@ -1,7 +1,7 @@
 open Tjr_either
 open Tjr_map
-open C_base
-open D_functors
+open Base_
+open Ops_types
 
 (* in-mem impl ------------------------------------------------------ *)
 
@@ -179,12 +179,12 @@ let init_t = {
   fs=init_fs
 }
 
-module Monad = struct
+module In_mem_monad = struct
   open Step_monad
   type 'a m = ( 'a, t) step_monad
   let bind,return = bind,return
 end
-include Monad
+include In_mem_monad
 
 
 module Y_ = struct
@@ -208,30 +208,32 @@ let t_to_string t = Y_.(
 
 (* generate types --------------------------------------------------- *)
 
-module MB = struct
-  include Monad
+module MBR = struct
+  include In_mem_monad
   include Mem_base_types
+  type ('a,'e)r_ = ('a,'e)result
 end
 
-module Ops_type = Make_ops_type_with_result(MB)
+module Ops_type = Make_ops_type(MBR)
 include Ops_type
 
 module Ops_type_plus = struct
-  include MB
+  include MBR
   include Ops_type
 end
 
+(*
 module Imp_ops_type = Types_without_resultMake_ops_type_without_result(Ops_type_plus)
-
+*)
 
 
 
 (* main functionality ----------------------------------------------- *)
 
 open Tjr_map
-open B_step_monad
-open C_base
-open Monad
+open Step_monad
+open Base_
+open In_mem_monad
 
 type 'e extra_ops = {
   err: 'a 'e. 'e -> ('a,'e)result m;
@@ -734,6 +736,8 @@ end
 
 (* imperative ------------------------------------------------------- *)
 
+(*
+
 module Run_imperative = struct
   open Run_pure  
 
@@ -811,3 +815,4 @@ include struct
   let logged_ops = mk_logged_ops ~ops ~log_op ~fd2i
 
 end
+*)

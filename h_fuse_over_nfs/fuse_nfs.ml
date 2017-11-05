@@ -1,7 +1,7 @@
 (* mount nfs via fuse ----------------------------------------------- *)
 
-open C_base
-open D_functors
+open Base
+open Ops_types
 
 (* nfs client ops could be in unix.m or lwt.m; fuse takes an
    imperative ops which is expected to raise unix exceptions *)
@@ -10,7 +10,7 @@ open D_functors
 module Make_fuse_nfs_client(M:MONAD)(B:BASE_TYPES) = struct
 
   (* construct the type of operations *)
-  module Ops_type = D_functors.Make_ops_type(M)(B)
+  module Ops_type = Make_ops_type(M)(B)
 
   open Ops_type
       
