@@ -249,6 +249,10 @@ type 'e extra_ops = {
 let mk_ops ~extra = 
   let err = extra.err in
   let ( >>= ) = bind in
+  let ( >>=| ) a b = a >>= function
+    | Ok a -> b a
+    | Error e -> return (Error e)
+  in
 
   let resolve_did did = 
     extra.with_fs (fun s ->
@@ -327,10 +331,11 @@ let mk_ops ~extra =
 
   let root : path = "/" in
 
+  
 
   (* FIXME or just allow unlink with no expectation of the kind? *)
   let unlink ~parent ~name = 
-    resolve_dir_path parent >>= function Error e -> err `EOTHER | Ok pid ->
+    resolve_dir_path parent >>=| fun pid ->
       begin
         extra.with_fs (fun s ->
             s.dirs |> fun dirs ->
@@ -348,8 +353,8 @@ let mk_ops ~extra =
             | `Internal s -> extra.internal_err s
             | `Error_no_entry -> err @@ `Error_no_entry "unlink, mim.272") 
       end
-      >>= (function
-      | Ok x -> return (Ok x) | Error e -> return (Error `EOTHER))
+      (* >>= (function
+      | Ok x -> return (Ok x) | Error e -> return (Error e)) *)
   in
 
   let _ = unlink in 
@@ -357,7 +362,7 @@ let mk_ops ~extra =
 
   (* FIXME check is already exists etc *)
   let mkdir ~parent ~name : (unit,'e5)result m = 
-    resolve_dir_path parent >>= function Error e -> err `EOTHER | Ok pid -> 
+    resolve_dir_path parent >>=| fun pid -> 
       begin
         extra.new_did () >>= fun (did:did) -> 
         extra.with_fs (fun s -> 
@@ -385,7 +390,7 @@ let mk_ops ~extra =
 
 
   let opendir path = 
-    resolve_dir_path path >>= function Error e -> err `EOTHER | Ok did ->
+    resolve_dir_path path >>=| fun did ->
       begin
         extra.with_fs (fun s ->
             s.dirs |> fun dirs ->
@@ -424,7 +429,7 @@ let mk_ops ~extra =
   let internal_len = 1024 in 
 
   let create ~parent ~name : (unit,'e6)result m = 
-    resolve_dir_path parent >>= function Error e -> err `EOTHER | Ok parent ->
+    resolve_dir_path parent >>=| fun parent ->
       extra.new_fid () >>= fun (fid:fid) -> 
       extra.with_fs (fun s -> 
           s.dirs |> fun dirs ->
@@ -449,7 +454,7 @@ let mk_ops ~extra =
 
 
   let open_ path = 
-    resolve_file_path path >>= function Error e -> err `EOTHER | Ok fid -> 
+    resolve_file_path path >>=| fun fid -> 
     fid |> mk_fd |> fun fd -> return (Ok fd)
   in
 
@@ -573,14 +578,14 @@ let mk_ops ~extra =
               then return (Ok ())
               else extra.internal_err "FIXME rename d to d, dst should be empty?"
     end
-    >>= function
+(*    >>= function
     | Ok x -> return (Ok x)
-    | Error e -> err `EOTHER
+    | Error e -> err `EOTHER*)
   in
 
 
   let truncate ~path ~length = 
-    resolve_file_path path >>= function Error e -> err `EOTHER | Ok fid ->
+    resolve_file_path path >>=| fun fid ->
       extra.with_fs (fun s ->
           s.files |> fun files ->
           files_ops.map_find fid files |> function
@@ -588,14 +593,15 @@ let mk_ops ~extra =
           | Some contents ->
             contents_ops.resize length contents  |> fun contents ->
             files_ops.map_add fid contents files |> fun files ->
-            `Ok (),{s with files}) >>= function
+            `Ok (),{s with files}) 
+      >>= function
       | `Ok () -> return (Ok ())
       | `Internal s -> extra.internal_err s
   in
 
 
   let stat_file path = 
-    resolve_file_path path >>= function Error e -> err `EOTHER | Ok fid ->
+    resolve_file_path path >>=| fun fid ->
     extra.with_fs (fun s ->
         s.files |> fun files ->
         files_ops.map_find fid files |> function
@@ -610,16 +616,16 @@ let mk_ops ~extra =
   
   let kind path : (st_kind,'e)result m = 
     begin
-      resolve_path path >>= function Error e -> err e | Ok (_,id) ->    
+      resolve_path path >>=| fun (_,id) ->    
         id |> function 
         | None -> err @@ `Error_no_entry path
         | Some x -> x |> function
           | Fid fid -> return @@ Ok(`File:st_kind)
           | Did did -> return @@ Ok(`Dir:st_kind)
     end
-    >>= function
+(*    >>= function
     | Ok x -> return (Ok x)
-    | Error e -> err `EOTHER
+    | Error e -> err `EOTHER*)
   in
 
 

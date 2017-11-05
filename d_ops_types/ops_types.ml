@@ -4,7 +4,7 @@ open Base_
 
 
 (* FIXME the following should be refined *)
-type err_ = [ `ENOENT | `EOTHER ]
+type err_ = Error_.exn_
 type unlink_err = err_
 type mkdir_err = err_
 type opendir_err = err_
@@ -32,6 +32,7 @@ include struct
 
   let unknown_error = `Unix_error(EUNKNOWNERR 999,"FIXME","FIXME")
 
+(*
   let err_map = [
     `EOTHER, unknown_error;
     `ENOENT, `Unix_error(ENOENT,"FIXME","FIXME")
@@ -43,6 +44,7 @@ include struct
     with Not_found -> unknown_error
 
   let _ = err2unix
+*)
 
   (* type unix_error = Unix_error of error * string * string *)
 

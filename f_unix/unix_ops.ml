@@ -86,6 +86,8 @@ let mk_ops ~extra =
 
   (* FIXME refine - at the moment we wrap all exns as EOTHER *)
   (* let safely a = extra.safely (fun e -> Ops_types.unix2err e) a in *)
+
+  let _EOTHER = Error `Error_other in
   
   let unlink ~parent ~name = 
     delay @@ fun _ ->
@@ -93,7 +95,7 @@ let mk_ops ~extra =
       Unix.unlink @@ parent^"/"^name ;
       return (Ok ())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
 
   in
 
@@ -107,7 +109,7 @@ let mk_ops ~extra =
       Unix.mkdir (parent^"/"^name) default_perm;
       return (Ok ())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -124,7 +126,7 @@ let mk_ops ~extra =
     try Unix.readdir dh |> fun e -> return (Ok([e],not finished))
     with
     | End_of_file -> return (Ok([],finished))
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -133,7 +135,7 @@ let mk_ops ~extra =
     try 
       Unix.closedir dh; return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in  
   (* FIXME should we record which dh are valid? ie not closed *)
 
@@ -146,7 +148,7 @@ let mk_ops ~extra =
       close fd;
       return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -155,7 +157,7 @@ let mk_ops ~extra =
     try 
       Unix.(openfile path [O_RDWR] default_perm) |> fun x -> return (Ok x)
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
   let open_ path = mk_fd path in
@@ -170,7 +172,7 @@ let mk_ops ~extra =
       ExtUnix.All.BA.pread fd foff buffer |> fun nread ->
       return (Ok nread)
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -181,7 +183,7 @@ let mk_ops ~extra =
       ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
       return (Ok n)
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -190,7 +192,7 @@ let mk_ops ~extra =
     try 
       Unix.close fd; return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in 
   (* FIXME record which are open? *)
 
@@ -201,7 +203,7 @@ let mk_ops ~extra =
       Unix.rename (spath^"/"^sname) (dpath^"/"^dname); 
       return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
   let truncate ~path ~length = 
@@ -210,7 +212,7 @@ let mk_ops ~extra =
       Unix.truncate path length; 
       return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -222,7 +224,7 @@ let mk_ops ~extra =
       st.st_size |> fun sz ->        
       return (Ok{sz})
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
 
@@ -238,7 +240,7 @@ let mk_ops ~extra =
           | _ -> `Other) 
       |> fun x -> return (Ok x)
     with
-    | Unix.Unix_error(e,_,_) -> return (Error `EOTHER)
+    | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
     

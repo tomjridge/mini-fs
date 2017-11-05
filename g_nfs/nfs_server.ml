@@ -3,17 +3,21 @@
 (* we use some backing ops to provide the functionality, and the code
    below translates this to messages on the wire *)
 
-open C_base
-open D_functors
+open Base_
+open Ops_types
 
-module Make_server(O:OPS_TYPE) = struct
+module Make_server(O:OPS_TYPE_WITH_RESULT) = struct
   open O
 
   type extra_ops = {
     internal_err: 'a. string -> 'a m;
   }
 
-  open C_msgs
+  open Msgs
+
+  (* NOTE the server is roughly a function of type msg_from_client ->
+     msg_from_server m, which wraps a backend ops *)
+
   let mk_serve
       ~ops  (* backend *)
       ~data_of_buffer
@@ -23,14 +27,30 @@ module Make_server(O:OPS_TYPE) = struct
       ~fd2i ~i2fd
     =
     let ( >>= ) = bind in
-    let ret_unit = fun () -> return Unit in
-    let unlink ~parent ~name = ops.unlink ~parent ~name >>= ret_unit in
-    let mkdir ~parent ~name = ops.mkdir ~parent ~name >>= ret_unit in
-    let opendir p = ops.opendir p >>= fun dh -> return @@ Dh (dh2i dh) in
-    let readdir dh = ops.readdir dh >>= fun (xs,b) -> return @@ Readdir' (xs,b) in
-    let closedir dh = ops.closedir dh >>= ret_unit in
-    let create ~parent ~name = ops.create ~parent ~name >>= ret_unit in
-    let open_ p = ops.open_ p >>= fun fd -> return @@ Open' (fd2i fd) in
+(*    let fmap : ('a m) -> ('a -> 'b) -> ('b m) = failwith "FIXME" in
+    let ( >>=| ) = fmap in *)
+    let fmap_error: 'a. ('a,exn_)result m -> ('a -> msg_from_server') -> msg_from_server m = 
+      fun a f -> 
+      a >>= function
+      | Ok a -> return (Ok_ (f a))
+      | Error e -> return (Error_ e)
+    in
+    let ( >>=| ) = fmap_error in
+    let ret_unit = fun () -> Unit in
+    let unlink ~parent ~name = ops.unlink ~parent ~name 
+      >>=| ret_unit in
+    let mkdir ~parent ~name = ops.mkdir ~parent ~name 
+      >>=| ret_unit in
+    let opendir p = ops.opendir p 
+      >>=| fun dh -> Dh (dh2i dh) in
+    let readdir dh = ops.readdir dh 
+      >>=| fun (xs,b) -> Readdir' (xs,b) in
+    let closedir dh = ops.closedir dh 
+      >>=| ret_unit in
+    let create ~parent ~name = ops.create ~parent ~name 
+      >>=| ret_unit in
+    let open_ p = ops.open_ p 
+      >>=| fun fd -> Open' (fd2i fd) in
     let pread ~fd ~foff ~length = 
       (* ASSUMES length should not exceed Sys.max_string_length, since
          strings/bytes are used in bigarray_buffer *)
@@ -38,24 +58,30 @@ module Make_server(O:OPS_TYPE) = struct
       buf_size_check length;
       let length = min length Sys.max_string_length in
       mk_buffer length |> fun buffer ->
-      ops.pread ~fd ~foff ~length ~buffer ~boff:0 >>= fun nread -> 
+      ops.pread ~fd ~foff ~length ~buffer ~boff:0 
+      >>=| fun nread -> 
       buf_size_check nread;
       data_of_buffer ~buffer ~len:nread |> fun data ->
-      return @@ Pread' data
+      Pread' data
     in
     let pwrite ~fd ~foff ~data = 
       let length = String.length data in
       buf_size_check length;
       let length = min length Sys.max_string_length in
       buffer_of_data data |> fun buffer ->
-      ops.pwrite ~fd ~foff ~length ~buffer ~boff:0 >>= fun nwritten ->
-      return @@ Int nwritten
+      ops.pwrite ~fd ~foff ~length ~buffer ~boff:0 
+      >>=| fun nwritten -> Int nwritten
     in
-    let close fd = ops.close fd >>= ret_unit in
-    let rename ~spath ~sname ~dpath ~dname = ops.rename ~spath ~sname ~dpath ~dname >>= ret_unit in
-    let truncate ~path ~length = ops.truncate ~path ~length >>= ret_unit in
-    let stat_file p = ops.stat_file p >>= fun st -> return @@ Stat_file' st in
-    let kind p = ops.kind p >>= fun k -> return @@ Kind' k in
+    let close fd = ops.close fd 
+      >>=| ret_unit in
+    let rename ~spath ~sname ~dpath ~dname = ops.rename ~spath ~sname ~dpath ~dname 
+      >>=| ret_unit in
+    let truncate ~path ~length = ops.truncate ~path ~length 
+      >>=| ret_unit in
+    let stat_file p = ops.stat_file p 
+      >>=| fun st -> Stat_file' st in
+    let kind p = ops.kind p 
+      >>=| fun k -> Kind' k in
     let serve' = function
       | Unlink(parent,name) -> unlink ~parent ~name 
       | Mkdir(parent,name) -> mkdir ~parent ~name 
@@ -71,9 +97,9 @@ module Make_server(O:OPS_TYPE) = struct
       | Truncate(path,length) -> truncate ~path ~length 
       | Stat_file p -> stat_file p
       | Kind p -> kind p
-      | Reset -> ops.reset () >>= ret_unit
+      | Reset -> ops.reset () >>= fun () -> return (Ok_ Unit)
     in
-    let _ :msg_from_client -> msg_from_server' m = serve' in
+    let _ :msg_from_client -> msg_from_server m = serve' in
     serve'
 
   let _ = mk_serve
@@ -89,7 +115,7 @@ let mk_server
 *)
 
   include struct 
-    open G_nfs_aux
+    open Nfs_aux
     (* specialize mk_serve *)
     let mk_serve = 
       mk_serve 

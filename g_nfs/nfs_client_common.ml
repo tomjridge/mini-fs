@@ -3,7 +3,7 @@
 (* we use unix again, since we will probably interface with fuse *)
 
 open Tjr_connection
-open C_base
+open Base_
 
 module Connection = Tjr_connection.Unix_
 
@@ -26,13 +26,13 @@ let _ = dest_exceptional
 
 
 module Monad = struct
-  type 'a m = ('a,w) Step_monad.m
+  type 'a m = ('a,w) Step_monad.step_monad
   let return,bind = Step_monad.(return,bind)
 end
 include Monad
 
 
-module Base_types = E_in_mem.Mem_base_types
+module Base_types = In_mem.Mem_base_types
 
 
 module Ops_type = D_functors.Make_ops_type(Monad)(Base_types)

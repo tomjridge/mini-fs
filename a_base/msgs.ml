@@ -52,6 +52,6 @@ type msg_from_server' =
 
 (* or just use error in monad? *)
 type msg_from_server = 
-  | Msg of msg_from_server' 
-  | Error of exn_ [@@deriving bin_io, yojson]
+  | Ok_ of msg_from_server' 
+  | Error_ of exn_ [@@deriving bin_io, yojson]
 (* FIXME Error is probably a bad choice of constructor - prefer Exn_ *)
