@@ -76,3 +76,13 @@ let buf_size_check n =
   then (log_.log_now __LOC__; failwith __LOC__ )
   else ()
 
+
+
+(* fix up unix ------------------------------------------------------ *)
+
+(*
+module Unix_ = struct
+  include Unix
+  type unix_error = Unix_error_ of error*string*string
+end
+*)

@@ -1,6 +1,7 @@
 (* bind an imperative ops to fuse ----------------------------------- *)
 
 open Base_
+open Ops_types
 
 module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
 
@@ -141,15 +142,11 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
     let utime path atim mtim = () in
 
 
-    (* FIXME refine following *)
-    let err2unix = function
-      | `EOTHER -> Unix.Unix_error(EUNKNOWNERR 999,"FIXME","FIXME")
-      | `ENOENT -> Unix.Unix_error(ENOENT,"FIXME","FIXME")
-    in
-
     let maybe_raise a = a |> co_eta |> function
       | Ok a -> a
-      | Error e -> raise (err2unix e)
+      | Error e -> 
+        (err2unix e|> fun (`Unix_error(e,s1,s2)) -> Unix_error(e,s1,s2)) |> fun e ->
+        raise e
     in
     let _ = maybe_raise in
 
