@@ -1,6 +1,7 @@
 open Tjr_either
 open Tjr_map
 open C_base
+open D_functors
 
 (* in-mem impl ------------------------------------------------------ *)
 
@@ -207,16 +208,20 @@ let t_to_string t = Y_.(
 
 (* generate types --------------------------------------------------- *)
 
-module Ops_type = D_functors.Make_ops_type(Monad)(Mem_base_types)
+module MB = struct
+  include Monad
+  include Mem_base_types
+end
+
+module Ops_type = Make_ops_type_with_result(MB)
 include Ops_type
 
 module Ops_type_plus = struct
-      include Monad
-      include Mem_base_types
-      include Ops_type
-    end
+  include MB
+  include Ops_type
+end
 
-module Imp_ops_type = D_functors.Make_imp_ops_type(Ops_type_plus)
+module Imp_ops_type = Types_without_resultMake_ops_type_without_result(Ops_type_plus)
 
 
 

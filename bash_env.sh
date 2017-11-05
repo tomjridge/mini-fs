@@ -16,14 +16,16 @@ source bash_env.common
 
 
 # clean generated 
-function clean_hook() {
-    rm -f msg_{lwt,unix,abstract}.ml
+function clean_links() {
+    find . -maxdepth 1 -type l -exec rm -f \{\} \;
+    rm -f links
 }
 
 
 
-function link() {
-    ln -s generated/*.ml .
+function mk_links() {
+    ln -s {a_,d_,e_,f_,g_,h_,m_}*/*.ml .
+    touch links
 }
 
 

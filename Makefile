@@ -9,7 +9,7 @@ libname:=$(shell source bash_env.sh && echo $${libname})#
 # 	$$ocamlopt -linkpkg literate.mli literate.ml
 # 	./a.out .
 
-all:
+all: links
 	$$ocamlc -c $$mls
 	mk_cma
 	$$ocamlopt -c $$mls
@@ -20,8 +20,8 @@ all:
 run: all
 	$(MAKE) -C bin run
 
-link:
-	link
+links:
+	mk_links
 
 install:
 	mk_meta
@@ -31,6 +31,16 @@ install:
 
 clean:
 	clean
+	clean_links
 	rm -f *.html
 	$(MAKE) -C bin clean
 
+
+
+
+# temporary do not use ------------------------------------------------
+
+prereqs:
+	echo "Making minifs prereqs"
+	$(MAKE) -C ../tjr_lib
+	$(MAKE) -C ../tjr_net
