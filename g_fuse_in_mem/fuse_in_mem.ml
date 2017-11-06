@@ -42,7 +42,7 @@ end
 *)
 
 
-module Fuse' = Fuse_common.Make_fuse(In_mem.Ops_type_plus)
+module Fuse' = Fuse_.Make_fuse(In_mem.Ops_type_plus)
 
 include Fuse'
 

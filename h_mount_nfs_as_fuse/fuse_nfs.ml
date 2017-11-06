@@ -1,7 +1,7 @@
 (* mount nfs via fuse ----------------------------------------------- *)
 
-(* This combines fuse with nfs client functionality (server not
-   needed) *)
+(* This combines fuse with nfs client functionality (server does not
+   need fuse) *)
 
 open Base_
 open Ops_types
@@ -31,11 +31,13 @@ module Make_fuse_nfs_client(O:OPS_TYPE_WITH_RESULT) = struct
 
   (* construct fuse from imperative operations *)
   include struct
-    module Fuse' = Fuse_common.Make_fuse(O)
+    module Fuse' = Fuse_.Make_fuse(O)
   end
+
 
   module Readdir' = Readdir'.Make_readdir'(O)
   let readdir' = Readdir'.readdir'
+
 
   (* call Fuse_common.mk_fuse_ops with nfs client ops *)
   let mk_fuse_ops 
@@ -43,16 +45,14 @@ module Make_fuse_nfs_client(O:OPS_TYPE_WITH_RESULT) = struct
     ~call
     ~i2dh ~dh2i
     ~i2fd ~fd2i
-    ~run    
+    ~co_eta
     = 
-
+    let nfs_ops = mk_client_ops ~extra_ops ~call ~i2dh ~dh2i ~i2fd ~fd2i in
+    let ops = nfs_ops in
     Fuse'.mk_fuse_ops
-      ~extra_ops
-      ~call
-    ~i2dh ~dh2i
-    ~i2fd ~fd2i
-    ~run    
-    |> Fuse'.mk_fuse_ops
+      ~readdir':(readdir' ~ops)
+      ~ops
+      ~co_eta
 
 end
 
