@@ -133,14 +133,14 @@ module Step_monad_call = struct
   type ('a,'w)m = ('a,'w)step_monad
   let call ~conn (m:msg_from_client) : (msg_from_server,'w) m = 
     Step(fun w -> 
-        m |> msg_to_string |> fun s -> 
+        m |> msg_c_to_string |> fun s -> 
         log_.log_lazy (fun () -> Printf.sprintf "sending %s\n" s);
         s |> Connection.send_string ~conn 
         |> function Error () -> exit_1 __LOC__ | Ok () -> 
           Connection.recv_string ~conn 
           |> function Error () -> exit_1 __LOC__ | Ok s -> 
             log_.log_lazy (fun () -> Printf.sprintf "receiving %s\n" s);
-            s |> string_to_msg |> fun m -> 
+            s |> string_to_msg_s |> fun m -> 
             (w,Inl m))
 
 end

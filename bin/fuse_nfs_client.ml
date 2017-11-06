@@ -73,7 +73,7 @@ end
 open Fuse_nfs_client
 
 let fuse_ops = 
-  let open In_mem.Mem_2i in
+  let open Int_base_types in
   let internal_marshal_err = { internal_marshal_err=fun s -> failwith s } in
   mk_fuse_ops 
     ~internal_marshal_err ~call 

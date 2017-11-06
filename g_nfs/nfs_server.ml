@@ -114,6 +114,8 @@ let mk_server
   recv () >>= serve >>= send
 *)
 
+  (* FIXME maybe handle_client_msg would be better than serve *)
+
   include struct 
     open Nfs_aux
     (* specialize mk_serve *)
@@ -124,5 +126,7 @@ let mk_server
         ~mk_buffer
     let _ = mk_serve
   end
+
+  let _ = mk_serve
 
 end

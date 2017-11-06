@@ -2,39 +2,39 @@
 
 open Tjr_connection
 open Tjr_minifs
-open C_base
-open C_msgs
-open E_in_mem
+open Base_
+open Msgs
+open In_mem
 
 
-let quad = M_runtime_config.get_config ~filename:"config.json" @@ 
+let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server -> server
 
-module Server' = G_nfs_server.Make_server(Ops_type_plus)
+
+module Server' = Nfs_server.Make_server(Ops_type_plus)
 include Server'
 
+
 let serve = 
-  let id = fun x -> x in
+  let open Int_base_types in
   mk_serve
-    ~ops:logged_ops
-    ~dh2i:id
-    ~i2dh:id
-    ~fd2i:id
-    ~i2fd:id
+    ~ops
+    ~dh2i
+    ~i2dh
+    ~fd2i
+    ~i2fd
 
+let _ : msg_from_client -> msg_from_server m = serve
 
-(* NOTE the errors are still in the monad *)
-let _ : msg_from_client -> msg_from_server' m = serve
 
 include struct
   (* NOTE Tjr_connection.Unix_ has: 'a m = ('a,exn)result, which is not
      the same as in_mem.m *)
   open Tjr_connection.Unix_
   let send ~conn (m:msg_from_server) =
-    m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
-    |> fun s -> send_string ~conn s
+    m |> msg_s_to_string |> send_string ~conn
 
-  let string_to_msg s = s |> Yojson.Safe.from_string |> msg_from_client_of_yojson
+(*  let string_to_msg s = s |> Yojson.Safe.from_string |> msg_from_client_of_yojson *)
 end
 
 
@@ -51,26 +51,17 @@ let main () =
       | Error () -> exit_1 __LOC__
       | Ok s ->
         log_.log s;
-        string_to_msg s |> function
-        | Error e -> 
-          "nfs_server.63, error unmarshalling string: "^e |> exit_1
-        | Ok msg -> 
-          serve msg |> fun x ->
-          E_in_mem.run (!w_ref) x |> function
-          | `Exn_ (e,w) -> (
-              (* FIXME in exceptional case, fs unchanged?*)
-              w_ref:={!w_ref with fs=w.fs};  
-              (* error is bound to e; FIXME ASSUMES
-                 w.thread_error_state/internal_error_state is None? *)
-              (* in the error case, we send the exception back *)
-              send ~conn (Error e) >>= function
-              | Error () -> exit_1 __LOC__
-              | Ok () -> loop())
-          | `Finished (a,w) -> 
-            w_ref:=w;
-            send ~conn (Msg a) >>= function
-            | Error () -> exit_1 __LOC__
-            | Ok () -> loop ()
+        string_to_msg_c s |> fun msg -> 
+        serve msg |> fun x ->
+        In_mem.run (!w_ref) x |> function
+        | Error (`Attempt_to_step_exceptional_state w) ->
+            (* NOTE an internal error - so just exit *)
+            exit_1 __LOC__
+        | Ok (w,a) -> 
+          w_ref:=w;
+          send ~conn a >>= function
+          | Error () -> exit_1 __LOC__
+          | Ok () -> loop ()
     in
     loop ()
 

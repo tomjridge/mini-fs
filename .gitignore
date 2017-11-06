@@ -22,3 +22,6 @@
 /fuse_nfs.ml
 /nfs_client_unix.ml
 /runtime_config.ml
+/int_base_types.ml
+/r_as_result.ml
+/trivial_state_monad.ml

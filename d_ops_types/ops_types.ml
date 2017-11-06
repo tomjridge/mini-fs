@@ -112,10 +112,11 @@ type ('a,'e) r' = 'a
 module type IMP_OPS_TYPE = 
   OPS_TYPE_WITHOUT_MONAD with type ('a,'e)r_ = ('a,'e)r'
 
-
+(*
 module R_as_result = struct
   type ('a,'e)r_ = ('a,'e)result
 end
+*)
 
 (* make the sig ----------------------------------------------------- *)
 

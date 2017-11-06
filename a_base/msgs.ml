@@ -57,14 +57,27 @@ type msg_from_server =
 (* FIXME Error is probably a bad choice of constructor - prefer Exn_ *)
 
 
-include struct
-  let msg_to_string m = 
-    m |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
 
-  let string_to_msg s = 
+
+include struct
+  let msg_s_to_string m = 
+    m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
+
+  let string_to_msg_s s = 
     s |> Yojson.Safe.from_string |> msg_from_server_of_yojson
     |> function
     | Ok x -> x
     | Error e -> 
       exit_1 __LOC__        
+
+  let msg_c_to_string m = 
+    m |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
+
+  let string_to_msg_c s = 
+    s |> Yojson.Safe.from_string |> msg_from_client_of_yojson
+    |> function
+    | Ok x -> x
+    | Error e -> 
+      exit_1 __LOC__ 
+
 end

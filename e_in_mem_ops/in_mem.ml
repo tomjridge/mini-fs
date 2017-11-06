@@ -5,24 +5,8 @@ open Ops_types
 
 (* in-mem impl ------------------------------------------------------ *)
 
-module Mem_base_types = struct
-  type fd = int
-  type dh = int
-
-  let fd2i x = x
-  let i2fd x = x
-  let dh2i x = x
-  let i2dh x = x
-end
+module Mem_base_types = Int_base_types
 include Mem_base_types
-
-
-module Mem_2i = struct
-  let fd2i x = x
-  let i2fd x = x
-  let dh2i x = x
-  let i2dh x = x
-end
 
 
 module Fid : sig
