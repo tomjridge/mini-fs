@@ -1,4 +1,4 @@
-(* bind an imperative ops to fuse ----------------------------------- *)
+(* bind ops to fuse ----------------------------------- *)
 
 open Base_
 open Ops_types

@@ -41,7 +41,7 @@ include Unix_monad
 module MBR = struct
   include Unix_monad
   include Unix_base_types
-  type ('a,'e) r_ = ('a,'e)result
+  include R_as_result
 end
 
 module Ops_type = Make_ops_type(MBR)

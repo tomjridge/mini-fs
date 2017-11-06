@@ -113,6 +113,10 @@ module type IMP_OPS_TYPE =
   OPS_TYPE_WITHOUT_MONAD with type ('a,'e)r_ = ('a,'e)r'
 
 
+module R_as_result = struct
+  type ('a,'e)r_ = ('a,'e)result
+end
+
 (* make the sig ----------------------------------------------------- *)
 
 
@@ -125,6 +129,8 @@ module type MBR = sig
   include MB
   include R
 end
+
+
 
 (* FIXME duplication *)
 module Make_ops_type(MBR:MBR) = struct

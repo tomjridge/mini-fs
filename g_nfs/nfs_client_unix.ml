@@ -4,6 +4,7 @@
 
 open Tjr_connection
 open Base_
+open Ops_types
 
 module Connection = Tjr_connection.Unix_
 
@@ -39,7 +40,7 @@ module Base_types = In_mem.Mem_base_types
 module MBR = struct
   include Monad
   include Base_types
-  type ('a,'e) r_ = ('a,'e)result
+  include R_as_result
 end
 
 module Ops_type = Ops_types.Make_ops_type(MBR)

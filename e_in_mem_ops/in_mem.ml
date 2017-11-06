@@ -215,7 +215,7 @@ let t_to_string t = Y_.(
 module MBR = struct
   include In_mem_monad
   include Mem_base_types
-  type ('a,'e)r_ = ('a,'e)result
+  include R_as_result
 end
 
 module Ops_type = Make_ops_type(MBR)
