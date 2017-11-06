@@ -1,9 +1,9 @@
-open Base
+open Base_
 open In_mem
 
 (* we want to call mk_fuse_ops, on an imperative version of in_mem ops;  *)
 
-let mk_unix_exn = A_error.mk_unix_exn
+let mk_unix_exn = Error_.mk_unix_exn
 
 (*
 include struct
@@ -41,19 +41,30 @@ include struct
 end
 *)
 
-module Fuse' = G_fuse_common.Make_fuse(struct
-    include Monad
-    include Mem_base_types
-    include Imp_ops_type
-  end)
+
+module Fuse' = Fuse_common.Make_fuse(In_mem.Ops_type_plus)
 
 include Fuse'
 
-let raise_ = {
-  raise_=(fun (e,_) -> e |> A_error.mk_unix_exn |> raise)
-}
+include struct 
+  (* NOTE could have multiple filesystems in memory, but here we just
+     fix one reference which points to the state of one in-mem fs *)
+  let w_ = ref In_mem.init_t
 
-let fuse_ops ~ref_ = 
-  mk_fuse_ops (mk_imperative_ops ~ref_ ~ops:logged_ops ~raise_)
+  let co_eta = fun a -> In_mem_monad.run (!w_) a |> function
+    | Error (`Attempt_to_step_exceptional_state w) -> failwith __LOC__
+    | Ok (w,a) -> 
+      w_:=w;
+      a
 
-let _ : ref_:t ref -> Fuse.operations = fuse_ops
+  let co_eta = { co_eta }
+end
+
+include Readdir'.Make_readdir'(Ops_type_plus)
+
+let readdir' = readdir' ~ops
+
+let fuse_ops = mk_fuse_ops ~readdir' ~ops ~co_eta
+
+let _ : Fuse.operations = fuse_ops
+

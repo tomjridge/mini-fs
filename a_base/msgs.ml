@@ -55,3 +55,16 @@ type msg_from_server =
   | Ok_ of msg_from_server' 
   | Error_ of exn_ [@@deriving bin_io, yojson]
 (* FIXME Error is probably a bad choice of constructor - prefer Exn_ *)
+
+
+include struct
+  let msg_to_string m = 
+    m |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
+
+  let string_to_msg s = 
+    s |> Yojson.Safe.from_string |> msg_from_server_of_yojson
+    |> function
+    | Ok x -> x
+    | Error e -> 
+      exit_1 __LOC__        
+end

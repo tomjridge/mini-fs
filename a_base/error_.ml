@@ -1,7 +1,7 @@
 open Bin_prot.Std
 
 type exn_ = [ 
-    | `Error_no_entry of string 
+    | `Error_no_entry
     | `Error_not_directory
     | `Error_not_file
     | `Error_attempt_to_rename_dir_over_file
@@ -18,7 +18,7 @@ let exn__to_string e =
 include struct
   open Unix
   let mk_unix_exn (e:exn_) = e |> function
-    | `Error_no_entry _ -> Unix_error(ENOENT, "154","")
+    | `Error_no_entry -> Unix_error(ENOENT, "154","")
     | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
     | `Error_not_file -> Unix_error(EINVAL, "156","") (* FIXME *)
     | `Error_attempt_to_rename_dir_over_file -> Unix_error(EINVAL, "157","") (* FIXME *)

@@ -76,7 +76,7 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
         (* log_.log @@ "# l71"; *)
         (path |> ops.kind) >>=| function
         | `File -> return (Ok None)
-        | _ -> return (Error `ENOENT)
+        | _ -> return (Error `Error_no_entry)
     in
 
 
@@ -133,7 +133,7 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
           return (Ok default_dir_stats))
       | _ -> (
           (* log_.log @@ "# getattr exception(ENOENT) mfuse.getattr.l123";*)
-          return (Error `ENOENT))
+          return (Error `Error_no_entry))
     in
 
 
@@ -145,7 +145,7 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
     let maybe_raise a = a |> co_eta |> function
       | Ok a -> a
       | Error e -> 
-        (err2unix e|> fun (`Unix_error(e,s1,s2)) -> Unix_error(e,s1,s2)) |> fun e ->
+        mk_unix_exn e |> fun e ->
         raise e
     in
     let _ = maybe_raise in

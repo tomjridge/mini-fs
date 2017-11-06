@@ -183,6 +183,10 @@ module In_mem_monad = struct
   open Step_monad
   type 'a m = ( 'a, t) step_monad
   let bind,return = bind,return
+  let run w a = 
+    let dest_exceptional w = w.internal_error_state in
+    Step_monad.run ~dest_exceptional w a
+    
 end
 include In_mem_monad
 
@@ -279,7 +283,7 @@ let mk_ops ~extra =
         | None -> (
             match names with
             | [] -> return @@ Ok(parent_id,None)
-            | _ -> err @@ `Error_no_entry name) (* FIXME give full path *)
+            | _ -> err `Error_no_entry) (* FIXME give full path *)
         | Some (Fid fid) -> (
             match names with 
             | [] -> return @@ Ok(parent_id,Some (Fid fid))
@@ -351,7 +355,7 @@ let mk_ops ~extra =
         >>= (function 
             | `Ok -> return (Ok ())
             | `Internal s -> extra.internal_err s
-            | `Error_no_entry -> err @@ `Error_no_entry "unlink, mim.272") 
+            | `Error_no_entry -> err @@ `Error_no_entry) 
       end
       (* >>= (function
       | Ok x -> return (Ok x) | Error e -> return (Error e)) *)
@@ -618,7 +622,7 @@ let mk_ops ~extra =
     begin
       resolve_path path >>=| fun (_,id) ->    
         id |> function 
-        | None -> err @@ `Error_no_entry path
+        | None -> err `Error_no_entry
         | Some x -> x |> function
           | Fid fid -> return @@ Ok(`File:st_kind)
           | Did did -> return @@ Ok(`Dir:st_kind)
