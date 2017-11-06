@@ -17,6 +17,13 @@ end
 include Mem_base_types
 
 
+module Mem_2i = struct
+  let fd2i x = x
+  let i2fd x = x
+  let dh2i x = x
+  let i2dh x = x
+end
+
 
 module Fid : sig
   type fid = int[@@deriving yojson]  (* FIXME hide *)
@@ -706,7 +713,7 @@ end
 
 let ops = mk_ops ~extra  
 
-let _ = ops
+let _ : ops = ops
 
 
 (* running ---------------------------------------------------------- *)

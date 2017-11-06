@@ -35,22 +35,17 @@ module Make_fuse_nfs_client(O:OPS_TYPE_WITH_RESULT) = struct
   end
 
 
-  module Readdir' = Readdir'.Make_readdir'(O)
-  let readdir' = Readdir'.readdir'
-
-
   (* call Fuse_common.mk_fuse_ops with nfs client ops *)
   let mk_fuse_ops 
-    ~extra_ops
+    ~internal_marshal_err
     ~call
     ~i2dh ~dh2i
     ~i2fd ~fd2i
     ~co_eta
     = 
-    let nfs_ops = mk_client_ops ~extra_ops ~call ~i2dh ~dh2i ~i2fd ~fd2i in
+    let nfs_ops = mk_client_ops ~internal_marshal_err ~call ~i2dh ~dh2i ~i2fd ~fd2i in
     let ops = nfs_ops in
     Fuse'.mk_fuse_ops
-      ~readdir':(readdir' ~ops)
       ~ops
       ~co_eta
 

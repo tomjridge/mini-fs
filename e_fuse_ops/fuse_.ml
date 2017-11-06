@@ -189,6 +189,11 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
       utime;
     } [@@ocaml.warning "-26"]
 
+  let readdir' = 
+    let module M = Readdir'.Make_readdir'(I) in 
+    M.readdir' 
+
+  let mk_fuse_ops ~ops = mk_fuse_ops ~readdir':(readdir' ~ops) ~ops
 
   let _ = mk_fuse_ops
 

@@ -10,7 +10,7 @@ module Make_client(O:OPS_TYPE_WITH_RESULT) = struct
 
   (* this is used to indicate that the result of a call was not what
      was expected *)
-  type extra_ops = {
+  type internal_marhsal_err = {
     internal_marshal_err: 'a. string -> 'a m;
   }
   
@@ -18,7 +18,7 @@ module Make_client(O:OPS_TYPE_WITH_RESULT) = struct
 
   (* construct message, send, recv *)
   let mk_client_ops (type t) 
-      ~extra_ops
+      ~internal_marshal_err
       (* NOTE call returns errors in the monad *)
       ~(call:msg_from_client -> msg_from_server m)
       ~data_length
@@ -28,7 +28,7 @@ module Make_client(O:OPS_TYPE_WITH_RESULT) = struct
       ~i2fd ~fd2i
     = 
     (* internal marshalling errors *)
-    let internal_err = extra_ops.internal_marshal_err in
+    let internal_err = internal_marshal_err.internal_marshal_err in
     let ty_err = "incorrect return return type from server" in
 
     let ( >>= ) = bind in  
@@ -116,3 +116,34 @@ module Make_client(O:OPS_TYPE_WITH_RESULT) = struct
   let _ = mk_client_ops
 
 end
+
+
+
+
+(* we also need to implement call: msg_from_client->msg_from_server m;
+   here we specialize to step_monad *)
+module Step_monad_call = struct
+  open Tjr_either
+  open Step_monad
+  open Msgs
+
+  (* NOTE specialized to unix impl *)
+  module Connection = Tjr_connection.Unix_
+
+  type ('a,'w)m = ('a,'w)step_monad
+  let call ~conn (m:msg_from_client) : (msg_from_server,'w) m = 
+    Step(fun w -> 
+        m |> msg_to_string |> fun s -> 
+        log_.log_lazy (fun () -> Printf.sprintf "sending %s\n" s);
+        s |> Connection.send_string ~conn 
+        |> function Error () -> exit_1 __LOC__ | Ok () -> 
+          Connection.recv_string ~conn 
+          |> function Error () -> exit_1 __LOC__ | Ok s -> 
+            log_.log_lazy (fun () -> Printf.sprintf "receiving %s\n" s);
+            s |> string_to_msg |> fun m -> 
+            (w,Inl m))
+
+end
+
+
+

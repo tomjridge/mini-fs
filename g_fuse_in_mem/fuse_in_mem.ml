@@ -1,7 +1,7 @@
+(* mount an in-mem fs via fuse -------------------------------------- *)
+
 open Base_
 open In_mem
-
-(* we want to call mk_fuse_ops, on an imperative version of in_mem ops;  *)
 
 let mk_unix_exn = Error_.mk_unix_exn
 
@@ -60,11 +60,7 @@ include struct
   let co_eta = { co_eta }
 end
 
-include Readdir'.Make_readdir'(Ops_type_plus)
-
-let readdir' = readdir' ~ops
-
-let fuse_ops = mk_fuse_ops ~readdir' ~ops ~co_eta
+let fuse_ops = mk_fuse_ops ~ops ~co_eta
 
 let _ : Fuse.operations = fuse_ops
 

@@ -1,3 +1,5 @@
+(* FIXME not sure this is needed anymore
+
 (* common defns for nfs_client.exe and fuse_nfs_client.exe *)
 
 (* we use unix again, since we will probably interface with fuse *)
@@ -113,3 +115,4 @@ let run (type a) ~w_ref (a:a m) =
   | `Finished(w'',a) -> w:=w''; a
 *)
 
+*)

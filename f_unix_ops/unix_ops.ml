@@ -1,3 +1,5 @@
+(* FIXME this should be called "wrap_local_filesystem" or similar *)
+
 open Tjr_either
 open Base_
 open Ops_types
@@ -261,7 +263,7 @@ let extra = { delay }
 
 let unix_ops = mk_ops ~extra 
 
-let _ = unix_ops
+let _ : ops = unix_ops
 
 
 (* imperative ------------------------------------------------------- *)
