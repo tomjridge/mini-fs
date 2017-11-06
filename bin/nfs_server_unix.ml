@@ -47,16 +47,16 @@ let main () =
   let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad >>= function
-  | Error e -> exit_1 __LOC__
+  | Error e -> failwith __LOC__
   | Ok conn ->
     let rec loop () = 
       recv_string ~conn >>= function
-      | Error () -> exit_1 __LOC__
+      | Error () -> failwith __LOC__
       | Ok s ->
         log_.log s;
         string_to_msg s |> function
         | Error e -> 
-          "nfs_server.63, error unmarshalling string: "^e |> exit_1
+          "nfs_server.63, error unmarshalling string: "^e |> failwith
         | Ok msg -> 
           serve msg |> fun x ->
           E_in_mem.run (!w_ref) x |> function
@@ -67,12 +67,12 @@ let main () =
                  w.thread_error_state/internal_error_state is None? *)
               (* in the error case, we send the exception back *)
               send ~conn (Error e) >>= function
-              | Error () -> exit_1 __LOC__
+              | Error () -> failwith __LOC__
               | Ok () -> loop())
           | `Finished (a,w) -> 
             w_ref:=w;
             send ~conn (Msg a) >>= function
-            | Error () -> exit_1 __LOC__
+            | Error () -> failwith __LOC__
             | Ok () -> loop ()
     in
     loop ()

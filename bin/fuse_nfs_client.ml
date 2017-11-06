@@ -51,7 +51,7 @@ include struct
     |> function 
     | Ok fd -> fd
     | Error e -> 
-      exit_1 __LOC__
+      failwith __LOC__
 
 
   let call = Nfs_client.Step_monad_call.call ~conn

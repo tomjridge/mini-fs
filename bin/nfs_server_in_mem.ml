@@ -44,11 +44,11 @@ let main () =
   let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad >>= function
-  | Error e -> exit_1 __LOC__
+  | Error e -> failwith __LOC__
   | Ok conn ->
     let rec loop () = 
       recv_string ~conn >>= function
-      | Error () -> exit_1 __LOC__
+      | Error () -> failwith __LOC__
       | Ok s ->
         log_.log s;
         string_to_msg_c s |> fun msg -> 
@@ -56,11 +56,11 @@ let main () =
         In_mem.run (!w_ref) x |> function
         | Error (`Attempt_to_step_exceptional_state w) ->
             (* NOTE an internal error - so just exit *)
-            exit_1 __LOC__
+            failwith __LOC__
         | Ok (w,a) -> 
           w_ref:=w;
           send ~conn a >>= function
-          | Error () -> exit_1 __LOC__
+          | Error () -> failwith __LOC__
           | Ok () -> loop ()
     in
     loop ()

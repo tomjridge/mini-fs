@@ -22,7 +22,7 @@ include struct
     Connection.connect ~quad
     |> function 
     | Ok fd -> fd
-    | Error _ -> exit_1 __LOC__
+    | Error _ -> failwith __LOC__
 
   let call = Nfs_client.Step_monad_call.call ~conn
 end
