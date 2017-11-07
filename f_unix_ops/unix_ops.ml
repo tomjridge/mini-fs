@@ -30,7 +30,7 @@ type w = {
   world_state: unit
 }
 
-let initial_world : w = { world_state=() }
+let the_world : w = { world_state=() }
 
 module Unix_monad = struct
   open Step_monad
@@ -251,6 +251,7 @@ let unix_ops = mk_ops ~extra
 
 let _ : ops = unix_ops
 
+let run w x = Step_monad.run ~dest_exceptional:(fun x -> None) w x
 
 (* imperative ------------------------------------------------------- *)
 

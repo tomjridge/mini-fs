@@ -1,15 +1,15 @@
-(* remote fs server using plain unix  *)
+(* remote fs server using unix passthrough  *)
 
 open Tjr_connection
 open Tjr_minifs
-open C_base
-open C_msgs
-open E_unix
+open Base_
+open Msgs
+open Unix_ops
 
-let quad = M_runtime_config.get_config ~filename:"config.json" @@ 
+let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server -> server
 
-module Server' = G_nfs_server.Make_server(Ops_type_plus)
+module Server' = Nfs_server.Make_server(Ops_type_plus)
 include Server'
 
 (* NOTE the dir_handle type is opaque; so the unix server must
