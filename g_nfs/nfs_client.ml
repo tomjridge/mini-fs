@@ -87,20 +87,16 @@ module Make_client(O:OPS_TYPE_WITH_RESULT) = struct
     let rename ~spath ~sname ~dpath ~dname = 
       Rename(spath,sname,dpath,dname) |> call >>= ret_unit in
     let truncate ~path ~length = Truncate(path,length) |> call >>= ret_unit in
-    let stat_file p = Stat_file p |> call >>=| function
-      | Stat_file' st -> return st
+    let stat p = Stat p |> call >>=| function
+      | Stat' st -> return st
       | _ -> internal_err @@ "stat_file, "^ty_err^" mnfs.68"
-    in
-    let kind p = Kind p |> call >>=| function
-      | Kind' k -> return k
-      | _ -> internal_err @@ "kind, "^ty_err^" mnfs.72"
     in
     let reset () = Reset |> call >>= function 
       | Ok_ Unit -> return ()
       | _ -> internal_err @@ "reset, "^ty_err^" mnfs.92"
     in
     { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-      pread; pwrite; close; rename; truncate; stat_file; kind; reset }
+      pread; pwrite; close; rename; truncate; stat; reset }
 
 
   include struct

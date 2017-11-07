@@ -12,6 +12,7 @@ end
 include Unix_base_types
 
 
+(*
 module Unix_conversions = struct
   open ExtUnix.All
   let fd2i = int_of_file_descr
@@ -20,6 +21,7 @@ module Unix_conversions = struct
      expose a version of the api that tracks a dh<->int bijection *)
   (* let dh2i x = x |> dirfd |> fd2i *)
 end
+*)
 
 
 (* ops -------------------------------------------------------------- *)
@@ -218,39 +220,23 @@ let mk_ops ~extra =
   in
 
 
-  let stat_file path = 
+  let stat path = 
     delay @@ fun _ ->
     try
-      let open Unix in
-      stat path |> fun st ->
-      st.st_size |> fun sz ->        
-      return (Ok{sz})
+      let open Unix.LargeFile in
+      stat path |> unix2stat |> fun stat -> 
+      return (Ok stat)
     with
     | Unix.Unix_error(e,_,_) -> return _EOTHER
   in
 
-
-  let kind path = 
-    delay @@ fun _ ->
-    try
-      let open Unix in
-      stat path |> fun st ->
-      st.st_kind 
-      |> (function
-          | S_DIR -> (`Dir:st_kind)
-          | S_REG -> (`File:st_kind)
-          | _ -> `Other) 
-      |> fun x -> return (Ok x)
-    with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
-  in
 
     
   let reset () = return () in
   
 
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat_file; kind; reset }
+    pread; pwrite; close; rename; truncate; stat; reset }
 
 let (>>=) = bind
 

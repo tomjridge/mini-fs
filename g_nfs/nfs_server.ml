@@ -78,10 +78,8 @@ module Make_server(O:OPS_TYPE_WITH_RESULT) = struct
       >>=| ret_unit in
     let truncate ~path ~length = ops.truncate ~path ~length 
       >>=| ret_unit in
-    let stat_file p = ops.stat_file p 
-      >>=| fun st -> Stat_file' st in
-    let kind p = ops.kind p 
-      >>=| fun k -> Kind' k in
+    let stat p = ops.stat p 
+      >>=| fun st -> Stat' st in
     let serve' = function
       | Unlink(parent,name) -> unlink ~parent ~name 
       | Mkdir(parent,name) -> mkdir ~parent ~name 
@@ -95,8 +93,7 @@ module Make_server(O:OPS_TYPE_WITH_RESULT) = struct
       | Close fd -> close (i2fd fd)
       | Rename(spath,sname,dpath,dname) -> rename ~spath ~sname ~dpath ~dname
       | Truncate(path,length) -> truncate ~path ~length 
-      | Stat_file p -> stat_file p
-      | Kind p -> kind p
+      | Stat p -> stat p
       | Reset -> ops.reset () >>= fun () -> return (Ok_ Unit)
     in
     let _ :msg_from_client -> msg_from_server m = serve' in

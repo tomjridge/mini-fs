@@ -2,6 +2,8 @@
 (* access a_* b_* via this module *)
 include Monad_type_
 include Error_
+include Stat_record
+
 module Step_monad = Tjr_step_monad 
 
 let exit_1 = failwith  (* hopefully not be caught *)
@@ -16,11 +18,8 @@ let dirname_basename path =
 
 include Bigarray_buffer
 
+
 (* minimal fs-like thing *)
-type st_kind = [`Dir | `File | `Symlink | `Other ]
-
-type file_stat = { sz:int }
-
 
 type is_finished = bool
 let finished = true
@@ -30,6 +29,7 @@ let _ = assert(Sys.int_size = 63)
 
 type length = int (* FIXME in following *)
 type offset = int
+
 
 
 include struct

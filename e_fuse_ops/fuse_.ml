@@ -3,6 +3,7 @@
 open Base_
 open Ops_types
 
+
 module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
 
   open Unix
@@ -11,20 +12,6 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
   open Fuse
   open I
   (* FIXME wrap operations so they return unix_error *)
-
-  let default_file_stats = 
-    (* ASSUMES this file is present *)
-    LargeFile.stat "tmp.txt"  
-
-  let default_file_stats st_size = 
-    { default_file_stats with 
-      st_nlink = 1;
-      st_kind=Unix.S_REG;
-      st_perm = 0o640;
-      st_size
-    }
-
-  let default_dir_stats = LargeFile.stat "."
 
   (* module Readdir' = Readdir'.Make_readdir'(I)  *)
 
@@ -57,8 +44,6 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
     (* let readdir' = Readdir'.readdir' ~ops in *)
     let readdir path _ = readdir' path in
 
-    let _ = ops.kind in
-
     (* FIXME tricky combining create with fopen *)
     (* NOTE that fuse keeps track of fds, so this just returns None;
        read and write are via path *)
@@ -74,9 +59,9 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
           return (Ok None))
       | false -> 
         (* log_.log @@ "# l71"; *)
-        (path |> ops.kind) >>=| function
-        | `File -> return (Ok None)
-        | _ -> return (Error `Error_no_entry)
+        (path |> ops.stat) >>=| function
+        | _ -> return (Ok None)
+        (* NOTE if no file, stat return error, which is propagated *)
     in
 
 
@@ -123,17 +108,7 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
       path0 |> fun path ->
       (* log_.log @@ "# mfuse.getattr.l112"; *)
       (* FIXME kind needs to be wrapped so it throws a unix_error *)
-      path |> ops.kind >>=| function
-      | `File -> (
-          (* log_.log @@ "# mfuse.getattr.l116"; *)
-          ops.stat_file path >>=| fun x -> 
-          x.sz |> Int64.of_int |> default_file_stats |> fun st -> return (Ok st))
-      | `Dir -> (
-          (* log_.log @@ "# mfuse.getattr.l120"; *)
-          return (Ok default_dir_stats))
-      | _ -> (
-          (* log_.log @@ "# getattr exception(ENOENT) mfuse.getattr.l123";*)
-          return (Error `Error_no_entry))
+      path |> ops.stat >>=| fun st -> return (Ok(stat2unix st))
     in
 
 

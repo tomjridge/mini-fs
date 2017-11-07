@@ -5,6 +5,8 @@ open Ops_types
 
 (* in-mem impl ------------------------------------------------------ *)
 
+let time = Unix.time (* 1s resolution *)
+
 module Mem_base_types = Int_base_types
 include Mem_base_types
 
@@ -67,26 +69,37 @@ type name_map_carrier = id Map_string.Map_.t
 type nm_ops = (string,id,name_map_carrier) map_ops
 let nm_ops = Map_string.map_ops
 
+
+let mk_meta () = 
+  time () |> fun t ->
+  { atim=t;ctim=();mtim=t}
+
+
 type dir_with_parent = {
   name_map:name_map_carrier;
+  meta:meta;
   parent:did
 }
 
 let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
-  let dir_empty ~parent = { name_map=nm_ops.map_empty; parent } in
+  let dir_empty ~meta ~parent = { name_map=nm_ops.map_empty; meta; parent } in
   let dir_find k t = nm_ops.map_find k t.name_map in
   let dir_add k v t = {t with name_map=nm_ops.map_add k v t.name_map} in
   let dir_remove k t = {t with name_map=nm_ops.map_remove k t.name_map} in
   let dir_bindings t = nm_ops.map_bindings t.name_map in
   (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
 
-type file_contents = Tjr_buffer.buf
+
+type file_meta_and_data = {
+  meta: meta; 
+  data: Tjr_buffer.buf
+}
 open Tjr_buffer
 let contents_ops = Tjr_buffer.mk_buf_ops()
 
 
-type files_carrier = file_contents Map_fid.Map_.t
-type files_ops = (fid,file_contents,files_carrier) map_ops
+type files_carrier = file_meta_and_data Map_fid.Map_.t
+type files_ops = (fid,file_meta_and_data,files_carrier) map_ops
 let files_ops : files_ops = Map_fid.map_ops
 
 type dirs_carrier = dir_with_parent Map_did.Map_.t
@@ -116,9 +129,10 @@ module X_ = struct
     (* FIXME dhandles *)
   } [@@deriving yojson]
 
+  (* FIXME meta not included *)
   let from_fs (fs:fs_t) = {
     files=files_ops.map_bindings fs.files |> List.map (fun (fid,c) -> 
-        (fid,contents_ops.to_string c));
+        (fid,contents_ops.to_string c.data));
     max_fid=fs.max_fid;
     dirs=
       dirs_ops.map_bindings fs.dirs 
@@ -137,7 +151,7 @@ let empty_dir ~parent = dir_empty ~parent
 let init_fs = {
   files=files_ops.map_empty;
   max_fid=fid0;
-  dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did (empty_dir ~parent:root_did));
+  dirs=(dirs_ops.map_empty |> dirs_ops.map_add root_did (empty_dir ~meta:(mk_meta()) ~parent:root_did));
   max_did=root_did;
   dir_handles=dhandles_ops.map_empty;
   max_dh=0;
@@ -340,6 +354,7 @@ let mk_ops ~extra =
               dir_find name pdir |> function
               | None -> `Error_no_entry,s
               | Some entry -> 
+                (* FIXME with hardlinks, tims can change for other link *)
                 dir_remove name pdir |> fun pdir ->
                 dirs_ops.map_add pid pdir dirs |> fun dirs ->
                 `Ok,{s with dirs}) 
@@ -355,21 +370,25 @@ let mk_ops ~extra =
   let _ = unlink in 
 
 
-  (* FIXME check is already exists etc *)
+  (* FIXME check if already exists etc *)
+  (* FIXME meta changes for parent and child *)
   let mkdir ~parent ~name : (unit,'e5)result m = 
     resolve_dir_path parent >>=| fun pid -> 
       begin
+        let meta = mk_meta () in
         extra.new_did () >>= fun (did:did) -> 
         extra.with_fs (fun s -> 
             s.dirs |> fun dirs ->
             (* add new empty dir to dirs *)
-            dirs_ops.map_add did (empty_dir ~parent:pid) dirs |> fun dirs ->
+            dirs_ops.map_add did (empty_dir ~meta ~parent:pid) dirs |> fun dirs ->
             (* add name to parent *)
             dirs_ops.map_find pid s.dirs |> fun pdir ->
             match pdir with 
             | None -> `Internal "impossible, parent not found mim.l259",s
             | Some pdir -> 
               dir_add name (Did did) pdir |> fun pdir ->
+              (* update parent meta *)
+              {pdir with meta} |> fun pdir ->
               (* update parent in dirs *)
               dirs_ops.map_add pid pdir dirs |> fun dirs ->
               `Ok,{s with dirs})
@@ -384,6 +403,7 @@ let mk_ops ~extra =
   (* let mk_dh ~did es = (did,es) in *)
 
 
+  (* FIXME update atim *)
   let opendir path = 
     resolve_dir_path path >>=| fun did ->
       begin
@@ -405,6 +425,7 @@ let mk_ops ~extra =
   in
 
 
+  (* FIXME atim *)
   let readdir dh = 
     extra.with_fs (fun s ->
         s.dir_handles |> fun handles ->
@@ -423,19 +444,24 @@ let mk_ops ~extra =
   (* default size preallocated for a file *)
   let internal_len = 1024 in 
 
+  
   let create ~parent ~name : (unit,'e6)result m = 
     resolve_dir_path parent >>=| fun parent ->
       extra.new_fid () >>= fun (fid:fid) -> 
+      let meta = mk_meta() in
       extra.with_fs (fun s -> 
           s.dirs |> fun dirs ->
           dirs_ops.map_find parent dirs |> function
           | None -> `Internal "create, impossible, parent did not found mim.299",s
           | Some pdir ->
             dir_add name (Fid fid) pdir |> fun pdir ->
+            (* update pdir meta *)
+            {pdir with meta} |> fun pdir ->
             dirs_ops.map_add parent pdir dirs |> fun dirs ->
             {s with dirs} |> fun s ->
-            s.files |> fun files -> 
-            files_ops.map_add fid (contents_ops.create ~internal_len 0) files |> fun files ->
+            s.files |> fun files ->
+            let data = contents_ops.create ~internal_len 0 in
+            files_ops.map_add fid {meta;data} files |> fun files ->
             `Ok,{s with files}) 
       >>= function
       | `Internal s -> extra.internal_err s
@@ -447,13 +473,13 @@ let mk_ops ~extra =
 
   let fd2int fd = fd (* ExtUnix.All.int_of_file_descr fd *) in
 
-
+  (* FIXME atim *)
   let open_ path = 
     resolve_file_path path >>=| fun fid -> 
     fid |> mk_fd |> fun fd -> return (Ok fd)
   in
 
-  (* FIXME must account for reading beyond end of file *)
+  (* FIXME must account for reading beyond end of file; FIXME atim *)
   let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     (* buf_size_check length; *)
     let fid = fd2int fd in
@@ -461,8 +487,8 @@ let mk_ops ~extra =
         s.files |> fun files ->
         files_ops.map_find fid files |> function
         | None -> `Internal "pread, impossible, no file, mim.325",s
-        | Some(contents) ->
-          let clen = contents_ops.len contents in
+        | Some(f) ->
+          let clen = contents_ops.len f.data in
           (* NOTE we have some flexibility to choose length *)
           assert(length >= 0);
           assert(foff >= 0);
@@ -475,7 +501,7 @@ let mk_ops ~extra =
           | _ when length=0 -> (`Ok 0,s)
           | _ -> 
             contents_ops.blit_buf_to_bigarray 
-              ~src:contents ~soff:foff ~len:length 
+              ~src:f.data ~soff:foff ~len:length 
               ~dst:buffer ~doff:boff;
             (`Ok length,s)) 
     >>= function
@@ -483,14 +509,16 @@ let mk_ops ~extra =
     | `Ok l -> return (Ok l)
   in
 
+
   let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
     (* buf_size_check length; *)
-    let fid = fd2int fd in
     extra.with_fs (fun s ->
+        let fid = fd2int fd in
+        let meta = mk_meta() in
         s.files |> fun files ->
         files_ops.map_find fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
-        | Some contents ->
+        | Some f ->
           let blen = Biga.length buffer in
           assert(length >= 0);
           assert(foff >= 0);
@@ -498,19 +526,19 @@ let mk_ops ~extra =
           assert(boff+length <= blen);
           (* we allow foff beyond EOF *)
           let contents = 
-            if foff+length > contents_ops.len contents 
-            then contents_ops.resize (foff+length) contents
-            else contents
+            if foff+length > contents_ops.len f.data 
+            then contents_ops.resize (foff+length) f.data
+            else f.data
           in
           assert(foff+length <= contents_ops.len contents);
           contents_ops.blit_bigarray_to_buf
             ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
-            |> fun contents ->
-            files_ops.map_add fid contents files |> fun files ->
-            (`Ok length,{s with files})) 
+            |> fun data ->
+            (files_ops.map_add fid {f with data;meta} files)[@ ocaml.warning "-23"] |> fun files ->
+            (`Ok length,{s with files}))
     >>= function
     | `Internal s -> extra.internal_err s
-    | `Ok l -> return (Ok l)
+    | `Ok l -> return (Ok l)  
   in
 
 
@@ -529,16 +557,20 @@ let mk_ops ~extra =
           | Some resolved_sname -> 
             resolve_did ddir_did >>= fun ddir ->
             resolve_name ~dir:ddir ~name:dname |> fun resolved_dname ->
+            let meta = mk_meta() in
             let insert_and_remove id =
               match sdir_did = ddir_did with
               | true -> 
                 dir_add dname id ddir |> fun ddir ->
                 dir_remove sname ddir |> fun ddir ->
+                {ddir with meta} |> fun ddir ->
                 extra.dirs_add ddir_did ddir >>= fun () ->
                 return (Ok ())
               | false -> 
                 dir_add dname id ddir |> fun ddir ->
+                {ddir with meta} |> fun ddir ->
                 dir_remove sname sdir |> fun sdir ->
+                {sdir with meta} |> fun sdir ->
                 extra.dirs_add sdir_did sdir >>= fun () ->
                 extra.dirs_add ddir_did ddir >>= fun () ->
                 return (Ok ())
@@ -561,6 +593,7 @@ let mk_ops ~extra =
                   | false -> 
                     (* FIXME other checks *)
                     resolve_did sdid >>= fun sdir -> 
+                    {sdir with meta} |> fun sdir ->
                     (* new directory id *)
                     extra.new_did() >>= fun did ->
                     (* record new directory with updated parent *)
@@ -585,49 +618,54 @@ let mk_ops ~extra =
           s.files |> fun files ->
           files_ops.map_find fid files |> function
           | None -> `Internal "file not found mim.362",s
-          | Some contents ->
-            contents_ops.resize length contents  |> fun contents ->
-            files_ops.map_add fid contents files |> fun files ->
+          | Some f ->
+            contents_ops.resize length f.data  |> fun data ->
+            let meta = mk_meta() in
+            files_ops.map_add fid ({f with data;meta}[@ocaml.warning "-23"]) files |> fun files ->
             `Ok (),{s with files}) 
       >>= function
       | `Ok () -> return (Ok ())
       | `Internal s -> extra.internal_err s
   in
 
-
-  let stat_file path = 
-    resolve_file_path path >>=| fun fid ->
-    extra.with_fs (fun s ->
-        s.files |> fun files ->
-        files_ops.map_find fid files |> function
-        | None -> `Internal "file fid not found mim.379",s
-        | Some contents ->
-          contents_ops.len contents |> fun sz ->
-          `Ok { sz },s) >>= function
-    | `Ok stat -> return (Ok stat)
-    | `Internal s -> extra.internal_err s
-  in
-
-  
-  let kind path : (st_kind,'e)result m = 
-    begin
-      resolve_path path >>=| fun (_,id) ->    
-        id |> function 
-        | None -> err `Error_no_entry
-        | Some x -> x |> function
-          | Fid fid -> return @@ Ok(`File:st_kind)
-          | Did did -> return @@ Ok(`Dir:st_kind)
-    end
-(*    >>= function
-    | Ok x -> return (Ok x)
-    | Error e -> err `EOTHER*)
+  (* FIXME here and elsewhere atim is not really dealt with *)
+  let stat path = 
+    resolve_path path >>=| function (did,id) -> 
+      begin
+        match id with
+        | None -> return `Error_no_entry
+        | Some id ->
+          match id with 
+          | Fid fid -> (
+              extra.with_fs (fun s ->
+                  s.files |> fun files ->
+                  files_ops.map_find fid files |> function
+                  | None -> `Internal "file fid not found mim.379",s
+                  | Some f ->          
+                    contents_ops.len f.data |> fun sz ->
+                    f.meta |> fun meta ->
+                    `Ok { sz;meta;kind=`File },s))
+          | Did did -> (
+              extra.with_fs (fun s ->
+                  s.dirs |> fun dirs ->
+                  dirs_ops.map_find did dirs |> function
+                  | None -> `Internal "dir did not found mim.651",s
+                  | Some f ->          
+                    let sz = 1 in (* for dir? FIXME size of dir *)
+                    f.meta |> fun meta ->
+                    `Ok { sz;meta;kind=`Dir },s))
+      end
+      >>= function
+      | `Ok stat -> return (Ok stat)
+      | `Error_no_entry -> return (Error `Error_no_entry)
+      | `Internal s -> extra.internal_err s
   in
 
 
   let reset () = return () in
 
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat_file; kind; reset }
+    pread; pwrite; close; rename; truncate; stat; reset }
 
 
 (* extra ----------------------------------------------------------- *)

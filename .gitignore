@@ -25,3 +25,4 @@
 /int_base_types.ml
 /r_as_result.ml
 /trivial_state_monad.ml
+/stat_record.ml
