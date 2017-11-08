@@ -42,7 +42,7 @@ include struct
   module Connection = Tjr_connection.Unix_
 
   let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-    fun ~client ~server -> client
+    fun ~client ~server ~log_everything -> client
 
 
   (* FIXME put all state in this module? *)

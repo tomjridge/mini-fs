@@ -53,7 +53,7 @@ end
 (* main ------------------------------------------------------------- *)
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server -> server
+  fun ~client ~server ~log_everything -> server
 
 let run = Step_monad.run ~dest_exceptional:(fun x -> None)
 

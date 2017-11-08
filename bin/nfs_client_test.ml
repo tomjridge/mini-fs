@@ -12,7 +12,7 @@ module Connection = Tjr_connection.Unix_
 let _ = Runtime_config.test()
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server -> client
+  fun ~client ~server ~log_everything -> client
 
 
 (* connection, call ------------------------------------------------- *)

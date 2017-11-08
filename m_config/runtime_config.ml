@@ -7,13 +7,15 @@ type quad = {
 
 type config = {
   client:quad;
-  server: quad
+  server: quad;
+  log_everything: bool;
 }  [@@deriving yojson]
 
 
 let test () = { 
   client={ip="client_ip"; port=1234 };
-  server={ip="server_ip"; port=1234 }
+  server={ip="server_ip"; port=1234 };
+  log_everything=false;
 } |> config_to_yojson |> Yojson.Safe.pretty_to_string |> print_endline
 
 
@@ -38,5 +40,5 @@ let get_config ~filename =
 
   let client = Tjr_connection.{ local=c'; remote=s } in
   let server = Tjr_connection.{ local=s; remote=c' } in
-                 
-  fun k -> k ~client ~server
+  let log_everything = c.log_everything in 
+  fun k -> k ~client ~server ~log_everything

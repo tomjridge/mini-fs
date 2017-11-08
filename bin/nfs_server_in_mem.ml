@@ -35,7 +35,7 @@ end
 (* main ------------------------------------------------------------- *)
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server -> server
+  fun ~client ~server ~log_everything -> server
 
 let main () = 
   let open Tjr_connection.Unix_ in
