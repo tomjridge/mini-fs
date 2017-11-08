@@ -64,7 +64,12 @@ end
 include Tjr_log
 let log_ = mk_log_ops()
 
-(* let log_ = {log_ with log=fun s -> ()}  (* FIXME performance *) *)
+(* FIXME this ensures all logs appear immediately *)
+let log_ = {
+  log_ with 
+  log=(fun s -> log_.log_now s);
+  log_lazy=(fun f -> log_.log_now (f()));
+}
 
 let () = at_exit log_.print_last_n
 

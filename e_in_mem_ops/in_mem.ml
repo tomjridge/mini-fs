@@ -824,34 +824,4 @@ end
 
 (* logging ---------------------------------------------------------- *)
 
-include struct
-  open C_msgs
-  open Step_monad
-
-  (* FIXME should also log exceptional returns *)
-  let log msg = 
-    let call = msg |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
-    let rec log_return a = 
-      a |> dest_Step |> fun a ->
-      Step(fun w ->
-          a w |> fun (w',rest) ->
-          (w', 
-           match rest with
-           | Inl a -> (
-               log_.log_lazy (fun () -> Printf.sprintf "call %s returns\n" call);
-               Inl a)
-           | Inr a -> Inr(log_return a)))
-    in
-    let log_call_and_return a = Step(
-        fun w -> 
-          log_.log_lazy (fun () -> Printf.sprintf "call %s starts\n" call);
-          w,Inr (log_return a))
-    in
-    log_call_and_return
-
-  let log_op = { log }
-
-  let logged_ops = mk_logged_ops ~ops ~log_op ~fd2i
-
-end
 *)

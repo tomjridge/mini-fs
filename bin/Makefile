@@ -21,16 +21,20 @@ fuse_main.native: FORCE
 # -f is foreground
 # -s is single-threaded
 
-fuse_mount_in_mem: fuse_main.native
+run_fuse_in_mem: fuse_in_mem.native
 	mkdir -p fuse_mount
-	./fuse_main.native -s -f -o allow_other ./fuse_mount 
+	./fuse_in_mem.native -s -f -o allow_other ./fuse_mount 
 
 
-fuse_mount_nfs_client: fuse_nfs_client.native
+run_fuse_nfs_client: fuse_nfs_client.native
 	-fusermount -u ./fuse_mount
 	mkdir -p fuse_mount
 	./fuse_nfs_client.native -s -f -o allow_other ./fuse_mount 
 
+
+# expose host filesystem on network
+run_nfs_server_unix: nfs_server_unix.native
+	./nfs_server_unix.native 
 
 
 clean: 

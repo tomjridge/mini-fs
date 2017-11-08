@@ -1,5 +1,8 @@
 (* remote fs server using unix passthrough  *)
 
+(* FIXME duplication between this and nfs_server_in_mem; perhaps add
+   common parts to ../x_nfs_server_bin_aux or similar *)
+
 open Tjr_connection
 open Tjr_minifs
 open Base_
@@ -10,15 +13,29 @@ open Msgs
 module Backend = Unix_with_int_handles
 open Backend
 
+module L = Ops_types.Make_logged_ops(Ops_type_plus)
+open L
+(* log all calls and returns immediately *)
+let log_string f = log_.log_now (f())
+let log_op = { log=(fun m a -> Step_monad_logging.log ~log_string m a) }
+let ops = 
+  let open Int_base_types in
+  mk_logged_ops
+    ~log_op
+    ~ops
+    ~dh2i
+    ~fd2i
+
 (* server ----------------------------------------------------------- *)
 
 module Server' = Nfs_server.Make_server(Ops_type_plus)
 include Server' 
 
+
 let serve = 
   let open Int_base_types in
   mk_serve
-    ~ops:Backend.ops
+    ~ops
     ~dh2i
     ~i2dh
     ~fd2i
@@ -68,5 +85,5 @@ let main ~init_world =
     loop ()
 
 
-let _ = main ~init_world:Unix_with_int_handles.initial_world
+let _ = main ~init_world:Backend.initial_world
 

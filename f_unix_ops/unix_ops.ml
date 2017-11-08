@@ -81,6 +81,15 @@ type 'e extra_ops = {
   (* this delays until receives a world *)
 }
 
+let _EOTHER = Error `Error_other
+
+(* return errors that we recognize, otherwise pass to an aux f *)
+let map_error (f : [ `EINVAL ] -> 'a) e =
+  Error_.map_error e |> function
+  | Inl e -> return (Error e)
+  | Inr e -> match e with
+    | `EINVAL -> f `EINVAL
+    | `SOME_OTHER_ERROR -> return _EOTHER
 
 let mk_ops ~extra = 
 
@@ -91,29 +100,43 @@ let mk_ops ~extra =
   (* FIXME refine - at the moment we wrap all exns as EOTHER *)
   (* let safely a = extra.safely (fun e -> Ops_types.unix2err e) a in *)
 
-  let _EOTHER = Error `Error_other in
-  
+  (* FIXME unlink usually operates only on files; do we want to have
+     rmdir as well? *)
   let unlink ~parent ~name = 
+    let open Unix in
     delay @@ fun _ ->
-    try
-      Unix.unlink @@ parent^"/"^name ;
-      return (Ok ())
+    try 
+      parent^"/"^name |> fun path ->
+      stat path |> fun st ->
+      begin
+        st.st_kind |> unix2kind |> function
+        | `File -> Unix.unlink path
+        | `Dir -> Unix.rmdir path
+        | `Symlink -> failwith __LOC__ (* FIXME *)
+        | _ -> failwith __LOC__
+      end;
+      return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
-
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function 
+      | `EINVAL ->
+        failwith __LOC__ (* posix: can't be thrown? check with SibylFS *)
   in
 
 
-  let default_perm = 0o640 in
+  let default_file_perm = 0o640 in  (* u:rw g:r o: *)
+  let default_dir_perm = 0o775 in  (* u:rwx g:rwx o:rx *)
 
 
   let mkdir ~parent ~name = 
     delay @@ fun _ ->
     try 
-      Unix.mkdir (parent^"/"^name) default_perm;
+      Unix.mkdir (parent^"/"^name) default_dir_perm;
       return (Ok ())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
@@ -121,7 +144,12 @@ let mk_ops ~extra =
 
   let opendir path = 
     delay @@ fun _ ->
-    return (Ok (mk_dh path))
+    try 
+      return (Ok (mk_dh path))
+    with 
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
@@ -130,7 +158,9 @@ let mk_ops ~extra =
     try Unix.readdir dh |> fun e -> return (Ok([e],not finished))
     with
     | End_of_file -> return (Ok([],finished))
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
@@ -139,7 +169,9 @@ let mk_ops ~extra =
     try 
       Unix.closedir dh; return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) ->
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in  
   (* FIXME should we record which dh are valid? ie not closed *)
 
@@ -148,20 +180,24 @@ let mk_ops ~extra =
     delay @@ fun _ ->
     try 
       let open Unix in
-      openfile (parent^"/"^name) [O_CREAT] default_perm |> fun fd ->
+      openfile (parent^"/"^name) [O_CREAT] default_file_perm |> fun fd ->
       close fd;
       return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
   let mk_fd path = 
     delay @@ fun _ ->
     try 
-      Unix.(openfile path [O_RDWR] default_perm) |> fun x -> return (Ok x)
+      Unix.(openfile path [O_RDWR] default_file_perm) |> fun x -> return (Ok x)
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
   let open_ path = mk_fd path in
@@ -171,12 +207,14 @@ let mk_ops ~extra =
     delay @@ fun _ ->
     try
       (* bigarray pread has no boff, and length is taken from array, so
-       resort to slicing *)
+         resort to slicing *)
       Bigarray.Array1.sub buffer boff length |> fun buffer -> 
       ExtUnix.All.BA.pread fd foff buffer |> fun nread ->
       return (Ok nread)
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
@@ -187,7 +225,9 @@ let mk_ops ~extra =
       ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
       return (Ok n)
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
@@ -207,7 +247,9 @@ let mk_ops ~extra =
       Unix.rename (spath^"/"^sname) (dpath^"/"^dname); 
       return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
   let truncate ~path ~length = 
@@ -216,7 +258,9 @@ let mk_ops ~extra =
       Unix.truncate path length; 
       return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> return _EOTHER  (* length < 0 *)
   in
 
 
@@ -227,13 +271,15 @@ let mk_ops ~extra =
       stat path |> unix2stat |> fun stat -> 
       return (Ok stat)
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> failwith __LOC__
   in
 
 
-    
+
   let reset () = return () in
-  
+
 
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat; reset }
