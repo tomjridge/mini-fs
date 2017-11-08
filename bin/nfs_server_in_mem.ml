@@ -4,13 +4,11 @@ open Tjr_connection
 open Tjr_minifs
 open Base_
 open Msgs
+
+(* backend ---------------------------------------------------------- *)
 open In_mem
 
-
-let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server -> server
-
-
+(* server ----------------------------------------------------------- *)
 module Server' = Nfs_server.Make_server(Ops_type_plus)
 include Server'
 
@@ -28,15 +26,16 @@ let _ : msg_from_client -> msg_from_server m = serve
 
 
 include struct
-  (* NOTE Tjr_connection.Unix_ has: 'a m = ('a,exn)result, which is not
-     the same as in_mem.m *)
   open Tjr_connection.Unix_
   let send ~conn (m:msg_from_server) =
     m |> msg_s_to_string |> send_string ~conn
-
-(*  let string_to_msg s = s |> Yojson.Safe.from_string |> msg_from_client_of_yojson *)
 end
 
+
+(* main ------------------------------------------------------------- *)
+
+let quad = Runtime_config.get_config ~filename:"config.json" @@ 
+  fun ~client ~server -> server
 
 let main () = 
   let open Tjr_connection.Unix_ in
