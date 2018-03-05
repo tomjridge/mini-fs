@@ -67,6 +67,8 @@ module Make_fuse = Make_fuse
 
 (* module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct ... *)
 
+let fuse_in_mem_ops = Fuse_in_mem.fuse_ops
+
 
 open Nfs_client
 module Make_client = Make_client

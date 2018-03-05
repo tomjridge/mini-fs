@@ -27,3 +27,8 @@
 /trivial_state_monad.ml
 /stat_record.ml
 /step_monad_logging.ml
+/base_types_.ml
+/error_types.ml
+/ops_type_.ml
+/r_.ml
+/recapitulation.ml
