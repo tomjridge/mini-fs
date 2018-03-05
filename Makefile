@@ -36,7 +36,9 @@ clean:
 	$(MAKE) -C bin clean
 
 
-
+# NOTE make this after making everything else 
+doc:
+	ocamlfind ocamldoc $$PKGS $$WARN -html -d /tmp *.ml
 
 # temporary do not use ------------------------------------------------
 

@@ -39,14 +39,13 @@ include struct
 end
 
 
-(* base types ------------------------------------------------------- *)
 
-module type BASE_TYPES = sig
-  type fd
-  type dh
-end
+(* base_types extra ------------------------------------------------- *)
 
-(* FIXME note that this is the only mention of Lwt - so move elsewhere and drop dependency? *)
+include Base_types_
+
+(* FIXME note that this is the only mention of Lwt - so move elsewhere
+   and drop dependency? *)
 module Lwt_base_types = struct
   type fd=Lwt_unix.file_descr
   type dh=Lwt_unix.dir_handle

@@ -3,8 +3,6 @@ set -a # export all vars
 
 libname=tjr_minifs
 Libname=Tjr_minifs
-#src_subdirs=`echo {ac,ag,c,d,e,f,h,i,j,n}_*`
-#mls_in_subdirs=`ls {ac,ag,c,d,e,f,h,i,j,n}_*/*.ml`
 meta_description="Minimal file-system-like thing"
 
 required_packages="extunix,extlib,Fuse,tjr_lib,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net"
@@ -24,7 +22,7 @@ function clean_links() {
 
 
 function mk_links() {
-    ln -s {a_,d_,e_,f_,g_,h_,m_}*/*.ml .
+    ln -s {a_,d_,e_,f_,g_,h_,m_,o_}*/*.ml .
 #    ln -s {a_,d_,e_,f_,g_}*/*.ml .
 #    ln -s {a_,d_,e_}*/*.ml .
 #    ln -s {a_,d_}*/*.ml .
