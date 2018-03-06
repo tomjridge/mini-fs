@@ -1,0 +1,356 @@
+--- recapitulation.mli.generated	2018-03-06 15:17:42.038745109 +0000
++++ recapitulation.mli.patched	2018-03-06 15:18:59.935789411 +0000
+@@ -1,25 +1,10 @@
+ type ('a, 'w) step_monad =
+   ('a, 'w) Tjr_step_monad.step_monad =
+     Step of ('w -> 'w * ('a, ('a, 'w) step_monad) Tjr_either.either)
+-type ('a, 'w) k_ = ('a, ('a, 'w) step_monad) Tjr_either.either
+-type ('a, 'w) sm = ('a, 'w) step_monad
+-val dest_Step :
+-  ('a, 'b) step_monad ->
+-  'b -> 'b * ('a, ('a, 'b) step_monad) Tjr_either.either
+-val return : 'a -> ('a, 'b) step_monad
+-val bind : ('a, 'w) sm -> ('a -> ('b, 'w) sm) -> ('b, 'w) sm
+-val fmap : ('a -> 'b) -> ('a, 'c) step_monad -> ('b, 'c) step_monad
+-val with_state : ('a -> 'b * 'a) -> ('b, 'a) sm
+-val run :
+-  dest_exceptional:('a -> 'b option) ->
+-  'a ->
+-  ('c, 'a) step_monad ->
+-  ('a * 'c, [> `Attempt_to_step_exceptional_state of 'a ]) result
+ module type MONAD =
+   sig
+     type 'a m
+-    val return : 'a -> 'a m
+-    val bind : 'a m -> ('a -> 'b m) -> 'b m
++    ...
+   end
+ module type BASE_TYPES = sig type fd type dh end
+ module Int_base_types :
+@@ -54,8 +39,7 @@
+ module type OPS_TYPE =
+   sig
+     type 'a m
+-    val return : 'a -> 'a m
+-    val bind : 'a m -> ('a -> 'b m) -> 'b m
++    ...
+     type fd
+     type dh
+     type ('a, 'e) r_
+@@ -100,144 +84,24 @@
+   end
+ module type OPS_TYPE_WITHOUT_MONAD =
+   sig
+-    type 'a m = 'a m'
+-    val return : 'a -> 'a m
+-    val bind : 'a m -> ('a -> 'b m) -> 'b m
+-    type fd
+-    type dh
+-    type ('a, 'e) r_
+-    type ops = {
+-      root : path;
+-      unlink :
+-        parent:path ->
+-        name:string -> (unit, unlink_err) r_ m;
+-      mkdir :
+-        parent:path ->
+-        name:string -> (unit, mkdir_err) r_ m;
+-      opendir : path -> (dh, opendir_err) r_ m;
+-      readdir :
+-        dh -> (string list * is_finished, readdir_err) r_ m;
+-      closedir : dh -> (unit, closedir_err) r_ m;
+-      create :
+-        parent:path ->
+-        name:string -> (unit, create_err) r_ m;
+-      open_ : path -> (fd, open_err) r_ m;
+-      pread :
+-        fd:fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer -> boff:int -> (int, pread_err) r_ m;
+-      pwrite :
+-        fd:fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer -> boff:int -> (int, pwrite_err) r_ m;
+-      close : fd -> (unit, close_err) r_ m;
+-      rename :
+-        spath:path ->
+-        sname:string ->
+-        dpath:path ->
+-        dname:string -> (unit, rename_err) r_ m;
+-      truncate :
+-        path:path ->
+-        length:int -> (unit, truncate_err) r_ m;
+-      stat : path -> (stat_record, stat_err) r_ m;
+-      reset : unit -> unit m;
+-    }
++    type 'a m = 'a m'  NOTE ... = 'a FIXME get info automatically?
++    ...
+   end
+ module type OPS_TYPE_WITH_RESULT =
+   sig
+     type 'a m
+-    val return : 'a -> 'a m
+-    val bind : 'a m -> ('a -> 'b m) -> 'b m
+     type fd
+     type dh
+     type ('a, 'e) r_ = ('a, 'e) result
+-    type ops = {
+-      root : path;
+-      unlink :
+-        parent:path ->
+-        name:string -> (unit, unlink_err) r_ m;
+-      mkdir :
+-        parent:path ->
+-        name:string -> (unit, mkdir_err) r_ m;
+-      opendir : path -> (dh, opendir_err) r_ m;
+-      readdir :
+-        dh -> (string list * is_finished, readdir_err) r_ m;
+-      closedir : dh -> (unit, closedir_err) r_ m;
+-      create :
+-        parent:path ->
+-        name:string -> (unit, create_err) r_ m;
+-      open_ : path -> (fd, open_err) r_ m;
+-      pread :
+-        fd:fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer -> boff:int -> (int, pread_err) r_ m;
+-      pwrite :
+-        fd:fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer -> boff:int -> (int, pwrite_err) r_ m;
+-      close : fd -> (unit, close_err) r_ m;
+-      rename :
+-        spath:path ->
+-        sname:string ->
+-        dpath:path ->
+-        dname:string -> (unit, rename_err) r_ m;
+-      truncate :
+-        path:path ->
+-        length:int -> (unit, truncate_err) r_ m;
+-      stat : path -> (stat_record, stat_err) r_ m;
+-      reset : unit -> unit m;
+-    }
++    type ops = { ... as OPS_TYPE but specialized to r_ = result }
+   end
+ module type IMP_OPS_TYPE =
+   sig
+-    type 'a m = 'a m'
+-    val return : 'a -> 'a m
+-    val bind : 'a m -> ('a -> 'b m) -> 'b m
++    type 'a m = 'a m' NOTE ... = 'a
+     type fd
+     type dh
+-    type ('a, 'e) r_ = ('a, 'e) r'
+-    type ops = {
+-      root : path;
+-      unlink :
+-        parent:path ->
+-        name:string -> (unit, unlink_err) r_ m;
+-      mkdir :
+-        parent:path ->
+-        name:string -> (unit, mkdir_err) r_ m;
+-      opendir : path -> (dh, opendir_err) r_ m;
+-      readdir :
+-        dh -> (string list * is_finished, readdir_err) r_ m;
+-      closedir : dh -> (unit, closedir_err) r_ m;
+-      create :
+-        parent:path ->
+-        name:string -> (unit, create_err) r_ m;
+-      open_ : path -> (fd, open_err) r_ m;
+-      pread :
+-        fd:fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer -> boff:int -> (int, pread_err) r_ m;
+-      pwrite :
+-        fd:fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer -> boff:int -> (int, pwrite_err) r_ m;
+-      close : fd -> (unit, close_err) r_ m;
+-      rename :
+-        spath:path ->
+-        sname:string ->
+-        dpath:path ->
+-        dname:string -> (unit, rename_err) r_ m;
+-      truncate :
+-        path:path ->
+-        length:int -> (unit, truncate_err) r_ m;
+-      stat : path -> (stat_record, stat_err) r_ m;
+-      reset : unit -> unit m;
+-    }
++    type ('a, 'e) r_ = ('a, 'e) r' NOTE ... = ('a,'e) result
++    type ops = { ... as OPS_TYPE but specialized to r_ }
+   end
+ module Mem_base_types :
+   sig
+@@ -251,15 +115,7 @@
+ module In_mem_monad :
+   sig
+     type 'a m = ('a, In_mem.t) Step_monad.step_monad
+-    val bind :
+-      ('a, 'b) Step_monad.sm ->
+-      ('a -> ('c, 'b) Step_monad.sm) -> ('c, 'b) Step_monad.sm
+-    val return : 'a -> ('a, 'b) Step_monad.step_monad
+-    val run :
+-      In_mem.t ->
+-      ('a, In_mem.t) Step_monad.step_monad ->
+-      (In_mem.t * 'a, [> `Attempt_to_step_exceptional_state of In_mem.t ])
+-      result
++    ... FIXME need In_mem.t
+   end
+ type nonrec 'e extra_ops = 'e In_mem.extra_ops
+ type nonrec w = Unix_ops.w
+@@ -268,18 +124,12 @@
+ module Unix_monad :
+   sig
+     type 'a m = ('a, Unix_ops.w) Step_monad.step_monad
+-    val bind :
+-      ('a, 'b) Step_monad.sm ->
+-      ('a -> ('c, 'b) Step_monad.sm) -> ('c, 'b) Step_monad.sm
+-    val return : 'a -> ('a, 'b) Step_monad.step_monad
++    ...
+   end
+ module Unix_MBR :
+   sig
+     type 'a m = ('a, Unix_ops.w) Step_monad.step_monad
+-    val bind :
+-      ('a, 'b) Step_monad.sm ->
+-      ('a -> ('c, 'b) Step_monad.sm) -> ('c, 'b) Step_monad.sm
+-    val return : 'a -> ('a, 'b) Step_monad.step_monad
++    ...
+     type fd = Unix.file_descr
+     type dh = Unix.dir_handle
+     type ('a, 'e) r_ = ('a, 'e) result
+@@ -287,76 +137,13 @@
+ module Unix_ops_type :
+   sig
+     type ops =
+-      Make_ops_type(Unix_MBR).ops = {
+-      root : path;
+-      unlink :
+-        parent:path ->
+-        name:string ->
+-        (unit, unlink_err) Unix_MBR.r_ Unix_MBR.m;
+-      mkdir :
+-        parent:path ->
+-        name:string ->
+-        (unit, mkdir_err) Unix_MBR.r_ Unix_MBR.m;
+-      opendir :
+-        path ->
+-        (Unix_MBR.dh, opendir_err) Unix_MBR.r_
+-        Unix_MBR.m;
+-      readdir :
+-        Unix_MBR.dh ->
+-        (string list * is_finished, readdir_err)
+-        Unix_MBR.r_ Unix_MBR.m;
+-      closedir :
+-        Unix_MBR.dh ->
+-        (unit, closedir_err) Unix_MBR.r_ Unix_MBR.m;
+-      create :
+-        parent:path ->
+-        name:string ->
+-        (unit, create_err) Unix_MBR.r_ Unix_MBR.m;
+-      open_ :
+-        path ->
+-        (Unix_MBR.fd, open_err) Unix_MBR.r_
+-        Unix_MBR.m;
+-      pread :
+-        fd:Unix_MBR.fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer ->
+-        boff:int ->
+-        (int, pread_err) Unix_MBR.r_ Unix_MBR.m;
+-      pwrite :
+-        fd:Unix_MBR.fd ->
+-        foff:int ->
+-        length:int ->
+-        buffer:buffer ->
+-        boff:int ->
+-        (int, pwrite_err) Unix_MBR.r_ Unix_MBR.m;
+-      close :
+-        Unix_MBR.fd ->
+-        (unit, close_err) Unix_MBR.r_ Unix_MBR.m;
+-      rename :
+-        spath:path ->
+-        sname:string ->
+-        dpath:path ->
+-        dname:string ->
+-        (unit, rename_err) Unix_MBR.r_ Unix_MBR.m;
+-      truncate :
+-        path:path ->
+-        length:int ->
+-        (unit, truncate_err) Unix_MBR.r_ Unix_MBR.m;
+-      stat :
+-        path ->
+-        (stat_record, stat_err) Unix_MBR.r_
+-        Unix_MBR.m;
+-      reset : unit -> unit Unix_MBR.m;
+-    }
++      Make_ops_type(Unix_MBR).ops = { ... }  
++      FIXME can we get explicit functor equality to appear elsewhere?
+   end
+ module Make_fuse :
+   functor (I : OPS_TYPE_WITH_RESULT) ->
+     sig
+-      val ( >>= ) : 'a I.m -> ('a -> 'b I.m) -> 'b I.m
+-      val ( >>=| ) :
+-        ('a, 'b) result I.m ->
+-        ('a -> ('c, 'b) result I.m) -> ('c, 'b) result I.m
++      ...
+       type co_eta =
+         Fuse_.Make_fuse(I).co_eta = {
+         co_eta : 'a. 'a I.m -> 'a;
+@@ -399,44 +186,9 @@
+ module Make_fuse_nfs_client :
+   functor (O : OPS_TYPE_WITH_RESULT) ->
+     sig
+-      module Client' :
+-        sig
+-          type internal_marhsal_err =
+-            Nfs_client.Make_client(O).internal_marhsal_err = {
+-            internal_marshal_err : 'a. string -> 'a O.m;
+-          }
+-          val mk_client_ops :
+-            internal_marshal_err:internal_marhsal_err ->
+-            call:(Msgs.msg_from_client -> Msgs.msg_from_server O.m) ->
+-            i2dh:(Msgs.dh -> O.dh) ->
+-            dh2i:(O.dh -> Msgs.dh) ->
+-            i2fd:(Msgs.fd -> O.fd) -> fd2i:(O.fd -> Msgs.fd) -> O.ops
+-        end
+-      type internal_marhsal_err =
+-        Nfs_client.Make_client(O).internal_marhsal_err = {
+-        internal_marshal_err : 'a. string -> 'a O.m;
+-      }
+-      val mk_client_ops :
+-        internal_marshal_err:internal_marhsal_err ->
+-        call:(Msgs.msg_from_client -> Msgs.msg_from_server O.m) ->
+-        i2dh:(Msgs.dh -> O.dh) ->
+-        dh2i:(O.dh -> Msgs.dh) ->
+-        i2fd:(Msgs.fd -> O.fd) -> fd2i:(O.fd -> Msgs.fd) -> O.ops
+-      module Fuse' :
+-        sig
+-          val ( >>= ) : 'a O.m -> ('a -> 'b O.m) -> 'b O.m
+-          val ( >>=| ) :
+-            ('a, 'b) result O.m ->
+-            ('a -> ('c, 'b) result O.m) -> ('c, 'b) result O.m
+-          type co_eta =
+-            Fuse_.Make_fuse(O).co_eta = {
+-            co_eta : 'a. 'a O.m -> 'a;
+-          }
+-          val readdir' :
+-            ops:O.ops ->
+-            path -> (string list, opendir_err) result O.m
+-          val mk_fuse_ops : ops:O.ops -> co_eta:co_eta -> Fuse.operations
+-        end
++      ... 
++      module Fuse' = ... as Fuse_.Make_fuse(O) ...
++      ...
+       val mk_fuse_ops :
+         internal_marshal_err:internal_marhsal_err ->
+         call:(Msgs.msg_from_client -> Msgs.msg_from_server O.m) ->

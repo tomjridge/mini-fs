@@ -36,7 +36,22 @@ clean:
 	$(MAKE) -C bin clean
 
 
-# NOTE make this after making everything else 
+# doc ------------------------------------------------------------------
+
+# NOTE make these after making everything else 
+
+# NOTE minor simplifications of types etc
+recapitulation.mli.generated: FORCE
+	$$ocamlc  -i recapitulation.ml | \
+	  sed -e "s/Error_types[.]//g" \
+	    -e "s/Base_.//g" \
+	    -e "s/Unix_ops.MBR/Unix_MBR/g" \
+	    -e "s/Ops_types.//g" >$@
+
+recapitulation.mli.patched: recapitulation.mli.generated FORCE
+	cp recapitulation.mli.generated recapitulation.mli.patched
+	patch -u recapitulation.mli.patched < recapitulation.patch
+
 doc:
 	ocamlfind ocamldoc $$PKGS $$WARN -html -d /tmp *.ml
 
@@ -46,3 +61,5 @@ prereqs:
 	echo "Making minifs prereqs"
 	$(MAKE) -C ../tjr_lib
 	$(MAKE) -C ../tjr_net
+
+FORCE:
