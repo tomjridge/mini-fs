@@ -262,6 +262,7 @@ module In_mem_monad :
       result
   end
 type nonrec 'e extra_ops = 'e In_mem.extra_ops
+val in_mem_make_ops : extra:'a In_mem.extra_ops -> In_mem.ops
 type nonrec w = Unix_ops.w
 module Unix_base_types :
   sig type fd = Unix.file_descr type dh = Unix.dir_handle end
@@ -350,6 +351,7 @@ module Unix_ops_type :
       reset : unit -> unit Unix_MBR.m;
     }
   end
+val unix_make_ops : extra:'a Unix_ops.extra_ops -> Unix_ops.ops
 module Make_fuse :
   functor (I : OPS_TYPE_WITH_RESULT) ->
     sig

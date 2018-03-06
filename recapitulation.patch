@@ -1,5 +1,5 @@
---- recapitulation.mli.generated	2018-03-06 15:17:42.038745109 +0000
-+++ recapitulation.mli.patched	2018-03-06 15:18:59.935789411 +0000
+--- recapitulation.mli.generated	2018-03-06 16:01:35.363686098 +0000
++++ recapitulation.mli.patched	2018-03-06 16:02:38.160448173 +0000
 @@ -1,25 +1,10 @@
  type ('a, 'w) step_monad =
    ('a, 'w) Tjr_step_monad.step_monad =
@@ -204,8 +204,8 @@
 +    ... FIXME need In_mem.t
    end
  type nonrec 'e extra_ops = 'e In_mem.extra_ops
- type nonrec w = Unix_ops.w
-@@ -268,18 +124,12 @@
+ val in_mem_make_ops : extra:'a In_mem.extra_ops -> In_mem.ops
+@@ -269,18 +125,12 @@
  module Unix_monad :
    sig
      type 'a m = ('a, Unix_ops.w) Step_monad.step_monad
@@ -226,7 +226,7 @@
      type fd = Unix.file_descr
      type dh = Unix.dir_handle
      type ('a, 'e) r_ = ('a, 'e) result
-@@ -287,76 +137,13 @@
+@@ -288,68 +138,8 @@
  module Unix_ops_type :
    sig
      type ops =
@@ -292,21 +292,12 @@
 -        Unix_MBR.m;
 -      reset : unit -> unit Unix_MBR.m;
 -    }
-+      Make_ops_type(Unix_MBR).ops = { ... }  
++      Make_ops_type(Unix_MBR).ops = { ... }
 +      FIXME can we get explicit functor equality to appear elsewhere?
    end
+ val unix_make_ops : extra:'a Unix_ops.extra_ops -> Unix_ops.ops
  module Make_fuse :
-   functor (I : OPS_TYPE_WITH_RESULT) ->
-     sig
--      val ( >>= ) : 'a I.m -> ('a -> 'b I.m) -> 'b I.m
--      val ( >>=| ) :
--        ('a, 'b) result I.m ->
--        ('a -> ('c, 'b) result I.m) -> ('c, 'b) result I.m
-+      ...
-       type co_eta =
-         Fuse_.Make_fuse(I).co_eta = {
-         co_eta : 'a. 'a I.m -> 'a;
-@@ -399,44 +186,9 @@
+@@ -401,44 +191,9 @@
  module Make_fuse_nfs_client :
    functor (O : OPS_TYPE_WITH_RESULT) ->
      sig

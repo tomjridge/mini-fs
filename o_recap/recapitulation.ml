@@ -58,6 +58,7 @@ module In_mem_monad = struct include In_mem_monad end
 
 type nonrec 'e extra_ops = 'e extra_ops
 
+let in_mem_make_ops = In_mem.mk_ops
 
 
 open Unix_ops
@@ -66,6 +67,8 @@ module Unix_base_types = struct include Unix_base_types end
 module Unix_monad = struct include Unix_monad end
 module Unix_MBR = struct include MBR end
 module Unix_ops_type = struct include Unix_ops.Ops_type end
+
+let unix_make_ops = Unix_ops.mk_ops
 
 
 open Fuse_

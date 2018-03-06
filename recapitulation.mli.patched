@@ -118,6 +118,7 @@ module In_mem_monad :
     ... FIXME need In_mem.t
   end
 type nonrec 'e extra_ops = 'e In_mem.extra_ops
+val in_mem_make_ops : extra:'a In_mem.extra_ops -> In_mem.ops
 type nonrec w = Unix_ops.w
 module Unix_base_types :
   sig type fd = Unix.file_descr type dh = Unix.dir_handle end
@@ -137,13 +138,17 @@ module Unix_MBR :
 module Unix_ops_type :
   sig
     type ops =
-      Make_ops_type(Unix_MBR).ops = { ... }  
+      Make_ops_type(Unix_MBR).ops = { ... }
       FIXME can we get explicit functor equality to appear elsewhere?
   end
+val unix_make_ops : extra:'a Unix_ops.extra_ops -> Unix_ops.ops
 module Make_fuse :
   functor (I : OPS_TYPE_WITH_RESULT) ->
     sig
-      ...
+      val ( >>= ) : 'a I.m -> ('a -> 'b I.m) -> 'b I.m
+      val ( >>=| ) :
+        ('a, 'b) result I.m ->
+        ('a -> ('c, 'b) result I.m) -> ('c, 'b) result I.m
       type co_eta =
         Fuse_.Make_fuse(I).co_eta = {
         co_eta : 'a. 'a I.m -> 'a;
