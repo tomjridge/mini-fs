@@ -70,9 +70,11 @@ module Set_string = Tjr_set.Make(
 type symlink = string [@@deriving yojson]
 
 (* type id = Fid of fid | Did of did [@@deriving yojson] *)
+(* entries are either files, dirs, or symlinks; for symlinks we just
+   record the string data in the entry *)
 type dir_entry = Fid of fid | Did of did | Symlink of symlink[@@deriving yojson]
 
-
+(* a name map - from strings to dir entries *)
 type name_map_carrier = dir_entry Map_string.Map_.t
 type nm_ops = (string,dir_entry,name_map_carrier) map_ops
 let nm_ops = Map_string.map_ops
@@ -225,7 +227,7 @@ module In_mem_monad = struct
 end
 include In_mem_monad
 
-
+(* easily json-able *)
 module Y_ = struct
   open X_
   type t' = {
@@ -297,10 +299,12 @@ let mk_ops ~extra =
     | None -> extra.internal_err "resolve_did, did not valid mim.l154"
     | Some dir -> return dir
   in
-  let _ = resolve_did in
+  let _ : did -> dir_with_parent m = resolve_did in
 
 
   let resolve_name ~dir ~name : dir_entry option = dir_find name dir in
+
+  (* we reuse the path_resolution library FIXME *)
 
   (* get parent and pass to rn_2 *)
   let rec resolve_names_1 ~parent_id ~names 
