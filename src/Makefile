@@ -15,10 +15,10 @@ all: links
 	$$ocamlopt -c $$mls
 	mk_cmxa
 	$(MAKE) install
-	$(MAKE) -C bin
+	$(MAKE) -C ../bin
 
 run: all
-	$(MAKE) -C bin run
+	$(MAKE) -C ../bin run
 
 links:
 	mk_links
@@ -33,7 +33,7 @@ clean:
 	clean
 	clean_links
 	rm -f *.html
-	$(MAKE) -C bin clean
+	$(MAKE) -C ../bin clean
 
 
 # doc ------------------------------------------------------------------
