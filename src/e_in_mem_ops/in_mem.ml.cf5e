@@ -11,7 +11,6 @@ module Mem_base_types = Int_base_types
 include Mem_base_types
 
 
-(* file ids *)
 module Fid : sig
   type fid = int[@@deriving yojson]  (* FIXME hide *)
   val fid0 : fid
@@ -23,8 +22,6 @@ end = struct
 end
 include Fid
 
-
-(* dir ids *)
 module Did : sig
   type did = int[@@deriving yojson] (* FIXME hide *)
   val root_did : did
@@ -35,7 +32,6 @@ end = struct
   let inc_did x = x+1 
 end
 include Did
-
 
 module Map_fid = Tjr_map.Make(
   struct 
@@ -54,7 +50,6 @@ module Map_string = Tjr_map.Make(
     type t = string let compare: t->t->int = Pervasives.compare 
   end)
 
-
 module Map_int = Tjr_map.Make(
   struct 
     type t = int let compare: t->t->int = Pervasives.compare 
@@ -67,14 +62,11 @@ module Set_string = Tjr_set.Make(
   end)
 
 
-type symlink = string [@@deriving yojson]
-
-(* type id = Fid of fid | Did of did [@@deriving yojson] *)
-type dir_entry = Fid of fid | Did of did | Symlink of symlink[@@deriving yojson]
+type id = Fid of fid | Did of did[@@deriving yojson]
 
 
-type name_map_carrier = dir_entry Map_string.Map_.t
-type nm_ops = (string,dir_entry,name_map_carrier) map_ops
+type name_map_carrier = id Map_string.Map_.t
+type nm_ops = (string,id,name_map_carrier) map_ops
 let nm_ops = Map_string.map_ops
 
 
@@ -110,16 +102,13 @@ type files_carrier = file_meta_and_data Map_fid.Map_.t
 type files_ops = (fid,file_meta_and_data,files_carrier) map_ops
 let files_ops : files_ops = Map_fid.map_ops
 
-
 type dirs_carrier = dir_with_parent Map_did.Map_.t
 type dirs_ops = (did,dir_with_parent,dirs_carrier) map_ops
 let dirs_ops : dirs_ops = Map_did.map_ops
 
-
 type dhandles_carrier = string list Map_int.Map_.t
 type dhandles_ops = (dh,string list,dhandles_carrier) map_ops
 let dhandles_ops : dhandles_ops = Map_int.map_ops
-
 
 type fs_t = {
   files: files_carrier;
@@ -130,19 +119,12 @@ type fs_t = {
   max_dh: dh;
 }
 
-
 module X_ = struct
   (* an easily-jsonable version *)
   type fs' = {
     files: (fid * string) list;
     max_fid: fid;
-    dirs: (
-      did * (* id of dir *)
-      (
-        (string*dir_entry) list * (* entries *)
-        did  (* parent *)
-      ) 
-    ) list;
+    dirs: (did * ((string*id) list * did) ) list;
     max_did: did;
     (* FIXME dhandles *)
   } [@@deriving yojson]
@@ -161,13 +143,10 @@ module X_ = struct
   }
 end
 
-
 let fs_to_json fs = X_.(
     from_fs fs |> fs'_to_yojson |> Yojson.Safe.pretty_to_string)
 
-
 let empty_dir ~parent = dir_empty ~parent
-
 
 let init_fs = {
   files=files_ops.map_empty;
@@ -187,14 +166,7 @@ let is_fid = function
   | _ -> false
 
 
-let is_did = function
-  | Did _ -> true 
-  | _ -> false
-
-let is_symlink x = function
-  | Symlink _ -> true
-  | _ -> false
-
+let is_did x = not (is_fid x)
 
 
 (* monad ------------------------------------------------------------ *)
@@ -206,13 +178,11 @@ type t = {
   fs: fs_t
 }
 
-
 let init_t = {
 (*  thread_error_state=None; *)
   internal_error_state=None;
   fs=init_fs
 }
-
 
 module In_mem_monad = struct
   open Step_monad
@@ -229,16 +199,17 @@ include In_mem_monad
 module Y_ = struct
   open X_
   type t' = {
+(*    thread_error_state: exn_ option;  (* for current call *) *)
     internal_error_state: string option;
     fs:fs' 
   } [@@deriving yojson]
 
   let from_t (t:t) = {
+(*    thread_error_state=t.thread_error_state; *)
     internal_error_state=t.internal_error_state;
     fs=X_.from_fs t.fs
   }
 end
-
 
 let t_to_string t = Y_.(
     t |> from_t |> t'_to_yojson |> Yojson.Safe.pretty_to_string)
@@ -252,15 +223,17 @@ module MBR = struct
   include R_as_result
 end
 
-
 module Ops_type = Make_ops_type(MBR)
 include Ops_type
-
 
 module Ops_type_plus = struct
   include MBR
   include Ops_type
 end
+
+(*
+module Imp_ops_type = Types_without_resultMake_ops_type_without_result(Ops_type_plus)
+*)
 
 
 
@@ -297,15 +270,12 @@ let mk_ops ~extra =
     | None -> extra.internal_err "resolve_did, did not valid mim.l154"
     | Some dir -> return dir
   in
+
   let _ = resolve_did in
 
+  let resolve_name ~dir ~name : id option = dir_find name dir in
 
-  let resolve_name ~dir ~name : dir_entry option = dir_find name dir in
-
-  (* get parent and pass to rn_2 *)
-  let rec resolve_names_1 ~parent_id ~names 
-    : (did * dir_entry option,'e1)result m 
-    = 
+  let rec resolve_names_1 ~parent_id ~names : (did * id option,'e1)result m = 
     resolve_did parent_id >>= fun parent -> 
     resolve_names_2 ~parent_id ~parent ~names 
 
@@ -327,20 +297,13 @@ let mk_ops ~extra =
             match names with
             | [] -> return @@ Ok(parent_id,Some (Did did))
             | _ -> resolve_names_1 ~parent_id:did ~names)
-        | Some (Symlink sl) -> (
-            (* 
-               if starts with /, then resolve from root
-               if ends with /, then split is (a;b;c;"") so probably we should remove ""
-               otherwise split and prepend to names *)
-            failwith "FIXME"
-          )
       end
   in
 
 
   let _ = resolve_names_1 in
 
-  let resolve_path : path -> (did * dir_entry option,'e2)result m = fun p -> 
+  let resolve_path : path -> (did * id option,'e2)result m = fun p -> 
     (if not @@ String.contains p '/' 
      then extra.internal_err "resolve_path, no slash, mim.l189" 
      else 
@@ -348,13 +311,11 @@ let mk_ops ~extra =
        if not (List.hd names = "")
        then extra.internal_err "resolve_path, no leading slash, mim.194"
        else 
-         let names=List.tl names in
+         let names = List.tl names in
          if names=[] 
          then extra.internal_err "resolve_path, names empty, impossible, mim.198"
          else 
-           let names = Tjr_list.(
-               if last names = "" then butlast names else names) 
-           in
+           let names = Tjr_list.(if last names = "" then butlast names else names) in
            (* not sure about special casing root *)
            if names = [] 
            then return @@ Ok(root_did,Some (Did root_did)) 
@@ -381,10 +342,7 @@ let mk_ops ~extra =
 
   
 
-  (* FIXME or just allow unlink with no expectation of the kind? FIXME
-     add a "follow" flag? optional? FIXME how does parent/name interact
-     with symlinks? FIXME perhaps keep parent/name, but allow another
-     layer ot deal with follow  *)
+  (* FIXME or just allow unlink with no expectation of the kind? *)
   let unlink ~parent ~name = 
     resolve_dir_path parent >>=| fun pid ->
       begin
@@ -618,8 +576,6 @@ let mk_ops ~extra =
                 return (Ok ())
             in
             match resolved_sname,resolved_dname with
-            (* FIMXE following for symlinks *)
-            | Symlink _,_ | _,Some(Symlink _) -> failwith "FIXME"
             | Fid fid,None -> insert_and_remove (Fid fid)
             | Fid fid1,Some(Fid fid2) -> 
               if fid1=fid2 
@@ -656,7 +612,6 @@ let mk_ops ~extra =
   in
 
 
-  (* FIXME truncate parent name; FIXME also stat *)
   let truncate ~path ~length = 
     resolve_file_path path >>=| fun fid ->
       extra.with_fs (fun s ->
@@ -699,7 +654,6 @@ let mk_ops ~extra =
                     let sz = 1 in (* for dir? FIXME size of dir *)
                     f.meta |> fun meta ->
                     `Ok { sz;meta;kind=`Dir },s))
-          | Symlink _ -> failwith "FIXME"
       end
       >>= function
       | `Ok stat -> return (Ok stat)
