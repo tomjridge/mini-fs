@@ -5,7 +5,7 @@ libname=tjr_minifs
 Libname=Tjr_minifs
 meta_description="Minimal file-system-like thing"
 
-required_packages="extunix,extlib,Fuse,tjr_lib,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net"
+required_packages="extunix,extlib,Fuse,tjr_lib,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net,tjr_path_resolution"
 
 natives=""
 bytes=""
@@ -19,7 +19,9 @@ function clean_links() {
 
 
 function mk_links() {
-    ln -s {a_,d_,e_,f_,g_,h_,m_,o_}*/*.ml .
+    ln -s {a_,d_,e_}*/*.ml .
+
+#    ln -s {a_,d_,e_,f_,g_,h_,m_,o_}*/*.ml .
 #    ln -s {a_,d_,e_,f_,g_}*/*.ml .
 #    ln -s {a_,d_,e_}*/*.ml .
 #    ln -s {a_,d_}*/*.ml .

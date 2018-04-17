@@ -1,4 +1,5 @@
-
+(* Although we expect to use Tjr_fs_shared.Monad, we try to make the
+   interfaces parametric over the monad *)
 (* :bb: *)
 module type MONAD = sig
   type 'a m

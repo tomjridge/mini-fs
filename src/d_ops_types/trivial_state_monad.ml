@@ -9,22 +9,22 @@ end
 open World
 
 module Monad = struct
-  open Step_monad
-  type 'a m = ('a,w)step_monad
-  let bind,return = bind,return
+  type 'a m = ('a,w)Monad.m
+  let bind a ab = Monad.bind ab a
+  let return = Monad.return
 end
 open Monad
 
 module MBR = struct
   include Monad
-  include In_mem.Mem_base_types
+  include Int_base_types
   include R_as_result
 end
   
 module Ops_type = Ops_types.Make_ops_type(MBR)
 module Ops_type_plus = struct include MBR include Ops_type end
 
-let run x = Step_monad.run ~dest_exceptional:(fun x -> None) init_w x
+let run x = Tjr_fs_shared.Monad.run init_w x
 
 let readdir' = 
   let module M = Readdir'.Make_readdir'(Ops_type_plus) in 

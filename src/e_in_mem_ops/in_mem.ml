@@ -3,6 +3,9 @@ open Tjr_map
 open Base_
 open Ops_types
 
+(* NOTE we specialize this later *)
+let resolve = Tjr_path_resolution.resolve
+
 (* in-mem impl ------------------------------------------------------ *)
 
 let time = Unix.time (* 1s resolution *)
@@ -132,6 +135,11 @@ type fs_t = {
   max_dh: dh;
 }
 
+(* list some of the map functions to work with fs *)
+let lookup_did did fs = 
+  fs.dirs |> fun map ->
+  Map_did.map_ops.map_find did map
+
 
 module X_ = struct
   (* an easily-jsonable version *)
@@ -217,8 +225,8 @@ let init_t = {
 
 
 module In_mem_monad = struct
-  open Step_monad
-  type 'a m = ( 'a, t) step_monad
+  open Monad
+  type 'a m = ( 'a, t) Monad.m
   let bind,return = bind,return
   let run w a = 
     let dest_exceptional w = w.internal_error_state in
@@ -284,6 +292,7 @@ type 'e extra_ops = {
 }
 
 
+
 let mk_ops ~extra = 
   let err = extra.err in
   let ( >>= ) = bind in
@@ -302,10 +311,51 @@ let mk_ops ~extra =
   let _ : did -> dir_with_parent m = resolve_did in
 
 
-  let resolve_name ~dir ~name : dir_entry option = dir_find name dir in
+  (* NOTE needs a dir_with_parent to resolve .. *)
+  let resolve_name ~(dir_with_parent:dir_with_parent) ~name : dir_entry option = 
+    dir_find name dir_with_parent 
+  in
 
   (* we reuse the path_resolution library FIXME *)
 
+  let dir_entry_option_to_resolve_result eopt = 
+    let open Tjr_path_resolution in
+    match eopt with
+    | None -> Missing
+    | Some x -> x |> function
+      | Fid fid -> File fid
+      | Did did -> Dir did
+      | Symlink s -> Sym s
+  in
+
+  (* path resolution *)
+  let resolve = 
+    let root = root_did in
+    (* paths are always absolute when coming from fuse, and via the
+       api... FIXME assert this? *)
+    let resolve_comp (did:did) (comp:string) 
+      : ((fid,did) Tjr_path_resolution.resolve_result,'t) Tjr_fs_shared.Monad.m
+      = 
+      let open Tjr_path_resolution in
+      (* we want to use resolve_name, but this works with dir_with_parent *)
+      extra.with_fs (fun fs -> 
+          Map_did.map_ops.map_find did fs.dirs |> function
+          | None -> failwith "impossible, invalid did"
+          | Some dwp -> 
+            resolve_name ~dir_with_parent:dwp ~name:comp 
+            |> dir_entry_option_to_resolve_result |> fun x -> (x,fs))
+    in
+    let _ = resolve_comp in
+    let fs_ops = Tjr_path_resolution.{ 
+        root; 
+        resolve_comp;
+      }        
+    in
+    failwith "FIXME"
+  in
+
+
+(*
   (* get parent and pass to rn_2 *)
   let rec resolve_names_1 ~parent_id ~names 
     : (did * dir_entry option,'e1)result m 
@@ -367,6 +417,9 @@ let mk_ops ~extra =
 
   let _ = resolve_path in
 
+*)
+
+  let resolve_path = failwith "" in
 
   let resolve_dir_path (path:path) : (did,'e3)result m = 
     resolve_path path >>= function 
@@ -389,7 +442,7 @@ let mk_ops ~extra =
      add a "follow" flag? optional? FIXME how does parent/name interact
      with symlinks? FIXME perhaps keep parent/name, but allow another
      layer ot deal with follow  *)
-  let unlink ~parent ~name = 
+  let unlink path = 
     resolve_dir_path parent >>=| fun pid ->
       begin
         extra.with_fs (fun s ->

@@ -18,17 +18,17 @@ type stat_record = Base_.stat_record
 
 
 type msg_from_client = 
-  | Unlink of path * string
-  | Mkdir of path * string
+  | Unlink of path
+  | Mkdir of path
   | Opendir of path 
   | Readdir of dh 
   | Closedir of dh
-  | Create of path * string
+  | Create of path
   | Open of path 
   | Pread of fd * offset * int
   | Pwrite of fd * offset * data
   | Close of fd
-  | Rename of path * string * path * string
+  | Rename of path * path
   | Truncate of path * length
   | Stat of path
   | Reset

@@ -30,7 +30,7 @@ end
 
 
 module type MB = sig
-  include MONAD
+  include Monad_type_.MONAD
   include BASE_TYPES
 end
 
@@ -46,13 +46,13 @@ module Make_ops_type(MBR:MBR) = struct
   open MBR
   type ops = {
     root: path;
-    unlink : parent:path -> name:string -> (unit,unlink_err)r_ m;
-    mkdir : parent:path -> name:string -> (unit,mkdir_err)r_ m;
+    unlink : path -> (unit,unlink_err)r_ m;
+    mkdir : path -> (unit,mkdir_err)r_ m;
     opendir : path -> (dh,opendir_err)r_ m;
     (* . and .. are returned *)
     readdir : dh -> (string list * is_finished,readdir_err)r_ m;
     closedir : dh -> (unit,closedir_err)r_ m;
-    create : parent:path -> name:string -> (unit,create_err)r_ m;
+    create : path -> (unit,create_err)r_ m;
     open_ : path -> (fd,open_err)r_ m;
     pread: 
       fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
@@ -61,9 +61,7 @@ module Make_ops_type(MBR:MBR) = struct
       fd:fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
       (int,pwrite_err)r_ m;
     close : fd -> (unit,close_err)r_ m;
-    rename: 
-      spath:path -> sname:string -> dpath:path -> dname:string -> 
-      (unit,rename_err)r_ m;
+    rename: path -> path -> (unit,rename_err)r_ m;
     truncate : path:path -> length:int -> (unit,truncate_err)r_ m;
     stat : path -> (stat_record,stat_err)r_ m;
     reset : unit -> unit m;
@@ -86,15 +84,15 @@ module Make_logged_ops(O:OPS_TYPE) = struct
 
   let mk_logged_ops ~log_op ~ops ~fd2i ~dh2i = 
     let root = ops.root in
-    let unlink ~parent ~name = 
-      log_op.log (Unlink(parent,name)) (ops.unlink ~parent ~name) in
-    let mkdir ~parent ~name = 
-      log_op.log (Mkdir(parent,name)) (ops.mkdir ~parent ~name) in
+    let unlink path = 
+      log_op.log (Unlink(path)) (ops.unlink path) in
+    let mkdir path = 
+      log_op.log (Mkdir(path)) (ops.mkdir path) in
     let opendir p = log_op.log (Opendir(p)) (ops.opendir p) in
     let readdir dh = log_op.log (Readdir(dh2i dh)) (ops.readdir dh) in 
     let closedir dh = log_op.log (Closedir(dh2i dh)) (ops.closedir dh) in
-    let create ~parent ~name = 
-      log_op.log (Create(parent,name)) (ops.create ~parent ~name) in
+    let create path = 
+      log_op.log (Create(path)) (ops.create path) in
     let open_ p = log_op.log (Open(p)) (ops.open_ p) in
     let pread ~fd ~foff ~length ~buffer ~boff =
       log_op.log 
@@ -107,10 +105,10 @@ module Make_logged_ops(O:OPS_TYPE) = struct
         (ops.pwrite ~fd ~foff ~length ~buffer ~boff) 
     in
     let close fd = log_op.log (Close(fd|>fd2i)) (ops.close fd) in
-    let rename ~spath ~sname ~dpath ~dname = 
+    let rename path path'  = 
       log_op.log 
-        (Rename(spath,sname,dpath,dname)) 
-        (ops.rename ~spath ~sname ~dpath ~dname) 
+        (Rename(path,path')) 
+        (ops.rename path path') 
     in
     let truncate ~path ~length = 
       log_op.log (Truncate(path,length)) (ops.truncate ~path ~length) in

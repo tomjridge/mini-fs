@@ -3,9 +3,10 @@
 open Tjr_either
 open Base_
 open Msgs
-open Step_monad
+open Monad
 
 (* FIXME should also log exceptional returns *)
+(* FIXME 
 let log ~log_string msg = 
   let call = msg |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
   let rec log_return a = 
@@ -25,3 +26,4 @@ let log ~log_string msg =
         w,Inr (log_return a))
   in
   log_call_and_return
+*)
