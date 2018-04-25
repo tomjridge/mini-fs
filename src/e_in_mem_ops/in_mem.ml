@@ -6,6 +6,8 @@ open Ops_types
 (* NOTE we specialize this later *)
 let resolve = Tjr_path_resolution.resolve
 
+
+
 (* in-mem impl ------------------------------------------------------ *)
 
 let time = Unix.time (* 1s resolution *)
@@ -290,7 +292,7 @@ type 'e extra_ops = {
   is_parent: parent:did -> child:dir_with_parent -> bool m
 }
 
-
+open Tjr_path_resolution
 
 let mk_ops ~extra = 
   let err = extra.err in
@@ -317,14 +319,13 @@ let mk_ops ~extra =
 
   (* we reuse the path_resolution library FIXME *)
 
-  let dir_entry_option_to_resolve_result eopt = 
-    let open Tjr_path_resolution in
+  let dir_entry_option_to_resolve_result eopt : (fid,did) resolved_comp = 
     match eopt with
-    | None -> Missing
+    | None -> RC_missing
     | Some x -> x |> function
-      | Fid fid -> File fid
-      | Did did -> Dir did
-      | Symlink s -> Sym s
+      | Fid fid -> RC_file fid
+      | Did did -> RC_dir did
+      | Symlink s -> RC_sym s
   in
 
   (* path resolution *)
@@ -332,10 +333,7 @@ let mk_ops ~extra =
     let root = root_did in
     (* paths are always absolute when coming from fuse, and via the
        api... FIXME assert this? *)
-    let resolve_comp (did:did) (comp:string) 
-      : ((fid,did) Tjr_path_resolution.resolve_result,'t) Tjr_step_monad.m
-      = 
-      let open Tjr_path_resolution in
+    let resolve_comp (did:did) (comp:string) : ((fid,did)resolved_comp,'t) Tjr_step_monad.m = 
       (* we want to use resolve_name, but this works with dir_with_parent *)
       extra.with_fs (fun fs -> 
           Map_did.map_ops.map_find did fs.dirs |> function
@@ -345,13 +343,11 @@ let mk_ops ~extra =
             |> dir_entry_option_to_resolve_result |> fun x -> (x,fs))
     in
     let _ = resolve_comp in
-    let fs_ops = Tjr_path_resolution.{ 
-        root; 
-        resolve_comp;
-      }        
-    in
-    failwith "FIXME"
+    let fs_ops = { root; resolve_comp } in
+    Tjr_path_resolution.resolve ~fs_ops
   in
+
+
 
 
 (*
@@ -418,51 +414,61 @@ let mk_ops ~extra =
 
 *)
 
-  let resolve_path = failwith "" in
+  let resolve_path ~follow_last_symlink path = 
+    (* paths from Fuse should satisfy this; FIXME what if we are not using fuse? *)
+    assert(String_util.starts_with_slash path); 
+    let cwd = root_did in
+    resolve ~follow_last_symlink ~cwd path >>= function
+    | Ok r -> return (Ok r)
+    | Error e -> err `Error_path_resolution  (* FIXME be more careful here? *)
+  in
 
+
+  (* FIXME not sure about Always in following two funs *)
   let resolve_dir_path (path:path) : (did,'e3)result m = 
-    resolve_path path >>= function 
-    | Ok(_,Some (Did did)) -> return (Ok did)
+    resolve_path ~follow_last_symlink:`Always path >>= function 
+    | Ok { result=(Dir did) } -> return (Ok did)
     | _ -> err `Error_not_directory
   in
 
 
   let resolve_file_path (path:path) : (fid,'e4)result m = 
-    resolve_path path >>= function
-    | Ok(_,Some (Fid fid)) -> return (Ok fid)
+    resolve_path ~follow_last_symlink:`Always path >>= function
+    | Ok { result=(File fid) } -> return (Ok fid)
     | _ -> err `Error_not_file
   in
 
+
   let root : path = "/" in
 
-  
 
   (* FIXME or just allow unlink with no expectation of the kind? FIXME
      add a "follow" flag? optional? FIXME how does parent/name interact
      with symlinks? FIXME perhaps keep parent/name, but allow another
-     layer ot deal with follow  *)
+     layer ot deal with follow; FIXME not sure about `If_trailing_slash  *)
   let unlink path = 
-    resolve_dir_path parent >>=| fun pid ->
-      begin
-        extra.with_fs (fun s ->
-            s.dirs |> fun dirs ->
-            dirs_ops.map_find pid dirs |> function
-            | None -> `Internal "impossible, parent not found, mim.233",s
-            | Some pdir -> 
-              dir_find name pdir |> function
-              | None -> `Error_no_entry,s
-              | Some entry -> 
-                (* FIXME with hardlinks, tims can change for other link *)
-                dir_remove name pdir |> fun pdir ->
-                dirs_ops.map_add pid pdir dirs |> fun dirs ->
-                `Ok,{s with dirs}) 
-        >>= (function 
-            | `Ok -> return (Ok ())
-            | `Internal s -> extra.internal_err s
-            | `Error_no_entry -> err @@ `Error_no_entry) 
-      end
-      (* >>= (function
-      | Ok x -> return (Ok x) | Error e -> return (Error e)) *)
+    resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
+    let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    begin
+      extra.with_fs (fun s ->
+          s.dirs |> fun dirs ->
+          dirs_ops.map_find pid dirs |> function
+          | None -> `Internal "impossible, parent not found, mim.233",s
+          | Some pdir -> 
+            dir_find name pdir |> function
+            | None -> `Error_no_entry,s
+            | Some entry -> 
+              (* FIXME with hardlinks, tims can change for other link *)
+              dir_remove name pdir |> fun pdir ->
+              dirs_ops.map_add pid pdir dirs |> fun dirs ->
+              `Ok,{s with dirs}) 
+      >>= (function 
+          | `Ok -> return (Ok ())
+          | `Internal s -> extra.internal_err s
+          | `Error_no_entry -> err @@ `Error_no_entry)
+    end
+    (* >>= (function
+       | Ok x -> return (Ok x) | Error e -> return (Error e)) *)
   in
 
   let _ = unlink in 
@@ -470,30 +476,34 @@ let mk_ops ~extra =
 
   (* FIXME check if already exists etc *)
   (* FIXME meta changes for parent and child *)
-  let mkdir ~parent ~name : (unit,'e5)result m = 
-    resolve_dir_path parent >>=| fun pid -> 
-      begin
-        let meta = mk_meta () in
-        extra.new_did () >>= fun (did:did) -> 
-        extra.with_fs (fun s -> 
-            s.dirs |> fun dirs ->
-            (* add new empty dir to dirs *)
-            dirs_ops.map_add did (empty_dir ~meta ~parent:pid) dirs |> fun dirs ->
-            (* add name to parent *)
-            dirs_ops.map_find pid s.dirs |> fun pdir ->
-            match pdir with 
-            | None -> `Internal "impossible, parent not found mim.l259",s
-            | Some pdir -> 
-              dir_add name (Did did) pdir |> fun pdir ->
-              (* update parent meta *)
-              {pdir with meta} |> fun pdir ->
-              (* update parent in dirs *)
-              dirs_ops.map_add pid pdir dirs |> fun dirs ->
-              `Ok,{s with dirs})
-      end
-    >>= (function
+  let mkdir path : (unit,'e5)result m = 
+    resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
+    let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    match result with 
+    | Missing -> (
+        begin
+          let meta = mk_meta () in
+          extra.new_did () >>= fun (did:did) -> 
+          extra.with_fs (fun s -> 
+              s.dirs |> fun dirs ->
+              (* add new empty dir to dirs *)
+              dirs_ops.map_add did (empty_dir ~meta ~parent:pid) dirs |> fun dirs ->
+              (* add name to parent *)
+              dirs_ops.map_find pid s.dirs |> fun pdir ->
+              match pdir with 
+              | None -> `Internal "impossible, parent not found mim.l259",s
+              | Some pdir -> 
+                dir_add name (Did did) pdir |> fun pdir ->
+                (* update parent meta *)
+                {pdir with meta} |> fun pdir ->
+                (* update parent in dirs *)
+                dirs_ops.map_add pid pdir dirs |> fun dirs ->
+                `Ok,{s with dirs})
+        end
+        >>= function
         | `Ok -> return (Ok ())
         | `Internal s -> extra.internal_err s)
+    | _ -> err @@ `Error_exists
   in
 
   let _ = mkdir in
@@ -504,22 +514,22 @@ let mk_ops ~extra =
   (* FIXME update atim *)
   let opendir path = 
     resolve_dir_path path >>=| fun did ->
-      begin
-        extra.with_fs (fun s ->
-            s.dirs |> fun dirs ->
-            dirs_ops.map_find did dirs |> function
-            | None -> `Internal "opendir, impossible, dir not found mim.278",s
-            | Some dir -> 
-              dir_bindings dir |> List.map fst |> fun names ->
-              1+s.max_dh |> fun dh ->
-              s.dir_handles |> fun handles ->
-              dhandles_ops.map_add dh names handles |> fun dir_handles ->
-              {s with dir_handles; max_dh=dh } |> fun s ->                            
-              `Ok(dh),s)
-      end
-      >>= (function
-          | `Ok dh -> return (Ok dh)
-          | `Internal s -> extra.internal_err s)
+    begin
+      extra.with_fs (fun s ->
+          s.dirs |> fun dirs ->
+          dirs_ops.map_find did dirs |> function
+          | None -> `Internal "opendir, impossible, dir not found mim.278",s
+          | Some dir -> 
+            dir_bindings dir |> List.map fst |> fun names ->
+            1+s.max_dh |> fun dh ->
+            s.dir_handles |> fun handles ->
+            dhandles_ops.map_add dh names handles |> fun dir_handles ->
+            {s with dir_handles; max_dh=dh } |> fun s ->                            
+            `Ok(dh),s)
+    end
+    >>= function
+    | `Ok dh -> return (Ok dh)
+    | `Internal s -> extra.internal_err s
   in
 
 
@@ -542,28 +552,29 @@ let mk_ops ~extra =
   (* default size preallocated for a file *)
   let internal_len = 1024 in 
 
-  
-  let create ~parent ~name : (unit,'e6)result m = 
-    resolve_dir_path parent >>=| fun parent ->
-      extra.new_fid () >>= fun (fid:fid) -> 
-      let meta = mk_meta() in
-      extra.with_fs (fun s -> 
-          s.dirs |> fun dirs ->
-          dirs_ops.map_find parent dirs |> function
-          | None -> `Internal "create, impossible, parent did not found mim.299",s
-          | Some pdir ->
-            dir_add name (Fid fid) pdir |> fun pdir ->
-            (* update pdir meta *)
-            {pdir with meta} |> fun pdir ->
-            dirs_ops.map_add parent pdir dirs |> fun dirs ->
-            {s with dirs} |> fun s ->
-            s.files |> fun files ->
-            let data = contents_ops.create ~internal_len 0 in
-            files_ops.map_add fid {meta;data} files |> fun files ->
-            `Ok,{s with files}) 
-      >>= function
-      | `Internal s -> extra.internal_err s
-      | `Ok -> return (Ok())
+
+  let create path : (unit,'e6)result m = 
+    resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
+    let Tjr_path_resolution.{ parent_id=parent; comp=name; result; trailing_slash } = rpath in
+    extra.new_fid () >>= fun (fid:fid) -> 
+    let meta = mk_meta() in
+    extra.with_fs (fun s -> 
+        s.dirs |> fun dirs ->
+        dirs_ops.map_find parent dirs |> function
+        | None -> `Internal "create, impossible, parent did not found mim.299",s
+        | Some pdir ->
+          dir_add name (Fid fid) pdir |> fun pdir ->
+          (* update pdir meta *)
+          {pdir with meta} |> fun pdir ->
+          dirs_ops.map_add parent pdir dirs |> fun dirs ->
+          {s with dirs} |> fun s ->
+          s.files |> fun files ->
+          let data = contents_ops.create ~internal_len 0 in
+          files_ops.map_add fid {meta;data} files |> fun files ->
+          `Ok,{s with files}) 
+    >>= function
+    | `Internal s -> extra.internal_err s
+    | `Ok -> return (Ok())
   in
 
 
@@ -631,9 +642,9 @@ let mk_ops ~extra =
           assert(foff+length <= contents_ops.len contents);
           contents_ops.blit_bigarray_to_buf
             ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
-            |> fun data ->
-            (files_ops.map_add fid {f with data;meta} files)[@ ocaml.warning "-23"] |> fun files ->
-            (`Ok length,{s with files}))
+          |> fun data ->
+          (files_ops.map_add fid {f with data;meta} files)[@ ocaml.warning "-23"] |> fun files ->
+          (`Ok length,{s with files}))
     >>= function
     | `Internal s -> extra.internal_err s
     | `Ok l -> return (Ok l)  
@@ -645,47 +656,49 @@ let mk_ops ~extra =
 
   (* FIXME ddir and sdir may be the same, so we need to be careful to
      always use indirection via did *)
-  let rename ~spath ~sname ~dpath ~dname = 
+  let rename spath dpath = 
+    let follow_last_symlink = `Always in
     begin
-      resolve_dir_path spath >>= function Error e -> err e | Ok sdir_did ->
-        resolve_dir_path dpath >>= function Error e -> err e | Ok ddir_did ->
-          resolve_did sdir_did >>= fun sdir ->
-          resolve_name ~dir:sdir ~name:sname |> function
-          | None -> err `Error_no_src_entry
-          | Some resolved_sname -> 
-            resolve_did ddir_did >>= fun ddir ->
-            resolve_name ~dir:ddir ~name:dname |> fun resolved_dname ->
+      resolve_path ~follow_last_symlink spath >>= function Error e -> err e | Ok spath ->
+        resolve_path ~follow_last_symlink dpath >>= function Error e -> err e | Ok dpath ->          
+          resolve_did spath.parent_id >>= fun sdir ->
+          match spath.result with 
+          | Missing -> err `Error_no_src_entry
+          | _ -> 
+            let scomp = spath.comp in
+            resolve_did dpath.parent_id >>= fun ddir ->
+            let dcomp = dpath.comp in
             let meta = mk_meta() in
             let insert_and_remove id =
-              match sdir_did = ddir_did with
+              match spath.parent_id = dpath.parent_id with
               | true -> 
-                dir_add dname id ddir |> fun ddir ->
-                dir_remove sname ddir |> fun ddir ->
+                dir_add dcomp id ddir |> fun ddir ->
+                dir_remove scomp ddir |> fun ddir ->
                 {ddir with meta} |> fun ddir ->
-                extra.dirs_add ddir_did ddir >>= fun () ->
+                extra.dirs_add dpath.parent_id ddir >>= fun () ->
                 return (Ok ())
               | false -> 
-                dir_add dname id ddir |> fun ddir ->
+                dir_add dcomp id ddir |> fun ddir ->
                 {ddir with meta} |> fun ddir ->
-                dir_remove sname sdir |> fun sdir ->
+                dir_remove scomp sdir |> fun sdir ->
                 {sdir with meta} |> fun sdir ->
-                extra.dirs_add sdir_did sdir >>= fun () ->
-                extra.dirs_add ddir_did ddir >>= fun () ->
+                extra.dirs_add spath.parent_id sdir >>= fun () ->
+                extra.dirs_add dpath.parent_id ddir >>= fun () ->
                 return (Ok ())
             in
-            match resolved_sname,resolved_dname with
+            match spath.result,dpath.result with
             (* FIMXE following for symlinks *)
-            | Symlink _,_ | _,Some(Symlink _) -> failwith "FIXME"
-            | Fid fid,None -> insert_and_remove (Fid fid)
-            | Fid fid1,Some(Fid fid2) -> 
+            | Sym _,_ | _,Sym _ -> failwith "FIXME shouldn't happen - follow=`Always"
+            | File fid,Missing -> insert_and_remove (Fid fid)
+            | File fid1,File fid2 -> 
               if fid1=fid2 
               then return (Ok ())
               else insert_and_remove (Fid fid1)
-            | Fid fid,Some(Did did) ->
+            | File fid,Dir did ->
               extra.internal_err "FIXME rename f to d, d should be empty?"
-            | Did sdid,None -> 
+            | Dir sdid,Missing -> 
               (* check not root *)
-              if ddir_did=root_did 
+              if sdid=root_did 
               then err `Error_attempt_to_rename_root
               (* check not subdir *)
               else extra.is_parent ~parent:sdid ~child:ddir >>= (function
@@ -697,70 +710,70 @@ let mk_ops ~extra =
                     (* new directory id *)
                     extra.new_did() >>= fun did ->
                     (* record new directory with updated parent *)
-                    extra.dirs_add did { sdir with parent=ddir_did } >>= fun () ->
+                    extra.dirs_add did { sdir with parent=dpath.parent_id } >>= fun () ->
                     insert_and_remove (Did did))
-            | Did sdid,Some(Fid fid) -> 
+            | Dir sdid,File fid -> 
               err `Error_attempt_to_rename_dir_over_file  (* FIXME correct ? *)
-            | Did sdid,Some(Did ddid) ->
+            | Dir sdid,Dir ddid ->
               if sdid=ddid 
               then return (Ok ())
               else extra.internal_err "FIXME rename d to d, dst should be empty?"
+            | Missing ,_ -> failwith "impossible"
     end
-(*    >>= function
-    | Ok x -> return (Ok x)
-    | Error e -> err `EOTHER*)
+    (*    >>= function
+          | Ok x -> return (Ok x)
+          | Error e -> err `EOTHER*)
   in
 
 
   (* FIXME truncate parent name; FIXME also stat *)
   let truncate ~path ~length = 
     resolve_file_path path >>=| fun fid ->
-      extra.with_fs (fun s ->
-          s.files |> fun files ->
-          files_ops.map_find fid files |> function
-          | None -> `Internal "file not found mim.362",s
-          | Some f ->
-            contents_ops.resize length f.data  |> fun data ->
-            let meta = mk_meta() in
-            files_ops.map_add fid ({f with data;meta}[@ocaml.warning "-23"]) files |> fun files ->
-            `Ok (),{s with files}) 
-      >>= function
-      | `Ok () -> return (Ok ())
-      | `Internal s -> extra.internal_err s
+    extra.with_fs (fun s ->
+        s.files |> fun files ->
+        files_ops.map_find fid files |> function
+        | None -> `Internal "file not found mim.362",s
+        | Some f ->
+          contents_ops.resize length f.data  |> fun data ->
+          let meta = mk_meta() in
+          files_ops.map_add fid ({f with data;meta}[@ocaml.warning "-23"]) files |> fun files ->
+          `Ok (),{s with files}) 
+    >>= function
+    | `Ok () -> return (Ok ())
+    | `Internal s -> extra.internal_err s
   in
 
   (* FIXME here and elsewhere atim is not really dealt with *)
   let stat path = 
-    resolve_path path >>=| function (did,id) -> 
-      begin
-        match id with
-        | None -> return `Error_no_entry
-        | Some id ->
-          match id with 
-          | Fid fid -> (
-              extra.with_fs (fun s ->
-                  s.files |> fun files ->
-                  files_ops.map_find fid files |> function
-                  | None -> `Internal "file fid not found mim.379",s
-                  | Some f ->          
-                    contents_ops.len f.data |> fun sz ->
-                    f.meta |> fun meta ->
-                    `Ok { sz;meta;kind=`File },s))
-          | Did did -> (
-              extra.with_fs (fun s ->
-                  s.dirs |> fun dirs ->
-                  dirs_ops.map_find did dirs |> function
-                  | None -> `Internal "dir did not found mim.651",s
-                  | Some f ->          
-                    let sz = 1 in (* for dir? FIXME size of dir *)
-                    f.meta |> fun meta ->
-                    `Ok { sz;meta;kind=`Dir },s))
-          | Symlink _ -> failwith "FIXME"
-      end
-      >>= function
-      | `Ok stat -> return (Ok stat)
-      | `Error_no_entry -> return (Error `Error_no_entry)
-      | `Internal s -> extra.internal_err s
+    resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
+    let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    begin
+      match result with
+      | Missing -> return `Error_no_entry
+      | File fid ->
+        extra.with_fs (fun s ->
+            s.files |> fun files ->
+            files_ops.map_find fid files |> function
+            | None -> `Internal "file fid not found mim.379",s
+            | Some f ->          
+              contents_ops.len f.data |> fun sz ->
+              f.meta |> fun meta ->
+              `Ok { sz;meta;kind=`File },s)
+      | Dir did -> 
+        extra.with_fs (fun s ->
+            s.dirs |> fun dirs ->
+            dirs_ops.map_find did dirs |> function
+            | None -> `Internal "dir did not found mim.651",s
+            | Some f ->          
+              let sz = 1 in (* for dir? FIXME size of dir *)
+              f.meta |> fun meta ->
+              `Ok { sz;meta;kind=`Dir },s)
+      | Sym _ -> failwith "FIXME"
+    end
+    >>= function
+    | `Ok stat -> return (Ok stat)
+    | `Error_no_entry -> return (Error `Error_no_entry)
+    | `Internal s -> extra.internal_err s
   in
 
 
@@ -773,9 +786,10 @@ let mk_ops ~extra =
 (* extra ----------------------------------------------------------- *)
 
 include struct
-  open Step_monad
 
-  let ( >>= ) = Step_monad.bind
+  let ( >>= ) = fun a ab -> bind ab a 
+
+  let with_state = Tjr_step_monad.Extra.with_state
 
   let with_fs (f:fs_t -> 'a * fs_t) : 'a m = 
     with_state 
@@ -796,9 +810,10 @@ include struct
   let _ = new_fid
 
   let internal_err s : 'a m = 
+    let open Tjr_step_monad.Step_monad_implementation in
     Step(fun w -> 
-        ({ w with internal_error_state=(Some s)}, Inr(Step(fun _ -> 
-             failwith __LOC__))))
+        ({ w with internal_error_state=(Some s)}, 
+         `Inr(Step(fun _ -> failwith __LOC__))))
 
   let _ = internal_err
 
@@ -828,8 +843,9 @@ include struct
         (),{s with dirs})
 
   let err e : 'a m = 
+    let open Tjr_step_monad.Step_monad_implementation in
     Step(fun w -> 
-        (w,Inl (Error e)))
+        (w,`Inl (Error e)))
 
   let extra = { new_did; new_fid; with_fs; internal_err; is_parent; dirs_add; err }
 
@@ -858,16 +874,16 @@ let dest_exceptional w =
 module Run_pure = struct 
 
   (* NOTE don't attempt to step if this is Some _ *)
-  let dest_exceptional x = x.internal_error_state
+  let halt x = x.internal_error_state <> None
 
   let rec run (w:t) (x:'a m) = 
-    w |> dest_exceptional |> function
+    w.internal_error_state |> function
     | None -> (
-      Step_monad.run ~dest_exceptional w x
-      |> function
-      | Ok (w,a) -> (w,a)
-      | Error (`Attempt_to_step_exceptional_state w) -> 
-        failwith __LOC__ (* impossible *))
+        Tjr_step_monad.Extra.run_with_halt ~halt w x
+        |> function
+        | w, Ok a -> (w,a)
+        | w, Error `Attempt_to_step_halted_state -> 
+          failwith __LOC__ (* impossible *))
     | Some s -> 
       (* for internal errors, just fail *)
       failwith s
