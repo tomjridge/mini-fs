@@ -15,7 +15,7 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
 
   (* module Readdir' = Readdir'.Make_readdir'(I)  *)
 
-  let ( >>=) = I.bind
+  let ( >>= ) = fun a ab -> I.bind ab a
 
   (* propagate errors *)
   let ( >>=| ) a b = a >>= function Error e -> return (Error e) | Ok a -> b a
@@ -27,15 +27,9 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
   let mk_fuse_ops ~readdir' ~ops ~co_eta = 
     let co_eta = co_eta.co_eta in
 
-    let unlink path = 
-      path |> dirname_basename |> fun (parent,name) -> 
-      ops.unlink ~parent ~name 
-    in
+    let unlink path = ops.unlink path in
 
-    let mkdir path _perms = 
-      path |> dirname_basename |> fun (parent,name) -> 
-      ops.mkdir ~parent ~name
-    in
+    let mkdir path _perms = ops.mkdir path in
 
     (* opendir and closedir omitted *)
     (* create combined with fopen *)
@@ -53,9 +47,8 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
       | true -> (
           (* log_.log @@ "# l64"; *)
           (* may be creating a file *)
-          dirname_basename path |> fun (parent,name) ->
-          ops.create ~parent ~name >>=| fun () ->
-            (* log_.log @@ "# l68"; *)
+          ops.create path >>=| fun () ->
+          (* log_.log @@ "# l68"; *)
           return (Ok None))
       | false -> 
         (* log_.log @@ "# l71"; *)
@@ -88,14 +81,9 @@ module Make_fuse(I:Ops_types.OPS_TYPE_WITH_RESULT) =  struct
       return (Ok n)
     in
 
-    let rename src dst = 
-      src |> dirname_basename |> fun (spath,sname) ->
-      dst |> dirname_basename |> fun (dpath,dname) ->
-      ops.rename ~spath ~sname ~dpath ~dname
-    in
+    let rename src dst = ops.rename src dst in
 
     let truncate path length = 
-      path |> fun path ->
       length |> Int64.to_int |> fun length ->  (* FIXME *)
       ops.truncate ~path ~length
     in
