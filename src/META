@@ -1,6 +1,6 @@
 name="tjr_minifs"
 description="Minimal file-system-like thing"
-version="Wed 25 Apr 16:45:22 BST 2018 b00ffcf2607c666e0b2c4b13c7f24e1113a7560e"
+version="Wed 25 Apr 18:10:04 BST 2018 e2be3d4ba50e3b036c9d88f15ceb6203f320510b"
 requires="extunix,extlib,Fuse,tjr_lib,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net,tjr_path_resolution"
 archive(byte)="tjr_minifs.cma"
 archive(native)="tjr_minifs.cmxa"

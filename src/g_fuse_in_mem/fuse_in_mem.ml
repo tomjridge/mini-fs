@@ -2,6 +2,7 @@
 
 open Base_
 open In_mem
+open Fuse_
 
 let mk_unix_exn = Error_.mk_unix_exn
 
@@ -42,9 +43,6 @@ end
 *)
 
 
-module Fuse' = Fuse_.Make_fuse(In_mem.Ops_type_plus)
-
-include Fuse'
 
 include struct 
   (* NOTE could have multiple filesystems in memory, but here we just
@@ -52,8 +50,8 @@ include struct
   let w_ = ref In_mem.init_t
 
   let co_eta = fun a -> In_mem_monad.run (!w_) a |> function
-    | Error (`Attempt_to_step_exceptional_state w) -> failwith __LOC__
-    | Ok (w,a) -> 
+    | w,Error `Attempt_to_step_halted_state -> failwith __LOC__
+    | w,Ok a -> 
       w_:=w;
       a
 

@@ -21,21 +21,20 @@ end
 
 (* Read all directory entries at once; obviously not a good idea if
    there are a large number of entries. *)
-module Make_readdir'(I:Ops_types.OPS_TYPE_WITH_RESULT) = struct
-  open I
-  (* for small directories *)
-  let readdir' ~ops = 
-    let ( >>= ) = fun a ab -> bind ab a in
-    fun path ->
-      ops.opendir path >>= function Error e -> return (Error e) | Ok dh ->
-        let es = ref [] in
-        let rec f () = 
-          ops.readdir dh 
-          >>= function Error e -> return (Error e) | Ok (es',finished) ->
-            es:=!es@es';
-            if finished then return (Ok !es) else f ()
-        in
-        f() >>= fun x -> 
-        ops.closedir dh >>= fun _ -> 
-        return x
-end
+open Ops_types.Ops_type_with_result
+
+(* for small directories *)
+let readdir' ~ops = 
+  let ( >>= ) = fun a ab -> bind ab a in
+  fun path ->
+    ops.opendir path >>= function Error e -> return (Error e) | Ok dh ->
+      let es = ref [] in
+      let rec f () = 
+        ops.readdir dh 
+        >>= function Error e -> return (Error e) | Ok (es',finished) ->
+          es:=!es@es';
+          if finished then return (Ok !es) else f ()
+      in
+      f() >>= fun x -> 
+      ops.closedir dh >>= fun _ -> 
+      return x
