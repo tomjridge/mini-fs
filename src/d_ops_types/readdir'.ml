@@ -24,7 +24,7 @@ module Make_readdir'(I:Ops_types.OPS_TYPE_WITH_RESULT) = struct
   open I
   (* for small directories *)
   let readdir' ~ops = 
-    let ( >>= ) = bind in
+    let ( >>= ) = fun a ab -> bind ab a in
     fun path ->
       ops.opendir path >>= function Error e -> return (Error e) | Ok dh ->
         let es = ref [] in

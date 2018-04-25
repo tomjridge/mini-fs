@@ -3,10 +3,10 @@
 open Tjr_either
 open Base_
 open Msgs
-open Monad
+
 
 (* FIXME should also log exceptional returns *)
-(* FIXME 
+(* FIXME commented out this module
 let log ~log_string msg = 
   let call = msg |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string in
   let rec log_return a = 

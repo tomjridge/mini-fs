@@ -225,12 +225,12 @@ let init_t = {
 
 
 module In_mem_monad = struct
-  open Monad
-  type 'a m = ( 'a, t) Monad.m
+  open Tjr_step_monad
+  type 'a m = ( 'a, t) Tjr_step_monad.m
   let bind,return = bind,return
   let run w a = 
-    let dest_exceptional w = w.internal_error_state in
-    Step_monad.run ~dest_exceptional w a
+    let halt w = w.internal_error_state <> None in
+    Tjr_step_monad.Extra.run_with_halt ~halt w a
     
 end
 include In_mem_monad
@@ -277,7 +277,6 @@ end
 (* main functionality ----------------------------------------------- *)
 
 open Tjr_map
-open Step_monad
 open Base_
 open In_mem_monad
 
@@ -295,7 +294,7 @@ type 'e extra_ops = {
 
 let mk_ops ~extra = 
   let err = extra.err in
-  let ( >>= ) = bind in
+  let ( >>= ) = fun a ab -> bind ab a in
   let ( >>=| ) a b = a >>= function
     | Ok a -> b a
     | Error e -> return (Error e)
@@ -334,7 +333,7 @@ let mk_ops ~extra =
     (* paths are always absolute when coming from fuse, and via the
        api... FIXME assert this? *)
     let resolve_comp (did:did) (comp:string) 
-      : ((fid,did) Tjr_path_resolution.resolve_result,'t) Tjr_fs_shared.Monad.m
+      : ((fid,did) Tjr_path_resolution.resolve_result,'t) Tjr_step_monad.m
       = 
       let open Tjr_path_resolution in
       (* we want to use resolve_name, but this works with dir_with_parent *)
