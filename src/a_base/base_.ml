@@ -40,6 +40,7 @@ end
 
 (* base_types extra ------------------------------------------------- *)
 
+(* FIXME remove this section
 include Base_types_
 
 (* FIXME note that this is the only mention of Lwt - so move elsewhere
@@ -54,7 +55,7 @@ module Abstract_base_types = struct
   type fd
   type dh
 end
-
+*)
 
 (* logging ----------------------------------------------------------- *)
 

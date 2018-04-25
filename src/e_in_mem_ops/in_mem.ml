@@ -256,23 +256,9 @@ let t_to_string t = Y_.(
     t |> from_t |> t'_to_yojson |> Yojson.Safe.pretty_to_string)
 
 
-(* generate types --------------------------------------------------- *)
-
-module MBR = struct
-  include In_mem_monad
-  include Mem_base_types
-  include R_as_result
-end
-
-
-module Ops_type = Make_ops_type(MBR)
+module Ops_type = Ops_types.Ops_type_with_result
 include Ops_type
 
-
-module Ops_type_plus = struct
-  include MBR
-  include Ops_type
-end
 
 
 
@@ -852,8 +838,6 @@ include struct
 end
 
 let ops = mk_ops ~extra  
-
-let _ : ops = ops
 
 
 (* running ---------------------------------------------------------- *)

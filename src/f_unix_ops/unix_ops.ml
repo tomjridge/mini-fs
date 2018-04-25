@@ -1,5 +1,6 @@
 (* FIXME this should be called "wrap_local_filesystem" or similar *)
 
+open Tjr_step_monad
 open Tjr_either
 open Base_
 open Ops_types
@@ -24,50 +25,16 @@ end
 *)
 
 
-(* ops -------------------------------------------------------------- *)
-
-type w = {
-  world_state: unit
-}
-
-let the_world : w = { world_state=() }
-
-module Unix_monad = struct
-  open Step_monad
-  type 'a m = ('a,w)step_monad
-  let bind,return = bind,return
-end
-include Unix_monad
-
-
 (* generate types --------------------------------------------------- *)
 
-module MBR = struct
-  include Unix_monad
-  include Unix_base_types
-  include R_as_result
-end
-
-module Ops_type = Make_ops_type(MBR)
+module Ops_type = Ops_types.Ops_type_with_result
 include Ops_type
-
-module Ops_type_plus = struct
-  include MBR
-  include Ops_type
-end
-      
-
-(* module Imp_ops_type = D_functors.Make_imp_ops_type(Ops_type_plus) *)
-
-
-
-
 
 (* construct ops ---------------------------------------------------- *)
 
 (* pass-through to Unix.xxx *)
 
-let return = Step_monad.return
+let return = Tjr_step_monad.return
 
 (*
 type 'e extra_ops = {
@@ -76,8 +43,8 @@ type 'e extra_ops = {
 }
 *)
 
-type 'e extra_ops = {
-  delay: 'a. (w -> 'a m) -> 'a m;  
+type 'w extra_ops = {
+  delay: 'a. ('w -> ('a,'w) m) -> ('a,'w) m;  
   (* this delays until receives a world *)
 }
 
@@ -102,11 +69,10 @@ let mk_ops ~extra =
 
   (* FIXME unlink usually operates only on files; do we want to have
      rmdir as well? *)
-  let unlink ~parent ~name = 
+  let unlink path = 
     let open Unix in
     delay @@ fun _ ->
     try 
-      parent^"/"^name |> fun path ->
       stat path |> fun st ->
       begin
         st.st_kind |> unix2kind |> function
@@ -128,10 +94,10 @@ let mk_ops ~extra =
   let default_dir_perm = 0o775 in  (* u:rwx g:rwx o:rx *)
 
 
-  let mkdir ~parent ~name = 
+  let mkdir path = 
     delay @@ fun _ ->
     try 
-      Unix.mkdir (parent^"/"^name) default_dir_perm;
+      Unix.mkdir path default_dir_perm;
       return (Ok ())
     with
     | Unix.Unix_error(e,_,_) -> 
@@ -176,11 +142,11 @@ let mk_ops ~extra =
   (* FIXME should we record which dh are valid? ie not closed *)
 
 
-  let create ~parent ~name = 
+  let create path = 
     delay @@ fun _ ->
     try 
       let open Unix in
-      openfile (parent^"/"^name) [O_CREAT] default_file_perm |> fun fd ->
+      openfile path [O_CREAT] default_file_perm |> fun fd ->
       close fd;
       return (Ok())
     with
@@ -241,10 +207,10 @@ let mk_ops ~extra =
   (* FIXME record which are open? *)
 
 
-  let rename ~spath ~sname ~dpath ~dname = 
+  let rename src dst = 
     delay @@ fun _ ->
     try
-      Unix.rename (spath^"/"^sname) (dpath^"/"^dname); 
+      Unix.rename src dst;
       return (Ok())
     with
     | Unix.Unix_error(e,_,_) -> 
@@ -284,20 +250,20 @@ let mk_ops ~extra =
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat; reset }
 
-let (>>=) = bind
+let (>>=) = fun a ab -> bind ab a
 
-let delay : 'a. (w -> 'a m) -> 'a m =
-  let open Step_monad in
+let delay : 'a. ('w -> ('a,'w) m) -> ('a,'w) m =
+  let open Tjr_step_monad.Step_monad_implementation in
   fun f -> 
-    Step(fun w -> w,Inl w) >>= f
+    Step(fun w -> w,`Inl w) >>= f
 
 let extra = { delay }
 
-let unix_ops = mk_ops ~extra 
+let unix_ops () = mk_ops ~extra 
 
-let _ : ops = unix_ops
+let _ : unit -> (fd,dh,'w) ops = unix_ops
 
-let run w x = Step_monad.run ~dest_exceptional:(fun x -> None) w x
+let run w x = Tjr_step_monad.Extra.run w x
 
 (* imperative ------------------------------------------------------- *)
 
