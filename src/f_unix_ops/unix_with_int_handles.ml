@@ -4,6 +4,8 @@
    (with key the genint) into a map; subsequently, we only pass the
    genint to the client *)
 
+open Tjr_monad.Monad
+
 open Tjr_map
 open Base_
 
@@ -27,10 +29,12 @@ type 'w ops_type = (int,int,'w) Ops_types.Ops_type_with_result.ops
 
 open Unix_ops
 
-let ops ~dh2i ~i2dh ~fd2i ~i2fd = 
+let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd = 
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
   let open Unix_ops in
   let ( >>=| ) a b = a >>= function Error e -> return (Error e) | Ok a -> b a in
-  let ops = unix_ops () in
+  let ops = failwith "FIXME" in (* unix_ops ~monad_ops () in *) (* FIXME need to redo *)
   let root = ops.root in
 
   let unlink path = ops.unlink path in

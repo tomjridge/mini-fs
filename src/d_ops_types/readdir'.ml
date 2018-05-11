@@ -1,4 +1,4 @@
-open Tjr_step_monad 
+open Tjr_monad.Monad
 
 (*
 module Make_readdir'(I:Ops_types.IMP_OPS_TYPE) = struct
@@ -24,8 +24,9 @@ end
 open Ops_types.Ops_type_with_result
 
 (* for small directories *)
-let readdir' ~ops = 
-  let ( >>= ) = fun a ab -> bind ab a in
+let readdir' ~monad_ops ~ops = 
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
   fun path ->
     ops.opendir path >>= function Error e -> return (Error e) | Ok dh ->
       let es = ref [] in

@@ -1,6 +1,6 @@
 (* FIXME rename this file *)
 
-open Tjr_step_monad
+open Tjr_monad.Monad
 open Base_
 
 open R_

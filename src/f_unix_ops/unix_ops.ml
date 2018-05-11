@@ -1,6 +1,6 @@
 (* FIXME this should be called "wrap_local_filesystem" or similar *)
 
-open Tjr_step_monad
+open Tjr_monad.Monad
 open Tjr_either
 open Base_
 open Ops_types
@@ -34,7 +34,6 @@ include Ops_type
 
 (* pass-through to Unix.xxx *)
 
-let return = Tjr_step_monad.return
 
 (*
 type 'e extra_ops = {
@@ -51,14 +50,22 @@ type 'w extra_ops = {
 let _EOTHER = Error `Error_other
 
 (* return errors that we recognize, otherwise pass to an aux f *)
-let map_error (f : [ `EINVAL ] -> 'a) e =
+let map_error' ~monad_ops (f : [ `EINVAL ] -> 'a) e =
+  let return = monad_ops.return in
   Error_.map_error e |> function
   | Inl e -> return (Error e)
   | Inr e -> match e with
     | `EINVAL -> f `EINVAL
     | `SOME_OTHER_ERROR -> return _EOTHER
 
-let mk_ops ~extra = 
+let _ = map_error'
+
+let mk_ops ~monad_ops ~extra = 
+
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
+
+  let map_error f e = map_error' ~monad_ops f e in
 
   let delay = extra.delay in
 
@@ -250,6 +257,7 @@ let mk_ops ~extra =
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat; reset }
 
+(* FIXME this looks like we assume a state passing monad - but perhaps better to perform in imperative?
 let (>>=) = fun a ab -> bind ab a
 
 let delay : 'a. ('w -> ('a,'w) m) -> ('a,'w) m =
@@ -264,6 +272,8 @@ let unix_ops () = mk_ops ~extra
 let _ : unit -> (fd,dh,'w) ops = unix_ops
 
 let run w x = Tjr_step_monad.Extra.run w x
+*)
+
 
 (* imperative ------------------------------------------------------- *)
 

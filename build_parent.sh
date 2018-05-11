@@ -6,7 +6,6 @@
 
 DST=..
 
-for f in tjr_step_monad tjr_fs_shared path_resolution tjr_btree tjr_net tjr_lib; do
-    make -C $DST/$f clean
-    make -C $DST/$f 
-done
+(cd $DST/tjr_btree && ./build_parent.sh)
+make -C $DST/tjr_btree clean
+make -C $DST/tjr_btree
