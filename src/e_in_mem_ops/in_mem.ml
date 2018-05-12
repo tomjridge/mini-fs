@@ -334,7 +334,7 @@ let mk_ops ~monad_ops ~extra =
     in
     let _ = resolve_comp in
     let fs_ops = { root; resolve_comp } in
-    Tjr_path_resolution.resolve ~fs_ops
+    Tjr_path_resolution.resolve ~monad_ops ~fs_ops
   in
 
 
@@ -408,7 +408,7 @@ let mk_ops ~monad_ops ~extra =
     (* paths from Fuse should satisfy this; FIXME what if we are not using fuse? *)
     assert(String_util.starts_with_slash path); 
     let cwd = root_did in
-    resolve ~monad_ops ~follow_last_symlink ~cwd path >>= function
+    resolve ~follow_last_symlink ~cwd path >>= function
     | Ok r -> return (Ok r)
     | Error e -> err `Error_path_resolution  (* FIXME be more careful here? *)
   in
