@@ -1,3 +1,5 @@
+open Tjr_monad
+open Tjr_monad.Monad
 open Tjr_either
 open Tjr_map
 open Base_
@@ -225,9 +227,9 @@ let init_t = {
   fs=init_fs
 }
 
-
+(*
 module In_mem_monad = struct
-  open Tjr_step_monad
+  open Tjr_monad
   type 'a m = ( 'a, t) Tjr_step_monad.m
   let bind,return = bind,return
   let run w a = 
@@ -236,6 +238,7 @@ module In_mem_monad = struct
     
 end
 include In_mem_monad
+*)
 
 (* easily json-able *)
 module Y_ = struct
@@ -266,23 +269,24 @@ include Ops_type
 
 open Tjr_map
 open Base_
-open In_mem_monad
+(* open In_mem_monad *)
 
-type 'e extra_ops = {
-  err: 'a 'e. 'e -> ('a,'e)result m;
-  new_did: unit -> did m;
-  new_fid: unit -> fid m;
-  with_fs: 'a. (fs_t -> 'a * fs_t) -> 'a m;  (* ASSUME-ed not to raise exception *)
-  internal_err: 'a. string -> 'a m;
-  dirs_add: did -> dir_with_parent -> unit m;
-  is_parent: parent:did -> child:dir_with_parent -> bool m
+type ('e,'t) extra_ops = {
+  err: 'a 'e. 'e -> (('a,'e)result,'t) m;
+  new_did: unit -> (did,'t) m;
+  new_fid: unit -> (fid,'t) m;
+  with_fs: 'a. (fs_t -> 'a * fs_t) -> ('a,'t) m;  (* ASSUME-ed not to raise exception *)
+  internal_err: 'a. string -> ('a,'t) m;
+  dirs_add: did -> dir_with_parent -> (unit,'t) m;
+  is_parent: parent:did -> child:dir_with_parent -> (bool,'t) m
 }
 
 open Tjr_path_resolution
 
-let mk_ops ~extra = 
+let mk_ops ~monad_ops ~extra = 
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
   let err = extra.err in
-  let ( >>= ) = fun a ab -> bind ab a in
   let ( >>=| ) a b = a >>= function
     | Ok a -> b a
     | Error e -> return (Error e)
@@ -295,7 +299,7 @@ let mk_ops ~extra =
     | None -> extra.internal_err "resolve_did, did not valid mim.l154"
     | Some dir -> return dir
   in
-  let _ : did -> dir_with_parent m = resolve_did in
+  let _ : did -> (dir_with_parent,'t) m = resolve_did in
 
 
   (* NOTE needs a dir_with_parent to resolve .. *)
@@ -319,7 +323,7 @@ let mk_ops ~extra =
     let root = root_did in
     (* paths are always absolute when coming from fuse, and via the
        api... FIXME assert this? *)
-    let resolve_comp (did:did) (comp:string) : ((fid,did)resolved_comp,'t) Tjr_step_monad.m = 
+    let resolve_comp (did:did) (comp:string) : ((fid,did)resolved_comp,'t) m = 
       (* we want to use resolve_name, but this works with dir_with_parent *)
       extra.with_fs (fun fs -> 
           Map_did.map_ops.map_find did fs.dirs |> function
@@ -404,21 +408,21 @@ let mk_ops ~extra =
     (* paths from Fuse should satisfy this; FIXME what if we are not using fuse? *)
     assert(String_util.starts_with_slash path); 
     let cwd = root_did in
-    resolve ~follow_last_symlink ~cwd path >>= function
+    resolve ~monad_ops ~follow_last_symlink ~cwd path >>= function
     | Ok r -> return (Ok r)
     | Error e -> err `Error_path_resolution  (* FIXME be more careful here? *)
   in
 
 
   (* FIXME not sure about Always in following two funs *)
-  let resolve_dir_path (path:path) : (did,'e3)result m = 
+  let resolve_dir_path (path:path) : ((did,'e3)result,'t) m = 
     resolve_path ~follow_last_symlink:`Always path >>= function 
     | Ok { result=(Dir did) } -> return (Ok did)
     | _ -> err `Error_not_directory
   in
 
 
-  let resolve_file_path (path:path) : (fid,'e4)result m = 
+  let resolve_file_path (path:path) : ((fid,'e4)result,'t) m = 
     resolve_path ~follow_last_symlink:`Always path >>= function
     | Ok { result=(File fid) } -> return (Ok fid)
     | _ -> err `Error_not_file
@@ -462,7 +466,7 @@ let mk_ops ~extra =
 
   (* FIXME check if already exists etc *)
   (* FIXME meta changes for parent and child *)
-  let mkdir path : (unit,'e5)result m = 
+  let mkdir path : ((unit,'e5)result,'t) m = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
     let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
     match result with 
@@ -539,7 +543,7 @@ let mk_ops ~extra =
   let internal_len = 1024 in 
 
 
-  let create path : (unit,'e6)result m = 
+  let create path : ((unit,'e6)result,'t) m = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
     let Tjr_path_resolution.{ parent_id=parent; comp=name; result; trailing_slash } = rpath in
     extra.new_fid () >>= fun (fid:fid) -> 

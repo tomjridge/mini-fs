@@ -1,5 +1,6 @@
 (* FIXME this should be called "wrap_local_filesystem" or similar *)
 
+open Tjr_monad
 open Tjr_monad.Monad
 open Tjr_either
 open Base_
@@ -42,8 +43,8 @@ type 'e extra_ops = {
 }
 *)
 
-type 'w extra_ops = {
-  delay: 'a. ('w -> ('a,'w) m) -> ('a,'w) m;  
+type ('w,'t) extra_ops = {
+  delay: 'a. ('w -> ('a,'t) m) -> ('a,'t) m;  
   (* this delays until receives a world *)
 }
 
@@ -257,23 +258,27 @@ let mk_ops ~monad_ops ~extra =
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat; reset }
 
-(* FIXME this looks like we assume a state passing monad - but perhaps better to perform in imperative?
-let (>>=) = fun a ab -> bind ab a
 
-let delay : 'a. ('w -> ('a,'w) m) -> ('a,'w) m =
-  let open Tjr_step_monad.Step_monad_implementation in
-  fun f -> 
-    Step(fun w -> w,`Inl w) >>= f
+let unix_ops ~monad_ops () =
+  (* define within unix_ops, otherwise an error about type vars that
+     cannot be generalized *)
+  let open State_passing_instance in
+  let monad_ops = monad_ops () in
+      
+  let ( >>= ) = monad_ops.bind in
 
-let extra = { delay }
+  let delay : 'a. ('w -> ('a,'w state_passing) m) -> ('a,'w state_passing) m =
+    fun f -> 
+      with_world(fun w -> w,w) >>= f 
+  in
 
-let unix_ops () = mk_ops ~extra 
+  let extra = { delay } in
 
-let _ : unit -> (fd,dh,'w) ops = unix_ops
+  let unix_ops = mk_ops ~monad_ops ~extra in
 
-let run w x = Tjr_step_monad.Extra.run w x
-*)
-
+  let _ : (fd,dh,'w state_passing) ops = unix_ops in
+  unix_ops
+  
 
 (* imperative ------------------------------------------------------- *)
 

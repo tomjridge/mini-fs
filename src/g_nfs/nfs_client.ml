@@ -3,7 +3,8 @@
 (* the client makes network calls, which potentially could be in lwt.m
    or unix.m; so we parameterize over ops *)
 
-open Tjr_step_monad
+open Tjr_monad
+open Tjr_monad.Monad
 open Base_
 open Ops_types
 open Ops_type_with_result
@@ -19,6 +20,7 @@ open Msgs
 
 (* construct message, send, recv *)
 let mk_client_ops (* (type t) *)
+    ~monad_ops
     ~internal_marshal_err
     (* NOTE call returns errors in the monad *)
     ~(call:msg_from_client -> (msg_from_server,'w) m)
@@ -28,11 +30,11 @@ let mk_client_ops (* (type t) *)
     ~i2dh ~dh2i
     ~i2fd ~fd2i
   = 
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
   (* internal marshalling errors *)
   let internal_err = internal_marshal_err.internal_marshal_err in
   let ty_err = "incorrect return return type from server" in
-
-  let ( >>= ) = fun a ab -> bind ab a in  
 
   (* NOTE after we use call m, we are left with a msg_from_server m;
      we then need a map from msg_from_server' to 'a to get a
@@ -44,9 +46,9 @@ let mk_client_ops (* (type t) *)
     (msg_from_server' -> ('a,'w) m) -> 
     (('a,exn_)result,'w) m 
     = fun m f -> 
-    m >>= function
-    | Ok_ m' -> f m' >>= fun a -> return (Ok a)
-    | Error_ e -> return (Error e)
+      m >>= function
+      | Ok_ m' -> f m' >>= fun a -> return (Ok a)
+      | Error_ e -> return (Error e)
   in
 
   let ( >>=| ) m f = fmap_error m f in
@@ -120,15 +122,15 @@ let _ = mk_client_ops
 
 (* we also need to implement call: msg_from_client->msg_from_server m;
    here we specialize to step_monad *)
-module Step_monad_call = struct
-  open Step_monad_implementation
+module State_passing_call = struct
+  open State_passing_instance
   open Msgs
 
   (* NOTE specialized to unix impl *)
   module Connection = Tjr_connection.Unix_
 
-  let call ~conn (m:msg_from_client) : (msg_from_server,'w) m = 
-    Step(fun w -> 
+  let call ~conn (m:msg_from_client) : (msg_from_server,'w state_passing) m = 
+    with_world(fun w -> 
         m |> msg_c_to_string |> fun s -> 
         log_.log_lazy (fun () -> Printf.sprintf "sending %s\n" s);
         s |> Connection.send_string ~conn 
@@ -137,8 +139,7 @@ module Step_monad_call = struct
           |> function Error () -> exit_1 __LOC__ | Ok s -> 
             log_.log_lazy (fun () -> Printf.sprintf "receiving %s\n" s);
             s |> string_to_msg_s |> fun m -> 
-            (w,`Inl m))
-
+            (m,w))
 end
 
 

@@ -3,7 +3,8 @@
 (* we use some backing ops to provide the functionality, and the code
    below translates this to messages on the wire *)
 
-open Tjr_step_monad
+open Tjr_monad
+open Tjr_monad.Monad
 open Base_
 open Ops_types
 
@@ -19,6 +20,7 @@ open Msgs
    msg_from_server m, which wraps a backend ops *)
 
 let mk_serve
+  ~monad_ops
     ~ops  (* backend *)
     ~data_of_buffer
     ~buffer_of_data
@@ -26,7 +28,8 @@ let mk_serve
     ~dh2i ~i2dh
     ~fd2i ~i2fd
   =
-  let ( >>= ) = fun a ab -> bind ab a in
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
   (*    let fmap : ('a m) -> ('a -> 'b) -> ('b m) = failwith "FIXME" in
         let ( >>=| ) = fmap in *)
   let fmap_error: 

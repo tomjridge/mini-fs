@@ -4,6 +4,7 @@
    (with key the genint) into a map; subsequently, we only pass the
    genint to the client *)
 
+open Tjr_monad
 open Tjr_monad.Monad
 
 open Tjr_map
@@ -34,7 +35,7 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
   let return = monad_ops.return in
   let open Unix_ops in
   let ( >>=| ) a b = a >>= function Error e -> return (Error e) | Ok a -> b a in
-  let ops = failwith "FIXME" in (* unix_ops ~monad_ops () in *) (* FIXME need to redo *)
+  let ops = unix_ops ~monad_ops () in 
   let root = ops.root in
 
   let unlink path = ops.unlink path in
@@ -86,27 +87,27 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
 (* aux funs dh2i etc ------------------------------------------------ *)
 
 include struct
-  open Tjr_step_monad
-  open Tjr_step_monad.Step_monad_implementation
-  let dh2i dh = Step(fun w ->
+  open Tjr_monad.State_passing_instance
+  let dh2i dh = with_world(fun w ->
       (* allocate int, add i,dh to map, and return i *)
       genint() |> fun i ->
       {w with int2dh=Map_int.add i dh w.int2dh} |> fun w ->
-      w,`Inl i)
-  let i2dh i = Step(fun w->
-      w,`Inl (Map_int.find i w.int2dh))  (* FIXME if missing? *)
-  let fd2i fd = Step(fun w ->
+      i,w)
+  let i2dh i = with_world(fun w->
+      (Map_int.find i w.int2dh),w)  (* FIXME if missing? *)
+  let fd2i fd = with_world(fun w ->
       (* allocate int, add i,dh to map, and return i *)
       genint() |> fun i ->
       {w with int2fd=Map_int.add i fd w.int2fd} |> fun w ->
-      w,`Inl i)
-  let i2fd i = Step(fun w->
-      w,`Inl (Map_int.find i w.int2fd))  (* FIXME if missing? *)
+      i,w)
+  let i2fd i = with_world(fun w->
+      (Map_int.find i w.int2fd),w)  (* FIXME if missing? *)
+  let monad_ops = monad_ops ()
 end
 
-let ops = ops ~dh2i ~i2dh ~fd2i ~i2fd
+let ops = ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd
 
 (* NOTE this assumes the world is just the map - FIXME probably want
    to generalize this a bit by providing functions to get/set the map
    in the world state *)
-let _ : (int,int,fd_dh_map) ops = ops
+let _ : (int,int,fd_dh_map state_passing) ops = ops
