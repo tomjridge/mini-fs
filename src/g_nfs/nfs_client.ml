@@ -12,7 +12,7 @@ open Ops_type_with_result
 
 (* this is used to indicate that the result of a call was not what
    was expected *)
-type 'w internal_marhsal_err = {
+type 'w internal_marshal_err = {
   internal_marshal_err: 'a. string -> ('a,'w) m;
 }
 

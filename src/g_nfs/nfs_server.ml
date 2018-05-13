@@ -10,9 +10,11 @@ open Ops_types
 
 open Ops_type_with_result
 
+(*
 type 'w extra_ops = {
   internal_err: 'a. string -> ('a,'w) m;
 }
+*)
 
 open Msgs
 
@@ -73,8 +75,7 @@ let mk_serve
     ops.pwrite ~fd ~foff ~length ~buffer ~boff:0 
     >>=| fun nwritten -> Int nwritten
   in
-  let close fd = ops.close fd 
-    >>=| ret_unit in
+  let close fd = ops.close fd >>=| ret_unit in
   let rename src dst = ops.rename src dst >>=| ret_unit in
   let truncate ~path ~length = ops.truncate ~path ~length >>=| ret_unit in
   let stat p = ops.stat p >>=| fun st -> Stat' st in

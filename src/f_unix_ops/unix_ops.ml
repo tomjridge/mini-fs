@@ -14,34 +14,16 @@ end
 include Unix_base_types
 
 
-(*
-module Unix_conversions = struct
-  open ExtUnix.All
-  let fd2i = int_of_file_descr
-  let i2fd = file_descr_of_int
-  (* NOTE the following uses dirfd which is fragile; better to
-     expose a version of the api that tracks a dh<->int bijection *)
-  (* let dh2i x = x |> dirfd |> fd2i *)
-end
-*)
-
-
 (* generate types --------------------------------------------------- *)
 
+FIXME just open Ops_type_with_result
 module Ops_type = Ops_types.Ops_type_with_result
 include Ops_type
+
 
 (* construct ops ---------------------------------------------------- *)
 
 (* pass-through to Unix.xxx *)
-
-
-(*
-type 'e extra_ops = {
-  safely: 'a. (w -> 'a m) -> ('a,'e)result m;  
-  (* this delays until receives a world *)
-}
-*)
 
 type ('w,'t) extra_ops = {
   delay: 'a. ('w -> ('a,'t) m) -> ('a,'t) m;  
@@ -60,6 +42,7 @@ let map_error' ~monad_ops (f : [ `EINVAL ] -> 'a) e =
     | `SOME_OTHER_ERROR -> return _EOTHER
 
 let _ = map_error'
+
 
 let mk_ops ~monad_ops ~extra = 
 
@@ -280,6 +263,12 @@ let unix_ops ~monad_ops () =
   unix_ops
   
 
+
+
+(* old -------------------------------------------------------------- *)
+
+
+
 (* imperative ------------------------------------------------------- *)
 
 (*
@@ -312,3 +301,16 @@ include struct
 end
 
 *)
+
+
+(*
+module Unix_conversions = struct
+  open ExtUnix.All
+  let fd2i = int_of_file_descr
+  let i2fd = file_descr_of_int
+  (* NOTE the following uses dirfd which is fragile; better to
+     expose a version of the api that tracks a dh<->int bijection *)
+  (* let dh2i x = x |> dirfd |> fd2i *)
+end
+*)
+

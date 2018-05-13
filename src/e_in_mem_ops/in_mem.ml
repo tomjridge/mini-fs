@@ -145,7 +145,7 @@ let lookup_did did fs =
   Map_did.map_ops.map_find did map
 
 
-module X_ = struct
+module Fs_t_to_json = struct
   (* an easily-jsonable version *)
   type fs' = {
     files: (fid * string) list;
@@ -176,7 +176,7 @@ module X_ = struct
 end
 
 
-let fs_to_json fs = X_.(
+let fs_to_json fs = Fs_t_to_json.(
     from_fs fs |> fs'_to_yojson |> Yojson.Safe.pretty_to_string)
 
 
@@ -240,9 +240,9 @@ end
 include In_mem_monad
 *)
 
-(* easily json-able *)
+(* easily json-able FIXME used? *)
 module Y_ = struct
-  open X_
+  open Fs_t_to_json
   type t' = {
     internal_error_state: string option;
     fs:fs' 
@@ -250,7 +250,7 @@ module Y_ = struct
 
   let from_t (t:t) = {
     internal_error_state=t.internal_error_state;
-    fs=X_.from_fs t.fs
+    fs=Fs_t_to_json.from_fs t.fs
   }
 end
 

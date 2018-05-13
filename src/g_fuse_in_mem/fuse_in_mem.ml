@@ -6,6 +6,25 @@ open Fuse_
 
 let mk_unix_exn = Error_.mk_unix_exn
 
+(* NOTE could have multiple filesystems in memory, but here we just
+   fix one reference which points to the state of one in-mem fs *)
+let w_ = ref In_mem.init_t
+
+let co_eta = fun a -> In_mem_monad.run (!w_) a |> function
+  | w,Error `Attempt_to_step_halted_state -> failwith __LOC__
+  | w,Ok a -> 
+    w_:=w;
+    a
+
+let co_eta = { co_eta }
+
+let fuse_ops = mk_fuse_ops ~ops ~co_eta
+
+let _ : Fuse.operations = fuse_ops
+
+
+(* old -------------------------------------------------------------- *)
+
 (*
 include struct
   open Unix
@@ -41,24 +60,4 @@ include struct
   }
 end
 *)
-
-
-
-include struct 
-  (* NOTE could have multiple filesystems in memory, but here we just
-     fix one reference which points to the state of one in-mem fs *)
-  let w_ = ref In_mem.init_t
-
-  let co_eta = fun a -> In_mem_monad.run (!w_) a |> function
-    | w,Error `Attempt_to_step_halted_state -> failwith __LOC__
-    | w,Ok a -> 
-      w_:=w;
-      a
-
-  let co_eta = { co_eta }
-end
-
-let fuse_ops = mk_fuse_ops ~ops ~co_eta
-
-let _ : Fuse.operations = fuse_ops
 
