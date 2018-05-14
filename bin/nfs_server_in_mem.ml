@@ -1,4 +1,7 @@
-(* remote fs server using plain unix (could be lwt) *)
+(* remote fs server using in-mem (could be lwt) *)
+
+open Tjr_monad
+open Tjr_monad.Monad
 
 open Tjr_connection
 open Tjr_minifs
@@ -6,36 +9,42 @@ open Base_
 open Msgs
 
 (* backend ---------------------------------------------------------- *)
+
 open In_mem
 
-(* server ----------------------------------------------------------- *)
-module Server' = Nfs_server.Make_server(Ops_type_plus)
-include Server'
+let monad_ops = in_mem_monad_ops
 
+let ops = in_mem_state_passing_ops
+
+
+(* server ----------------------------------------------------------- *)
+
+open Nfs_server
 
 let serve = 
   let open Int_base_types in
   mk_serve
+    ~monad_ops
     ~ops
     ~dh2i
     ~i2dh
     ~fd2i
     ~i2fd
 
-let _ : msg_from_client -> msg_from_server m = serve
+let _ : msg_from_client -> (msg_from_server,'t) m = serve
 
 
-include struct
-  open Tjr_connection.Unix_
-  let send ~conn (m:msg_from_server) =
-    m |> msg_s_to_string |> send_string ~conn
-end
+let send ~conn (m:msg_from_server) =
+  let open Tjr_connection.Unix_ in
+  m |> msg_s_to_string |> send_string ~conn
 
 
 (* main ------------------------------------------------------------- *)
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server ~log_everything -> server
+
+let run = Tjr_monad.State_passing_instance.run
 
 let main () = 
   let open Tjr_connection.Unix_ in
@@ -52,11 +61,8 @@ let main () =
         log_.log s;
         string_to_msg_c s |> fun msg -> 
         serve msg |> fun x ->
-        In_mem.run (!w_ref) x |> function
-        | Error (`Attempt_to_step_exceptional_state w) ->
-            (* NOTE an internal error - so just exit *)
-            failwith __LOC__
-        | Ok (w,a) -> 
+        run ~init_state:!w_ref x |> function
+        | a,w -> 
           w_ref:=w;
           send ~conn a >>= function
           | Error () -> failwith __LOC__

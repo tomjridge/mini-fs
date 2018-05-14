@@ -5,7 +5,7 @@ export BASH_ENV
 all: natives
 
 
-natives: fuse_in_mem.native fuse_nfs_client.native nfs_server_in_mem.native nfs_client_test.native nfs_server_unix.native
+natives: fuse_in_mem_main.native fuse_nfs_client.native nfs_server_in_mem.native nfs_client_test.native nfs_server_unix.native
 	cp *.native /tmp
 
 
@@ -21,9 +21,9 @@ fuse_main.native: FORCE
 # -f is foreground
 # -s is single-threaded
 
-run_fuse_in_mem: fuse_in_mem.native
+run_fuse_in_mem: fuse_in_mem_main.native
 	mkdir -p fuse_mount
-	./fuse_in_mem.native -s -f -o allow_other ./fuse_mount 
+	./fuse_in_mem_main.native -s -f -o allow_other ./fuse_mount 
 
 
 run_fuse_nfs_client: fuse_nfs_client.native

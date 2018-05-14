@@ -105,14 +105,13 @@ let mk_client_ops (* (type t) *)
     pread; pwrite; close; rename; truncate; stat; reset }
 
 
-include struct
-  open Nfs_aux
-  (* specialize mk_client_ops *)
-  let mk_client_ops = mk_client_ops 
-      ~data_length
-      ~data_of_buffer
-      ~blit_data_to_buffer
-end
+(* specialize mk_client_ops *)
+let mk_client_ops = 
+  let open Nfs_aux in
+  mk_client_ops 
+    ~data_length
+    ~data_of_buffer
+    ~blit_data_to_buffer
 
 
 let _ = mk_client_ops

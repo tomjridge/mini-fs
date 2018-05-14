@@ -867,6 +867,8 @@ let mk_ops ~monad_ops ~extra_core =
 
 (* state-passing instance ------------------------------------------- *)
 
+let in_mem_monad_ops = State_passing_instance.monad_ops ()
+
 let in_mem_state_passing_ops = 
   (* FIXME internal_err should just mark the state as erroneous
      without having to produce an 'a; maybe state is either erroneous
@@ -883,8 +885,7 @@ let in_mem_state_passing_ops =
              failwith (s^"; "^__LOC__)))
   }
   in
-  let monad_ops = State_passing_instance.monad_ops () in
-  let ops = mk_ops ~monad_ops ~extra_core in
+  let ops = mk_ops ~monad_ops:in_mem_monad_ops ~extra_core in
   ops
 
 let _ = in_mem_state_passing_ops

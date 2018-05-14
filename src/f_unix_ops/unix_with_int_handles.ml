@@ -18,6 +18,11 @@ type fd_dh_map = {
   int2dh: Unix.dir_handle Map_int.t;
 }
 
+let init_fd_dh_map = {
+  int2fd=Map_int.empty;
+  int2dh=Map_int.empty
+}
+
 (* we assume we can get the fd_dh_map from the world 'w *)
 
 let genint = Tjr_gensym.gensym

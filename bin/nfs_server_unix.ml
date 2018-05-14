@@ -4,18 +4,25 @@
    common parts to ../x_nfs_server_bin_aux or similar *)
 
 open Tjr_connection
+open Tjr_monad
+open Tjr_monad.Monad
 open Tjr_minifs
 open Base_
 open Msgs
 
 (* backend ---------------------------------------------------------- *)
 
+(* FIXME logging
 module Backend = Unix_with_int_handles
 open Backend
 
 module L = Ops_types.Make_logged_ops(Ops_type_plus)
 open L
+*)
+
+
 (* log all calls and returns immediately *)
+(*
 let log_string f = log_.log_now (f())
 let log_op = { log=(fun m a -> Step_monad_logging.log ~log_string m a) }
 let ops = 
@@ -25,29 +32,32 @@ let ops =
     ~ops
     ~dh2i
     ~fd2i
+*)
+
+let monad_ops = Unix_with_int_handles.monad_ops
+
+let ops = Unix_with_int_handles.ops
+
 
 (* server ----------------------------------------------------------- *)
 
-module Server' = Nfs_server.Make_server(Ops_type_plus)
-include Server' 
-
-
 let serve = 
   let open Int_base_types in
-  mk_serve
+  Nfs_server.mk_serve
+    ~monad_ops
     ~ops
     ~dh2i
     ~i2dh
     ~fd2i
     ~i2fd
 
-let _ : msg_from_client -> msg_from_server m = serve
+let _ : msg_from_client -> (msg_from_server,'t) m = serve
 
-include struct
-  open Tjr_connection.Unix_
-  let send ~conn (m:msg_from_server) =
-    m |> msg_s_to_string |> send_string ~conn
-end
+
+let send ~conn (m:msg_from_server) =
+  let open Tjr_connection.Unix_ in
+  m |> msg_s_to_string |> send_string ~conn
+
 
 
 (* main ------------------------------------------------------------- *)
@@ -55,7 +65,7 @@ end
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server ~log_everything -> server
 
-let run = Step_monad.run ~dest_exceptional:(fun x -> None)
+let run = Tjr_monad.State_passing_instance.run
 
 let main ~init_world = 
   let open Tjr_connection.Unix_ in
@@ -72,11 +82,8 @@ let main ~init_world =
         log_.log s;
         string_to_msg_c s |> fun msg -> 
         serve msg |> fun x ->
-        run (!w_ref) x |> function
-        | Error (`Attempt_to_step_exceptional_state w) ->
-            (* NOTE an internal error - so just exit *)
-            failwith __LOC__
-        | Ok (w,a) -> 
+        run ~init_state:!w_ref x |> function
+        | a,w -> 
           w_ref:=w;
           send ~conn a >>= function
           | Error () -> failwith __LOC__
@@ -84,6 +91,4 @@ let main ~init_world =
     in
     loop ()
 
-
-let _ = main ~init_world:Backend.initial_world
-
+let _ = main ~init_world:Unix_with_int_handles.init_fd_dh_map
