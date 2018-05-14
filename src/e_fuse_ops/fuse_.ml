@@ -11,8 +11,6 @@ open Bigarray
 open Fuse
 (* FIXME wrap operations so they return unix_error *)
 
-(* module Readdir' = Readdir'.Make_readdir'(I)  *)
-
 type 'w co_eta = {
   co_eta: 'a. ('a,'w) m -> 'a
 }
@@ -141,7 +139,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     mkdir;    
     readdir;
     fopen;
-    mknod = (fun path mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* FIXME gets called instead of fopen to create a file *)
+    mknod = (fun path mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* NOTE gets called instead of fopen to create a file *)
     read;
     write;
     rename;

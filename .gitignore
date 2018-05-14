@@ -30,3 +30,4 @@ src/trivial_state_monad.ml
 src/unix_ops.ml
 src/unix_with_int_handles.ml
 /src/META
+/src/log_.ml

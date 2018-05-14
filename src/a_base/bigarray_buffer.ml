@@ -1,3 +1,5 @@
+open Log_
+
 (* fuse uses this form of buffer *)
 
 type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
@@ -32,7 +34,7 @@ let bigarray_to_string ~src ~off ~len =
   (* ASSUMES not (len < 0 or n > Sys.max_string_length) *)
   match len < 0 || len > Sys.max_string_length with
   | true -> 
-    (Printf.sprintf "bigarray_to_string: len is %d\n" len |> print_endline);
+    log_.log_now (Printf.sprintf "bigarray_to_string: len is %d\n" len);
     failwith __LOC__
   | false ->
     Bytes.create len |> fun dst ->

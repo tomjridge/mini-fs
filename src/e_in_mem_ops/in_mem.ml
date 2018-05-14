@@ -130,6 +130,7 @@ type dhandles_carrier = string list Map_int.Map_.t
 type dhandles_ops = (dh,string list,dhandles_carrier) map_ops
 let dhandles_ops : dhandles_ops = Map_int.map_ops
 
+(* NOTE symlinks are stored directly as a dir entry *)
 
 type fs_t = {
   files: files_carrier;
@@ -215,7 +216,6 @@ let is_symlink x = function
 (* extra ops on top of monad ---------------------------------------- *)
 
 (* NOTE following can be built on top of with_fs and internal_err (?) *)
-(* FIXME why make 'e a param? why not admit we are using exn_ ? *)
 type 't extra_ops = {
   (* err: 'a. 'e -> (('a,'e)r_,'t) m;  (* FIXME? how can we handle all errors? *) *)
   new_did: unit -> (did,'t) m;
@@ -275,7 +275,9 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
       (* we want to use resolve_name, but this works with dir_with_parent *)
       extra_ops.with_fs (fun fs -> 
           Map_did.map_ops.map_find did fs.dirs |> function
-          | None -> failwith "impossible, invalid did"
+          | None -> (
+            log_.log_now __LOC__;
+            exit_1 "impossible, invalid did")
           | Some dwp -> 
             resolve_name ~dir_with_parent:dwp ~name:comp 
             |> dir_entry_option_to_resolve_result |> fun x -> (x,fs))
@@ -285,72 +287,6 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     Tjr_path_resolution.resolve ~monad_ops ~fs_ops
   in
 
-
-
-
-(*
-  (* get parent and pass to rn_2 *)
-  let rec resolve_names_1 ~parent_id ~names 
-    : (did * dir_entry option,'e1)result m 
-    = 
-    resolve_did parent_id >>= fun parent -> 
-    resolve_names_2 ~parent_id ~parent ~names 
-
-  and resolve_names_2 ~parent_id ~parent ~names = 
-    match names with
-    | [] -> return @@ Ok(parent_id,None)
-    | name::names -> 
-      begin
-        resolve_name ~dir:parent ~name |> function
-        | None -> (
-            match names with
-            | [] -> return @@ Ok(parent_id,None)
-            | _ -> err `Error_no_entry) (* FIXME give full path *)
-        | Some (Fid fid) -> (
-            match names with 
-            | [] -> return @@ Ok(parent_id,Some (Fid fid))
-            | _ -> err @@ `Error_not_directory)
-        | Some (Did did) -> (
-            match names with
-            | [] -> return @@ Ok(parent_id,Some (Did did))
-            | _ -> resolve_names_1 ~parent_id:did ~names)
-        | Some (Symlink sl) -> (
-            (* 
-               if starts with /, then resolve from root
-               if ends with /, then split is (a;b;c;"") so probably we should remove ""
-               otherwise split and prepend to names *)
-            failwith "FIXME"
-          )
-      end
-  in
-
-
-  let _ = resolve_names_1 in
-
-  let resolve_path : path -> (did * dir_entry option,'e2)result m = fun p -> 
-    (if not @@ String.contains p '/' 
-     then extra_ops.internal_err "resolve_path, no slash, mim.l189" 
-     else 
-       String.split_on_char '/' p |> fun names ->
-       if not (List.hd names = "")
-       then extra_ops.internal_err "resolve_path, no leading slash, mim.194"
-       else 
-         let names=List.tl names in
-         if names=[] 
-         then extra_ops.internal_err "resolve_path, names empty, impossible, mim.198"
-         else 
-           let names = Tjr_list.(
-               if last names = "" then butlast names else names) 
-           in
-           (* not sure about special casing root *)
-           if names = [] 
-           then return @@ Ok(root_did,Some (Did root_did)) 
-           else resolve_names_1 ~parent_id:root_did ~names)
-  in
-
-  let _ = resolve_path in
-
-*)
 
   let resolve_path ~follow_last_symlink path = 
     (* paths from Fuse should satisfy this; FIXME what if we are not using fuse? *)
@@ -405,14 +341,11 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
           | `Internal s -> extra_ops.internal_err s
           | `Error_no_entry -> err @@ `Error_no_entry)
     end
-    (* >>= (function
-       | Ok x -> return (Ok x) | Error e -> return (Error e)) *)
   in
 
   let _ = unlink in 
 
 
-  (* FIXME check if already exists etc *)
   (* FIXME meta changes for parent and child *)
   let mkdir path : ((unit,'e5)result,'t) m = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
@@ -626,7 +559,9 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             in
             match spath.result,dpath.result with
             (* FIMXE following for symlinks *)
-            | Sym _,_ | _,Sym _ -> failwith "FIXME shouldn't happen - follow=`Always"
+            | Sym _,_ | _,Sym _ -> (
+              log_.log_now __LOC__;
+              exit_1 "FIXME shouldn't happen - follow=`Always")
             | File fid,Missing -> insert_and_remove (Fid fid)
             | File fid1,File fid2 -> 
               if fid1=fid2 
@@ -656,11 +591,10 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
               if sdid=ddid 
               then return (Ok ())
               else extra_ops.internal_err "FIXME rename d to d, dst should be empty?"
-            | Missing ,_ -> failwith "impossible"
+            | Missing ,_ -> (
+                log_.log_now __LOC__;
+                exit_1 "impossible")
     end
-    (*    >>= function
-          | Ok x -> return (Ok x)
-          | Error e -> err `EOTHER*)
   in
 
 
@@ -680,6 +614,9 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     | `Ok () -> return (Ok ())
     | `Internal s -> extra_ops.internal_err s
   in
+
+
+  let dummy_symlink_meta = { atim=0.0; ctim=(); mtim=0.0 } in
 
   (* FIXME here and elsewhere atim is not really dealt with *)
   let stat path = 
@@ -706,7 +643,11 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
               let sz = 1 in (* for dir? FIXME size of dir *)
               f.meta |> fun meta ->
               `Ok { sz;meta;kind=`Dir },s)
-      | Sym _ -> failwith "FIXME"
+      | Sym s -> 
+        let sz = String.length s in
+        let meta = dummy_symlink_meta in
+        let kind = `Symlink in
+        return @@ `Ok { sz;meta;kind }
     end
     >>= function
     | `Ok stat -> return (Ok stat)
@@ -773,30 +714,6 @@ let t_to_string t = Y_.(
 
 
 (* extra ----------------------------------------------------------- *)
-
-(*
-  let with_fs (f:fs_t -> 'a * fs_t) : 'a m = 
-    with_state 
-      (fun w -> f w.fs |> fun (x,fs') -> x,{w with fs=fs'}) 
-  let _ = with_fs
-
-  let internal_err s : ('a,'t) m = 
-    let open Tjr_step_monad.Step_monad_implementation in
-    Step(fun w -> 
-        ({ w with internal_error_state=(Some s)}, 
-         `Inr(Step(fun _ -> failwith __LOC__))))
-
-  let _ = internal_err
-
-
-  let err e : 'a m = 
-    let open Tjr_step_monad.Step_monad_implementation in
-    Step(fun w -> 
-        (w,`Inl (Error e)))
-
-*)
-
-
 
 module Extra_core = struct
   type 't t = {
@@ -882,7 +799,8 @@ let in_mem_state_passing_ops =
     internal_err=(fun s -> 
         State_passing_instance.with_world
           (fun t ->
-             failwith (s^"; "^__LOC__)))
+             log_.log_now __LOC__;
+             exit_1 (s^"; "^__LOC__)))
   }
   in
   let ops = mk_ops ~monad_ops:in_mem_monad_ops ~extra_core in

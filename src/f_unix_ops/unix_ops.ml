@@ -30,6 +30,7 @@ type ('w,'t) extra_ops = {
 let _EOTHER = Error `Error_other
 
 (* return errors that we recognize, otherwise pass to an aux f *)
+(* for the time being, we typically just map EINVAL to return _EOTHER *)
 let map_error' ~monad_ops (f : [ `EINVAL ] -> 'a) e =
   let return = monad_ops.return in
   Error_.map_error e |> function
@@ -46,6 +47,11 @@ let mk_ops ~monad_ops ~extra =
   let ( >>= ) = monad_ops.bind in
   let return = monad_ops.return in
 
+  (* FIXME refine behaviour in following *)
+  let handle_EINVAL () = monad_ops.return _EOTHER in
+
+  let _ = handle_EINVAL in
+
   let map_error f e = map_error' ~monad_ops f e in
 
   let delay = extra.delay in
@@ -54,6 +60,8 @@ let mk_ops ~monad_ops ~extra =
 
   (* FIXME refine - at the moment we wrap all exns as EOTHER *)
   (* let safely a = extra.safely (fun e -> Ops_types.unix2err e) a in *)
+
+
 
   (* FIXME unlink usually operates only on files; do we want to have
      rmdir as well? *)
@@ -66,15 +74,20 @@ let mk_ops ~monad_ops ~extra =
         st.st_kind |> unix2kind |> function
         | `File -> Unix.unlink path
         | `Dir -> Unix.rmdir path
-        | `Symlink -> failwith __LOC__ (* FIXME *)
-        | _ -> failwith __LOC__
+        | `Symlink -> (
+          log_.log_now __LOC__;
+          exit_1 __LOC__ 
+          (* FIXME should be impossible since stat resolves symlinks; but is this what we want? *))
+        | _ -> (
+          log_.log_now __LOC__;
+          exit_1 __LOC__)
       end;
       return (Ok())
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function 
-      | `EINVAL ->
-        failwith __LOC__ (* posix: can't be thrown? check with SibylFS *)
+      | `EINVAL -> handle_EINVAL ()
+        (* posix: can't be thrown? check with SibylFS *)
   in
 
 
@@ -90,7 +103,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -103,7 +116,7 @@ let mk_ops ~monad_ops ~extra =
     with 
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -114,7 +127,7 @@ let mk_ops ~monad_ops ~extra =
     | End_of_file -> return (Ok([],finished))
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -125,7 +138,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) ->
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in  
   (* FIXME should we record which dh are valid? ie not closed *)
 
@@ -140,7 +153,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -151,7 +164,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
   let open_ path = mk_fd path in
@@ -168,7 +181,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -181,7 +194,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -192,7 +205,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> return _EOTHER
   in 
-  (* FIXME record which are open? *)
+  (* FIXME record which fd are open? *)
 
 
   let rename src dst = 
@@ -203,7 +216,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
   let truncate ~path ~length = 
@@ -227,7 +240,7 @@ let mk_ops ~monad_ops ~extra =
     with
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
-      | `EINVAL -> failwith __LOC__
+      | `EINVAL -> handle_EINVAL ()
   in
 
 
@@ -259,55 +272,4 @@ let unix_ops ~monad_ops () =
   let _ : (fd,dh,'w state_passing) ops = unix_ops in
   unix_ops
   
-
-
-
-(* old -------------------------------------------------------------- *)
-
-
-
-(* imperative ------------------------------------------------------- *)
-
-(*
-
-let rec run (w:w) (x:'a m) = 
-  (Step_monad.run ~dest_exceptional:(fun x -> None) w x) |> function
-  | Ok (w,a) -> (w,a)
-  | Error e -> failwith "impossible since no state is exceptional"
-
-let dest_exceptional w = w.error_state 
-
-include struct
-  open Imp_ops_type
-
-  let run ~ref_ a = run (!ref_) a |> fun (w,a) -> ref_:=w; a |> function
-    | Ok a -> a
-    | Error e -> failwith __LOC__
-
-
-  let ref_ = ref initial_world
-      
-  let run x = run ~ref_ x
-
-  let run : run = { run }
-
-  let unix_imperative_ops = mk_imperative_ops ~run ~ops:unix_ops
-
-  let _ : imp_ops = unix_imperative_ops
-
-end
-
-*)
-
-
-(*
-module Unix_conversions = struct
-  open ExtUnix.All
-  let fd2i = int_of_file_descr
-  let i2fd = file_descr_of_int
-  (* NOTE the following uses dirfd which is fragile; better to
-     expose a version of the api that tracks a dh<->int bijection *)
-  (* let dh2i x = x |> dirfd |> fd2i *)
-end
-*)
 

@@ -7,12 +7,6 @@ open Error_types
 
 type path = string
 
-(* NOTE R is expected to be result, but for imperative ops we might
-   eliminate the 'e component and throw an exception instead
-
-   FIXME even so, probably easier just to use result everywhere
-
-*)
 module type OPS_TYPE = sig
   type ('fd,'dh,'w) ops = {
     root: path;

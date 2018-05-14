@@ -30,8 +30,6 @@ let mk_serve
   =
   let ( >>= ) = monad_ops.bind in
   let return = monad_ops.return in
-  (*    let fmap : ('a m) -> ('a -> 'b) -> ('b m) = failwith "FIXME" in
-        let ( >>=| ) = fmap in *)
   let fmap_error: 
     'a. (('a,exn_)result,'w) m -> ('a -> msg_from_server') -> (msg_from_server,'w) m 
     = 

@@ -1,3 +1,4 @@
+open Log_
 open Bin_prot.Std
 
 type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io,yojson]
@@ -80,13 +81,27 @@ module Default = struct
        st_ctime=stat.meta.mtim;
        st_mtime=stat.meta.mtim;
       }
-    | _ -> failwith __LOC__
+    | `Symlink -> 
+      {default_file_stats with
+       st_size=Int64.of_int stat.sz;
+       st_kind=kind2unix stat.kind;
+       st_atime=stat.meta.atim; 
+       st_ctime=stat.meta.mtim;
+       st_mtime=stat.meta.mtim;
+      }
+    | `Other -> 
+      log_.log ("Unknown stat, `Other, at "^__LOC__);
+      (* FIXME what to do here? *)
+      {default_file_stats with
+       st_kind=kind2unix stat.kind }
+       
 
   let unix2stat stat = 
     match stat.st_kind with
     | S_DIR -> { sz=1; kind=`Dir; meta=unix2meta stat }
     | S_REG -> { sz=Int64.to_int stat.st_size; kind=`File; meta=unix2meta stat }
-    | _ -> failwith __LOC__
+    | S_LNK -> { sz=Int64.to_int stat.st_size; kind=`Symlink; meta=unix2meta stat }
+    | _ -> { sz=Int64.to_int stat.st_size; kind=`Other; meta=unix2meta stat }
 end
 
 
