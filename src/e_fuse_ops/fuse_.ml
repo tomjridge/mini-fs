@@ -1,9 +1,9 @@
 (* bind ops to fuse ----------------------------------- *)
 
-open Tjr_step_monad
+open Tjr_monad
+open Tjr_monad.Monad
 open Base_
-open Ops_types
-open Ops_type_with_result
+open Ops_type_
 
 open Unix
 open LargeFile
@@ -13,16 +13,18 @@ open Fuse
 
 (* module Readdir' = Readdir'.Make_readdir'(I)  *)
 
-let ( >>= ) = fun a ab -> Tjr_step_monad.bind ab a  (* Fuse has bind also *)
-
-(* propagate errors *)
-let ( >>=| ) a b = a >>= function Error e -> return (Error e) | Ok a -> b a
-
 type 'w co_eta = {
   co_eta: 'a. ('a,'w) m -> 'a
 }
 
-let mk_fuse_ops ~readdir' ~(ops:('fd,'dh,'w)Ops_type_with_result.ops) ~co_eta = 
+let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta = 
+
+  let ( >>= ) = monad_ops.bind in
+  let return = monad_ops.return in
+
+  (* propagate errors *)
+  let ( >>=| ) a b = a >>= function Error e -> return (Error e) | Ok a -> b a in
+
   let co_eta = co_eta.co_eta in
 
   let unlink path = ops.unlink path in
@@ -151,7 +153,7 @@ let mk_fuse_ops ~readdir' ~(ops:('fd,'dh,'w)Ops_type_with_result.ops) ~co_eta =
 
 let readdir' ~ops = Readdir'.readdir' ~ops
 
-let mk_fuse_ops ~ops = mk_fuse_ops ~readdir':(readdir' ~ops) ~ops
+let mk_fuse_ops ~monad_ops ~ops = mk_fuse_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
 
 let _ = mk_fuse_ops
 
