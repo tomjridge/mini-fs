@@ -862,3 +862,29 @@ let mk_extra_ops ~monad_ops ~(extra_core:'t Extra_core.t) =
 let mk_ops ~monad_ops ~extra_core = 
   let extra_ops = mk_extra_ops ~monad_ops ~extra_core in
   mk_ops ~monad_ops ~extra_ops
+
+
+
+(* state-passing instance ------------------------------------------- *)
+
+let in_mem_state_passing_ops = 
+  (* FIXME internal_err should just mark the state as erroneous
+     without having to produce an 'a; maybe state is either erroneous
+     or ok *)
+  let extra_core = Extra_core.{
+    with_fs=(fun f -> 
+        State_passing_instance.with_world
+          (fun t -> 
+             f t.fs |> fun (a,fs) ->
+             a,{t with fs}));
+    internal_err=(fun s -> 
+        State_passing_instance.with_world
+          (fun t ->
+             failwith (s^"; "^__LOC__)))
+  }
+  in
+  let monad_ops = State_passing_instance.monad_ops () in
+  let ops = mk_ops ~monad_ops ~extra_core in
+  ops
+
+let _ = in_mem_state_passing_ops

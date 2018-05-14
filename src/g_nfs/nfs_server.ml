@@ -6,9 +6,7 @@
 open Tjr_monad
 open Tjr_monad.Monad
 open Base_
-open Ops_types
-
-open Ops_type_with_result
+open Ops_type_
 
 (*
 type 'w extra_ops = {

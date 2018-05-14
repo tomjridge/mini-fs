@@ -6,8 +6,7 @@
 open Tjr_monad
 open Tjr_monad.Monad
 open Base_
-open Ops_types
-open Ops_type_with_result
+open Ops_type_
 
 
 (* this is used to indicate that the result of a call was not what

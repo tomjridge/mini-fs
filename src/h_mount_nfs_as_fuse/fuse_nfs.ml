@@ -4,7 +4,7 @@
    need fuse) *)
 
 open Base_
-open Ops_type_with_result
+open Ops_type_
 
 (* NOTE nfs client ops could be in unix.m or lwt.m, although probably
    ocamlfuse does not work properly with lwt *)
@@ -18,27 +18,35 @@ open Ops_type_with_result
 *)
 
 
-(* construct types for the nfs client *)
-module Client' = Nfs_client.Make_client(O)  
-include Client'
+(* open Nfs_client *)
+let mk_client_ops = Nfs_client.mk_client_ops
 
-let _ = mk_client_ops
+(* open Fuse_ *)
+let mk_fuse_ops = Fuse_.mk_fuse_ops
 
-(* construct fuse from imperative operations *)
-module Fuse' = Fuse_.Make_fuse(O)
-
-
-(* call Fuse_common.mk_fuse_ops with nfs client ops *)
-let mk_fuse_nfs_ops (* was mk_fuse_ops *)
+let mk_fuse_nfs_ops 
+  ~monad_ops
     ~internal_marshal_err
     ~call
     ~i2dh ~dh2i
     ~i2fd ~fd2i
     ~co_eta
   = 
-  let nfs_ops = mk_client_ops ~internal_marshal_err ~call ~i2dh ~dh2i ~i2fd ~fd2i in
+  let nfs_ops = 
+    mk_client_ops ~monad_ops ~internal_marshal_err ~call ~i2dh ~dh2i ~i2fd ~fd2i 
+  in
   let ops = nfs_ops in
-  Fuse'.mk_fuse_ops
+  mk_fuse_ops
+    ~monad_ops
     ~ops
     ~co_eta
 
+let _ : 
+  monad_ops:'a Tjr_monad.Monad.monad_ops ->
+  internal_marshal_err:'a Nfs_client.internal_marshal_err ->
+  call:(Msgs.msg_from_client -> (Msgs.msg_from_server, 'a) Tjr_monad.Monad.m) ->
+  i2dh:(Msgs.dh -> 'b) ->
+  dh2i:('b -> Msgs.dh) ->
+  i2fd:(Msgs.fd -> 'c) ->
+  fd2i:('c -> Msgs.fd) -> co_eta:'a Fuse_.co_eta -> Fuse.operations
+  = mk_fuse_nfs_ops

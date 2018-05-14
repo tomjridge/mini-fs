@@ -153,7 +153,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
 
 let readdir' ~ops = Readdir'.readdir' ~ops
 
-let mk_fuse_ops ~monad_ops ~ops = mk_fuse_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
+let mk_fuse_ops ~monad_ops ~ops = mk_fuse_ops ~monad_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
 
 let _ = mk_fuse_ops
 

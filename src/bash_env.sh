@@ -19,7 +19,7 @@ function clean_links() {
 
 
 function mk_links() {
-    ln -s {a_,d_,e_,f_}*/*.ml .
+    ln -s {a_,d_,e_,f_,g_,h_}*/*.ml .
 
 #    ln -s {a_,d_,e_,f_,g_}*/*.ml .
 
