@@ -9,6 +9,7 @@ open Tjr_monad.Monad
 
 open Tjr_map
 open Base_
+open Ops_type_
 
 module Base_types = Int_base_types
 
@@ -26,7 +27,7 @@ let genint = Tjr_gensym.gensym
 
 (* this is what we aim to provide *)
 
-type 'w ops_type = (int,int,'w) Ops_types.Ops_type_with_result.ops
+type 'w ops_type = (int,int,'w) Ops_type_.ops
 
 open Unix_ops
 

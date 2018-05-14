@@ -4,7 +4,7 @@ open Tjr_monad
 open Tjr_monad.Monad
 open Tjr_either
 open Base_
-open Ops_types
+open Ops_type_
 
 module Unix_base_types = struct
   type fd=Unix.file_descr
@@ -16,9 +16,6 @@ include Unix_base_types
 
 (* generate types --------------------------------------------------- *)
 
-FIXME just open Ops_type_with_result
-module Ops_type = Ops_types.Ops_type_with_result
-include Ops_type
 
 
 (* construct ops ---------------------------------------------------- *)

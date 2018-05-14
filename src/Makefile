@@ -32,6 +32,7 @@ install:
 clean:
 	clean
 	clean_links
+	rm -f META
 	rm -f *.html
 	$(MAKE) -C ../bin clean
 
