@@ -54,7 +54,7 @@ recapitulation.mli.patched: recapitulation.mli.generated FORCE
 	patch -u recapitulation.mli.patched < recapitulation.patch
 
 doc:
-	ocamlfind ocamldoc $$PKGS $$WARN -html -d /tmp *.ml
+	ocamlfind ocamldoc $$PKGS $$WARN -html -d ../ocamldoc *.ml
 
 # temporary do not use ------------------------------------------------
 

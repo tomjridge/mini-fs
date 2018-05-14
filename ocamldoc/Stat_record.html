@@ -1,0 +1,136 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Runtime_config.html">
+<link rel="next" href="Unix_ops.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Base_" rel="Chapter" href="Base_.html">
+<link title="Bigarray_buffer" rel="Chapter" href="Bigarray_buffer.html">
+<link title="Error_" rel="Chapter" href="Error_.html">
+<link title="Error_types" rel="Chapter" href="Error_types.html">
+<link title="Fuse_in_mem" rel="Chapter" href="Fuse_in_mem.html">
+<link title="Fuse_" rel="Chapter" href="Fuse_.html">
+<link title="Fuse_nfs" rel="Chapter" href="Fuse_nfs.html">
+<link title="In_mem" rel="Chapter" href="In_mem.html">
+<link title="Int_base_types" rel="Chapter" href="Int_base_types.html">
+<link title="Msgs" rel="Chapter" href="Msgs.html">
+<link title="Nfs_aux" rel="Chapter" href="Nfs_aux.html">
+<link title="Nfs_client" rel="Chapter" href="Nfs_client.html">
+<link title="Nfs_server" rel="Chapter" href="Nfs_server.html">
+<link title="Ops_type_" rel="Chapter" href="Ops_type_.html">
+<link title="Readdir'" rel="Chapter" href="Readdir'.html">
+<link title="R_" rel="Chapter" href="R_.html">
+<link title="Runtime_config" rel="Chapter" href="Runtime_config.html">
+<link title="Stat_record" rel="Chapter" href="Stat_record.html">
+<link title="Unix_ops" rel="Chapter" href="Unix_ops.html">
+<link title="Unix_with_int_handles" rel="Chapter" href="Unix_with_int_handles.html"><title>Stat_record</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Runtime_config.html" title="Runtime_config">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Unix_ops.html" title="Unix_ops">Next</a>
+</div>
+<h1>Module <a href="type_Stat_record.html">Stat_record</a></h1>
+
+<pre><span class="keyword">module</span> Stat_record: <code class="code">sig</code> <a href="Stat_record.html">..</a> <code class="code">end</code></pre><hr width="100%">
+
+<pre><span id="TYPEst_kind"><span class="keyword">type</span> <code class="type"></code>st_kind</span> = <code class="type">[ `Dir | `File | `Other | `Symlink ]</code> </pre>
+
+
+<pre><span id="VALbin_shape_st_kind"><span class="keyword">val</span> bin_shape_st_kind</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_st_kind"><span class="keyword">val</span> bin_size_st_kind</span> : <code class="type">'a -> int</code></pre>
+<pre><span id="VALbin_write_st_kind"><span class="keyword">val</span> bin_write_st_kind</span> : <code class="type">Bin_prot.Common.buf -><br>       pos:Bin_prot.Common.pos -><br>       [< `Dir | `File | `Other | `Symlink ] -> Bin_prot.Common.pos</code></pre>
+<pre><span id="VALbin_writer_st_kind"><span class="keyword">val</span> bin_writer_st_kind</span> : <code class="type">[< `Dir | `File | `Other | `Symlink ] Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_st_kind__"><span class="keyword">val</span> __bin_read_st_kind__</span> : <code class="type">'a -> pos_ref:'b -> int -> [> `Dir | `File | `Other | `Symlink ]</code></pre>
+<pre><span id="VALbin_read_st_kind"><span class="keyword">val</span> bin_read_st_kind</span> : <code class="type">Bin_prot.Common.buf -><br>       pos_ref:Bin_prot.Common.pos_ref -> [> `Dir | `File | `Other | `Symlink ]</code></pre>
+<pre><span id="VALbin_reader_st_kind"><span class="keyword">val</span> bin_reader_st_kind</span> : <code class="type">[> `Dir | `File | `Other | `Symlink ] Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_st_kind"><span class="keyword">val</span> bin_st_kind</span> : <code class="type">[ `Dir | `File | `Other | `Symlink ] Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALst_kind_to_yojson"><span class="keyword">val</span> st_kind_to_yojson</span> : <code class="type"><a href="Stat_record.html#TYPEst_kind">st_kind</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALst_kind_of_yojson"><span class="keyword">val</span> st_kind_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Stat_record.html#TYPEst_kind">st_kind</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><code><span id="TYPEmeta"><span class="keyword">type</span> <code class="type"></code>meta</span> = {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmeta.atim">atim</span>&nbsp;: <code class="type">float</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmeta.ctim">ctim</span>&nbsp;: <code class="type">unit</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmeta.mtim">mtim</span>&nbsp;: <code class="type">float</code>;</code></td>
+
+</tr></table>
+}
+
+
+
+<pre><span id="VALbin_shape_meta"><span class="keyword">val</span> bin_shape_meta</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_meta"><span class="keyword">val</span> bin_size_meta</span> : <code class="type"><a href="Stat_record.html#TYPEmeta">meta</a> -> int</code></pre>
+<pre><span id="VALbin_write_meta"><span class="keyword">val</span> bin_write_meta</span> : <code class="type">Bin_prot.Common.buf -><br>       pos:Bin_prot.Common.pos -> <a href="Stat_record.html#TYPEmeta">meta</a> -> Bin_prot.Common.pos</code></pre>
+<pre><span id="VALbin_writer_meta"><span class="keyword">val</span> bin_writer_meta</span> : <code class="type"><a href="Stat_record.html#TYPEmeta">meta</a> Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_meta__"><span class="keyword">val</span> __bin_read_meta__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_meta"><span class="keyword">val</span> bin_read_meta</span> : <code class="type">Bin_prot.Common.buf -> pos_ref:Bin_prot.Common.pos_ref -> <a href="Stat_record.html#TYPEmeta">meta</a></code></pre>
+<pre><span id="VALbin_reader_meta"><span class="keyword">val</span> bin_reader_meta</span> : <code class="type"><a href="Stat_record.html#TYPEmeta">meta</a> Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_meta"><span class="keyword">val</span> bin_meta</span> : <code class="type"><a href="Stat_record.html#TYPEmeta">meta</a> Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALmeta_to_yojson"><span class="keyword">val</span> meta_to_yojson</span> : <code class="type"><a href="Stat_record.html#TYPEmeta">meta</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALmeta_of_yojson"><span class="keyword">val</span> meta_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Stat_record.html#TYPEmeta">meta</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span class="keyword">include</span> struct ... end</pre>
+
+<pre><code><span id="TYPEstat_record"><span class="keyword">type</span> <code class="type"></code>stat_record</span> = {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTstat_record.sz">sz</span>&nbsp;: <code class="type">int</code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTstat_record.kind">kind</span>&nbsp;: <code class="type"><a href="Stat_record.html#TYPEst_kind">st_kind</a></code>;</code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTstat_record.meta">meta</span>&nbsp;: <code class="type"><a href="Stat_record.html#TYPEmeta">meta</a></code>;</code></td>
+
+</tr></table>
+}
+
+
+
+<pre><span id="VALbin_shape_stat_record"><span class="keyword">val</span> bin_shape_stat_record</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_stat_record"><span class="keyword">val</span> bin_size_stat_record</span> : <code class="type"><a href="Stat_record.html#TYPEstat_record">stat_record</a> -> int</code></pre>
+<pre><span id="VALbin_write_stat_record"><span class="keyword">val</span> bin_write_stat_record</span> : <code class="type">Bin_prot.Common.buf -><br>       pos:Bin_prot.Common.pos -> <a href="Stat_record.html#TYPEstat_record">stat_record</a> -> Bin_prot.Common.pos</code></pre>
+<pre><span id="VALbin_writer_stat_record"><span class="keyword">val</span> bin_writer_stat_record</span> : <code class="type"><a href="Stat_record.html#TYPEstat_record">stat_record</a> Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_stat_record__"><span class="keyword">val</span> __bin_read_stat_record__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_stat_record"><span class="keyword">val</span> bin_read_stat_record</span> : <code class="type">Bin_prot.Common.buf -><br>       pos_ref:Bin_prot.Common.pos_ref -> <a href="Stat_record.html#TYPEstat_record">stat_record</a></code></pre>
+<pre><span id="VALbin_reader_stat_record"><span class="keyword">val</span> bin_reader_stat_record</span> : <code class="type"><a href="Stat_record.html#TYPEstat_record">stat_record</a> Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_stat_record"><span class="keyword">val</span> bin_stat_record</span> : <code class="type"><a href="Stat_record.html#TYPEstat_record">stat_record</a> Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALstat_record_to_yojson"><span class="keyword">val</span> stat_record_to_yojson</span> : <code class="type"><a href="Stat_record.html#TYPEstat_record">stat_record</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALstat_record_of_yojson"><span class="keyword">val</span> stat_record_of_yojson</span> : <code class="type">Yojson.Safe.json -><br>       <a href="Stat_record.html#TYPEstat_record">stat_record</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span class="keyword">include</span> struct ... end</pre>
+
+<pre><span class="keyword">module</span> <a href="Stat_record.Default.html">Default</a>: <code class="code">sig</code> <a href="Stat_record.Default.html">..</a> <code class="code">end</code></pre>
+<pre><span id="VALstat2unix"><span class="keyword">val</span> stat2unix</span> : <code class="type"><a href="Stat_record.html#TYPEstat_record">stat_record</a> -> Unix.LargeFile.stats</code></pre>
+<pre><span id="VALunix2stat"><span class="keyword">val</span> unix2stat</span> : <code class="type">Unix.LargeFile.stats -> <a href="Stat_record.html#TYPEstat_record">stat_record</a></code></pre></body></html>

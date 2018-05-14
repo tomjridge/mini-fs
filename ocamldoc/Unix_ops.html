@@ -1,0 +1,63 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Stat_record.html">
+<link rel="next" href="Unix_with_int_handles.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Base_" rel="Chapter" href="Base_.html">
+<link title="Bigarray_buffer" rel="Chapter" href="Bigarray_buffer.html">
+<link title="Error_" rel="Chapter" href="Error_.html">
+<link title="Error_types" rel="Chapter" href="Error_types.html">
+<link title="Fuse_in_mem" rel="Chapter" href="Fuse_in_mem.html">
+<link title="Fuse_" rel="Chapter" href="Fuse_.html">
+<link title="Fuse_nfs" rel="Chapter" href="Fuse_nfs.html">
+<link title="In_mem" rel="Chapter" href="In_mem.html">
+<link title="Int_base_types" rel="Chapter" href="Int_base_types.html">
+<link title="Msgs" rel="Chapter" href="Msgs.html">
+<link title="Nfs_aux" rel="Chapter" href="Nfs_aux.html">
+<link title="Nfs_client" rel="Chapter" href="Nfs_client.html">
+<link title="Nfs_server" rel="Chapter" href="Nfs_server.html">
+<link title="Ops_type_" rel="Chapter" href="Ops_type_.html">
+<link title="Readdir'" rel="Chapter" href="Readdir'.html">
+<link title="R_" rel="Chapter" href="R_.html">
+<link title="Runtime_config" rel="Chapter" href="Runtime_config.html">
+<link title="Stat_record" rel="Chapter" href="Stat_record.html">
+<link title="Unix_ops" rel="Chapter" href="Unix_ops.html">
+<link title="Unix_with_int_handles" rel="Chapter" href="Unix_with_int_handles.html"><title>Unix_ops</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Stat_record.html" title="Stat_record">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Unix_with_int_handles.html" title="Unix_with_int_handles">Next</a>
+</div>
+<h1>Module <a href="type_Unix_ops.html">Unix_ops</a></h1>
+
+<pre><span class="keyword">module</span> Unix_ops: <code class="code">sig</code> <a href="Unix_ops.html">..</a> <code class="code">end</code></pre><hr width="100%">
+
+<pre><span class="keyword">module</span> <a href="Unix_ops.Unix_base_types.html">Unix_base_types</a>: <code class="code">sig</code> <a href="Unix_ops.Unix_base_types.html">..</a> <code class="code">end</code></pre>
+<pre><span class="keyword">include</span> Unix_base_types</pre>
+
+<pre><code><span id="TYPEextra_ops"><span class="keyword">type</span> <code class="type">('w, 't)</code> extra_ops</span> = {</code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code>&nbsp;&nbsp;</code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTextra_ops.delay">delay</span>&nbsp;: <code class="type">'a. ('w -> ('a, 't) Tjr_monad.Monad.m) -> ('a, 't) Tjr_monad.Monad.m</code>;</code></td>
+
+</tr></table>
+}
+
+
+
+<pre><span id="VAL_EOTHER"><span class="keyword">val</span> _EOTHER</span> : <code class="type">('a, [> `Error_other ]) Pervasives.result</code></pre>
+<pre><span id="VALmap_error'"><span class="keyword">val</span> map_error'</span> : <code class="type">monad_ops:'a Tjr_monad.Monad.monad_ops -><br>       ([ `EINVAL ] -><br>        (('b,<br>          [> `Error_exists<br>           | `Error_is_directory<br>           | `Error_no_entry<br>           | `Error_not_directory<br>           | `Error_not_empty<br>           | `Error_other ]<br>          as 'c)<br>         Pervasives.result, 'a)<br>        Tjr_monad.Monad.m) -><br>       Unix.error -> (('b, 'c) Pervasives.result, 'a) Tjr_monad.Monad.m</code></pre>
+<pre><span id="VALmk_ops"><span class="keyword">val</span> mk_ops</span> : <code class="type">monad_ops:'a Tjr_monad.Monad.monad_ops -><br>       extra:('b, 'a) <a href="Unix_ops.html#TYPEextra_ops">extra_ops</a> -><br>       (Unix.file_descr, Unix.dir_handle, 'a) Ops_type_.ops</code></pre>
+<pre><span id="VALunix_ops"><span class="keyword">val</span> unix_ops</span> : <code class="type">monad_ops:'a -><br>       unit -><br>       (Unix.file_descr, Unix.dir_handle, 'w Tjr_monad.state_passing) Ops_type_.ops</code></pre></body></html>

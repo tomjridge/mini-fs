@@ -1,0 +1,324 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="Start" href="index.html">
+<link rel="previous" href="Int_base_types.html">
+<link rel="next" href="Nfs_aux.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Index of module types" rel=Appendix href="index_module_types.html">
+<link title="Base_" rel="Chapter" href="Base_.html">
+<link title="Bigarray_buffer" rel="Chapter" href="Bigarray_buffer.html">
+<link title="Error_" rel="Chapter" href="Error_.html">
+<link title="Error_types" rel="Chapter" href="Error_types.html">
+<link title="Fuse_in_mem" rel="Chapter" href="Fuse_in_mem.html">
+<link title="Fuse_" rel="Chapter" href="Fuse_.html">
+<link title="Fuse_nfs" rel="Chapter" href="Fuse_nfs.html">
+<link title="In_mem" rel="Chapter" href="In_mem.html">
+<link title="Int_base_types" rel="Chapter" href="Int_base_types.html">
+<link title="Msgs" rel="Chapter" href="Msgs.html">
+<link title="Nfs_aux" rel="Chapter" href="Nfs_aux.html">
+<link title="Nfs_client" rel="Chapter" href="Nfs_client.html">
+<link title="Nfs_server" rel="Chapter" href="Nfs_server.html">
+<link title="Ops_type_" rel="Chapter" href="Ops_type_.html">
+<link title="Readdir'" rel="Chapter" href="Readdir'.html">
+<link title="R_" rel="Chapter" href="R_.html">
+<link title="Runtime_config" rel="Chapter" href="Runtime_config.html">
+<link title="Stat_record" rel="Chapter" href="Stat_record.html">
+<link title="Unix_ops" rel="Chapter" href="Unix_ops.html">
+<link title="Unix_with_int_handles" rel="Chapter" href="Unix_with_int_handles.html"><title>Msgs</title>
+</head>
+<body>
+<div class="navbar"><a class="pre" href="Int_base_types.html" title="Int_base_types">Previous</a>
+&nbsp;<a class="up" href="index.html" title="Index">Up</a>
+&nbsp;<a class="post" href="Nfs_aux.html" title="Nfs_aux">Next</a>
+</div>
+<h1>Module <a href="type_Msgs.html">Msgs</a></h1>
+
+<pre><span class="keyword">module</span> Msgs: <code class="code">sig</code> <a href="Msgs.html">..</a> <code class="code">end</code></pre><hr width="100%">
+
+<pre><span id="TYPElength"><span class="keyword">type</span> <code class="type"></code>length</span> = <code class="type">int</code> </pre>
+
+
+<pre><span id="VALbin_shape_length"><span class="keyword">val</span> bin_shape_length</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_length"><span class="keyword">val</span> bin_size_length</span> : <code class="type">int Bin_prot.Std.sizer</code></pre>
+<pre><span id="VALbin_write_length"><span class="keyword">val</span> bin_write_length</span> : <code class="type">int Bin_prot.Write.writer</code></pre>
+<pre><span id="VALbin_writer_length"><span class="keyword">val</span> bin_writer_length</span> : <code class="type">int Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_length__"><span class="keyword">val</span> __bin_read_length__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_length"><span class="keyword">val</span> bin_read_length</span> : <code class="type">int Bin_prot.Read.reader</code></pre>
+<pre><span id="VALbin_reader_length"><span class="keyword">val</span> bin_reader_length</span> : <code class="type">int Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_length"><span class="keyword">val</span> bin_length</span> : <code class="type">int Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALlength_to_yojson"><span class="keyword">val</span> length_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPElength">length</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALlength_of_yojson"><span class="keyword">val</span> length_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPElength">length</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span id="TYPEoffset"><span class="keyword">type</span> <code class="type"></code>offset</span> = <code class="type">int</code> </pre>
+
+
+<pre><span id="VALbin_shape_offset"><span class="keyword">val</span> bin_shape_offset</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_offset"><span class="keyword">val</span> bin_size_offset</span> : <code class="type">int Bin_prot.Std.sizer</code></pre>
+<pre><span id="VALbin_write_offset"><span class="keyword">val</span> bin_write_offset</span> : <code class="type">int Bin_prot.Write.writer</code></pre>
+<pre><span id="VALbin_writer_offset"><span class="keyword">val</span> bin_writer_offset</span> : <code class="type">int Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_offset__"><span class="keyword">val</span> __bin_read_offset__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_offset"><span class="keyword">val</span> bin_read_offset</span> : <code class="type">int Bin_prot.Read.reader</code></pre>
+<pre><span id="VALbin_reader_offset"><span class="keyword">val</span> bin_reader_offset</span> : <code class="type">int Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_offset"><span class="keyword">val</span> bin_offset</span> : <code class="type">int Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALoffset_to_yojson"><span class="keyword">val</span> offset_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEoffset">offset</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALoffset_of_yojson"><span class="keyword">val</span> offset_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPEoffset">offset</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span id="TYPEdh"><span class="keyword">type</span> <code class="type"></code>dh</span> = <code class="type">int</code> </pre>
+
+
+<pre><span id="VALbin_shape_dh"><span class="keyword">val</span> bin_shape_dh</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_dh"><span class="keyword">val</span> bin_size_dh</span> : <code class="type">int Bin_prot.Std.sizer</code></pre>
+<pre><span id="VALbin_write_dh"><span class="keyword">val</span> bin_write_dh</span> : <code class="type">int Bin_prot.Write.writer</code></pre>
+<pre><span id="VALbin_writer_dh"><span class="keyword">val</span> bin_writer_dh</span> : <code class="type">int Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_dh__"><span class="keyword">val</span> __bin_read_dh__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_dh"><span class="keyword">val</span> bin_read_dh</span> : <code class="type">int Bin_prot.Read.reader</code></pre>
+<pre><span id="VALbin_reader_dh"><span class="keyword">val</span> bin_reader_dh</span> : <code class="type">int Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_dh"><span class="keyword">val</span> bin_dh</span> : <code class="type">int Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALdh_to_yojson"><span class="keyword">val</span> dh_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEdh">dh</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALdh_of_yojson"><span class="keyword">val</span> dh_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPEdh">dh</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span id="TYPEfd"><span class="keyword">type</span> <code class="type"></code>fd</span> = <code class="type">int</code> </pre>
+
+
+<pre><span id="VALbin_shape_fd"><span class="keyword">val</span> bin_shape_fd</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_fd"><span class="keyword">val</span> bin_size_fd</span> : <code class="type">int Bin_prot.Std.sizer</code></pre>
+<pre><span id="VALbin_write_fd"><span class="keyword">val</span> bin_write_fd</span> : <code class="type">int Bin_prot.Write.writer</code></pre>
+<pre><span id="VALbin_writer_fd"><span class="keyword">val</span> bin_writer_fd</span> : <code class="type">int Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_fd__"><span class="keyword">val</span> __bin_read_fd__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_fd"><span class="keyword">val</span> bin_read_fd</span> : <code class="type">int Bin_prot.Read.reader</code></pre>
+<pre><span id="VALbin_reader_fd"><span class="keyword">val</span> bin_reader_fd</span> : <code class="type">int Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_fd"><span class="keyword">val</span> bin_fd</span> : <code class="type">int Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALfd_to_yojson"><span class="keyword">val</span> fd_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEfd">fd</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALfd_of_yojson"><span class="keyword">val</span> fd_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPEfd">fd</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span id="TYPEdata"><span class="keyword">type</span> <code class="type"></code>data</span> = <code class="type">string</code> </pre>
+
+
+<pre><span id="VALbin_shape_data"><span class="keyword">val</span> bin_shape_data</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_data"><span class="keyword">val</span> bin_size_data</span> : <code class="type">string Bin_prot.Std.sizer</code></pre>
+<pre><span id="VALbin_write_data"><span class="keyword">val</span> bin_write_data</span> : <code class="type">string Bin_prot.Write.writer</code></pre>
+<pre><span id="VALbin_writer_data"><span class="keyword">val</span> bin_writer_data</span> : <code class="type">string Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_data__"><span class="keyword">val</span> __bin_read_data__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_data"><span class="keyword">val</span> bin_read_data</span> : <code class="type">string Bin_prot.Read.reader</code></pre>
+<pre><span id="VALbin_reader_data"><span class="keyword">val</span> bin_reader_data</span> : <code class="type">string Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_data"><span class="keyword">val</span> bin_data</span> : <code class="type">string Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALdata_to_yojson"><span class="keyword">val</span> data_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEdata">data</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALdata_of_yojson"><span class="keyword">val</span> data_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPEdata">data</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span id="TYPEstat_record"><span class="keyword">type</span> <code class="type"></code>stat_record</span> = <code class="type">Base_.stat_record</code> </pre>
+
+
+<pre><code><span id="TYPEmsg_from_client"><span class="keyword">type</span> <code class="type"></code>msg_from_client</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Unlink"><span class="constructor">Unlink</span></span> <span class="keyword">of</span> <code class="type">Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Mkdir"><span class="constructor">Mkdir</span></span> <span class="keyword">of</span> <code class="type">Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Opendir"><span class="constructor">Opendir</span></span> <span class="keyword">of</span> <code class="type">Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Readdir"><span class="constructor">Readdir</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEdh">dh</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Closedir"><span class="constructor">Closedir</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEdh">dh</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Create"><span class="constructor">Create</span></span> <span class="keyword">of</span> <code class="type">Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Open"><span class="constructor">Open</span></span> <span class="keyword">of</span> <code class="type">Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Pread"><span class="constructor">Pread</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEfd">fd</a> * <a href="Msgs.html#TYPEoffset">offset</a> * int</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Pwrite"><span class="constructor">Pwrite</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEfd">fd</a> * <a href="Msgs.html#TYPEoffset">offset</a> * <a href="Msgs.html#TYPEdata">data</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Close"><span class="constructor">Close</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEfd">fd</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Rename"><span class="constructor">Rename</span></span> <span class="keyword">of</span> <code class="type">Base_.path * Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Truncate"><span class="constructor">Truncate</span></span> <span class="keyword">of</span> <code class="type">Base_.path * <a href="Msgs.html#TYPElength">length</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Stat"><span class="constructor">Stat</span></span> <span class="keyword">of</span> <code class="type">Base_.path</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_client.Reset"><span class="constructor">Reset</span></span></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALbin_shape_msg_from_client"><span class="keyword">val</span> bin_shape_msg_from_client</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_msg_from_client"><span class="keyword">val</span> bin_size_msg_from_client</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> -> int</code></pre>
+<pre><span id="VALbin_write_msg_from_client"><span class="keyword">val</span> bin_write_msg_from_client</span> : <code class="type">Bin_prot.Common.buf -><br>       pos:Bin_prot.Common.pos -> <a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> -> Bin_prot.Common.pos</code></pre>
+<pre><span id="VALbin_writer_msg_from_client"><span class="keyword">val</span> bin_writer_msg_from_client</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_msg_from_client__"><span class="keyword">val</span> __bin_read_msg_from_client__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_msg_from_client"><span class="keyword">val</span> bin_read_msg_from_client</span> : <code class="type">Bin_prot.Common.buf -><br>       pos_ref:Bin_prot.Common.pos_ref -> <a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a></code></pre>
+<pre><span id="VALbin_reader_msg_from_client"><span class="keyword">val</span> bin_reader_msg_from_client</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_msg_from_client"><span class="keyword">val</span> bin_msg_from_client</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALmsg_from_client_to_yojson"><span class="keyword">val</span> msg_from_client_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALmsg_from_client_of_yojson"><span class="keyword">val</span> msg_from_client_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPEmsg_from_client">msg_from_client</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><code><span id="TYPEmsg_from_server'"><span class="keyword">type</span> <code class="type"></code>msg_from_server'</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Unit"><span class="constructor">Unit</span></span></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Int"><span class="constructor">Int</span></span> <span class="keyword">of</span> <code class="type">int</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Dh"><span class="constructor">Dh</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEdh">dh</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Readdir'"><span class="constructor">Readdir'</span></span> <span class="keyword">of</span> <code class="type">string list * bool</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Open'"><span class="constructor">Open'</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEfd">fd</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Pread'"><span class="constructor">Pread'</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEdata">data</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Stat'"><span class="constructor">Stat'</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEstat_record">stat_record</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server'.Kind'"><span class="constructor">Kind'</span></span> <span class="keyword">of</span> <code class="type">Base_.st_kind</code></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALbin_shape_msg_from_server'"><span class="keyword">val</span> bin_shape_msg_from_server'</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_msg_from_server'"><span class="keyword">val</span> bin_size_msg_from_server'</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> -> int</code></pre>
+<pre><span id="VALbin_write_msg_from_server'"><span class="keyword">val</span> bin_write_msg_from_server'</span> : <code class="type">Bin_prot.Common.buf -><br>       pos:Bin_prot.Common.pos -> <a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> -> Bin_prot.Common.pos</code></pre>
+<pre><span id="VALbin_writer_msg_from_server'"><span class="keyword">val</span> bin_writer_msg_from_server'</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_msg_from_server'__"><span class="keyword">val</span> __bin_read_msg_from_server'__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_msg_from_server'"><span class="keyword">val</span> bin_read_msg_from_server'</span> : <code class="type">Bin_prot.Common.buf -><br>       pos_ref:Bin_prot.Common.pos_ref -> <a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a></code></pre>
+<pre><span id="VALbin_reader_msg_from_server'"><span class="keyword">val</span> bin_reader_msg_from_server'</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_msg_from_server'"><span class="keyword">val</span> bin_msg_from_server'</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALmsg_from_server'_to_yojson"><span class="keyword">val</span> msg_from_server'_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALmsg_from_server'_of_yojson"><span class="keyword">val</span> msg_from_server'_of_yojson</span> : <code class="type">Yojson.Safe.json -><br>       <a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><code><span id="TYPEmsg_from_server"><span class="keyword">type</span> <code class="type"></code>msg_from_server</span> = </code></pre><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server.Ok_"><span class="constructor">Ok_</span></span> <span class="keyword">of</span> <code class="type"><a href="Msgs.html#TYPEmsg_from_server'">msg_from_server'</a></code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span id="TYPEELTmsg_from_server.Error_"><span class="constructor">Error_</span></span> <span class="keyword">of</span> <code class="type">Base_.exn_</code></code></td>
+
+</tr></table>
+
+
+
+<pre><span id="VALbin_shape_msg_from_server"><span class="keyword">val</span> bin_shape_msg_from_server</span> : <code class="type">Bin_prot.Shape.t</code></pre>
+<pre><span id="VALbin_size_msg_from_server"><span class="keyword">val</span> bin_size_msg_from_server</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> -> int</code></pre>
+<pre><span id="VALbin_write_msg_from_server"><span class="keyword">val</span> bin_write_msg_from_server</span> : <code class="type">Bin_prot.Common.buf -><br>       pos:Bin_prot.Common.pos -> <a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> -> Bin_prot.Common.pos</code></pre>
+<pre><span id="VALbin_writer_msg_from_server"><span class="keyword">val</span> bin_writer_msg_from_server</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> Bin_prot.Type_class.writer</code></pre>
+<pre><span id="VAL__bin_read_msg_from_server__"><span class="keyword">val</span> __bin_read_msg_from_server__</span> : <code class="type">'a -> pos_ref:Bin_prot.Common.pos Pervasives.ref -> 'b -> 'c</code></pre>
+<pre><span id="VALbin_read_msg_from_server"><span class="keyword">val</span> bin_read_msg_from_server</span> : <code class="type">Bin_prot.Common.buf -><br>       pos_ref:Bin_prot.Common.pos_ref -> <a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a></code></pre>
+<pre><span id="VALbin_reader_msg_from_server"><span class="keyword">val</span> bin_reader_msg_from_server</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> Bin_prot.Type_class.reader</code></pre>
+<pre><span id="VALbin_msg_from_server"><span class="keyword">val</span> bin_msg_from_server</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> Bin_prot.Type_class.t</code></pre>
+<pre><span id="VALmsg_from_server_to_yojson"><span class="keyword">val</span> msg_from_server_to_yojson</span> : <code class="type"><a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> -> Yojson.Safe.json</code></pre>
+<pre><span id="VALmsg_from_server_of_yojson"><span class="keyword">val</span> msg_from_server_of_yojson</span> : <code class="type">Yojson.Safe.json -> <a href="Msgs.html#TYPEmsg_from_server">msg_from_server</a> Ppx_deriving_yojson_runtime.error_or</code></pre>
+<pre><span class="keyword">include</span> struct ... end</pre>
+</body></html>
