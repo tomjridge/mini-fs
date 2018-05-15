@@ -322,7 +322,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
      layer ot deal with follow; FIXME not sure about `If_trailing_slash  *)
   let unlink path = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
-    let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    let { parent_id=pid; comp=name; result; trailing_slash } = rpath in
     begin
       extra_ops.with_fs (fun s ->
           s.dirs |> fun dirs ->
@@ -349,7 +349,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   (* FIXME meta changes for parent and child *)
   let mkdir path : ((unit,'e5)result,'t) m = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
-    let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    let { parent_id=pid; comp=name; result; trailing_slash } = rpath in
     match result with 
     | Missing -> (
         begin
@@ -426,7 +426,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
 
   let create path : ((unit,'e6)result,'t) m = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
-    let Tjr_path_resolution.{ parent_id=parent; comp=name; result; trailing_slash } = rpath in
+    let { parent_id=parent; comp=name; result; trailing_slash } = rpath in
     extra_ops.new_fid () >>= fun (fid:fid) -> 
     let meta = mk_meta() in
     extra_ops.with_fs (fun s -> 
@@ -621,7 +621,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   (* FIXME here and elsewhere atim is not really dealt with *)
   let stat path = 
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
-    let Tjr_path_resolution.{ parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    let { parent_id=pid; comp=name; result; trailing_slash } = rpath in
     begin
       match result with
       | Missing -> return `Error_no_entry
@@ -727,7 +727,8 @@ let mk_extra_ops ~monad_ops ~(extra_core:'t Extra_core.t) =
   let ( >>= ) = monad_ops.bind in
   let return = monad_ops.return in
   
-  let Extra_core.{with_fs;internal_err} = extra_core in
+  (* following was Extra_core.{with_fs,internal_err} = extra_core, but there was a ppx bug https://github.com/ocaml-ppx/ocaml-migrate-parsetree/issues/18 *)
+  let with_fs,internal_err = Extra_core.(extra_core.with_fs,extra_core.internal_err) in
 
   let new_did () = with_fs (fun fs ->
       { fs with max_did=(inc_did fs.max_did) } |> fun fs' ->

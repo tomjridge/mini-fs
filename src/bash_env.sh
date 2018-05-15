@@ -5,6 +5,8 @@ libname=tjr_minifs
 Libname=Tjr_minifs
 meta_description="Minimal file-system-like thing"
 
+# NOTE Fuse is the ocamlfind package, but opam needs ocamlfuse
+# FIXME need to ensure that META is correct
 required_packages="extunix,extlib,Fuse,tjr_lib,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net,tjr_path_resolution"
 
 natives=""
@@ -175,7 +177,7 @@ cat >META <<EOF
 name="$libname"
 description="$meta_description"
 version="$d $gv"
-requires="$required_packages"
+requires="$required_packages"  # opam ocamlfuse is ocamlfind Fuse
 archive(byte)="$libname.cma"
 archive(native)="$libname.cmxa"
 EOF
