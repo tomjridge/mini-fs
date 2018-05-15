@@ -243,13 +243,33 @@ let mk_ops ~monad_ops ~extra =
       | `EINVAL -> handle_EINVAL ()
   in
 
+  let symlink contents path =
+    delay @@ fun _ ->
+    try
+      Unix.symlink contents path;
+      return (Ok())
+    with
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> handle_EINVAL ()
+  in
 
+  let readlink path = 
+    delay @@ fun _ ->
+    try
+      Unix.readlink path |> fun contents ->
+      return (Ok contents)
+    with
+    | Unix.Unix_error(e,_,_) -> 
+      e |> map_error @@ function
+      | `EINVAL -> handle_EINVAL ()
+  in
 
   let reset () = return () in
 
 
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; reset }
+    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
 
 
 let unix_ops ~monad_ops () =

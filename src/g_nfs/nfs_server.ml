@@ -75,6 +75,8 @@ let mk_serve
   let rename src dst = ops.rename src dst >>=| ret_unit in
   let truncate ~path ~length = ops.truncate ~path ~length >>=| ret_unit in
   let stat p = ops.stat p >>=| fun st -> Stat' st in
+  let symlink contents p = ops.symlink contents p >>=| ret_unit in
+  let readlink p = ops.readlink p >>=| fun s -> Readlink' s in
   let serve' = function
     | Unlink path -> unlink path
     | Mkdir path -> mkdir path
@@ -89,6 +91,8 @@ let mk_serve
     | Rename (src,dst) -> rename src dst
     | Truncate(path,length) -> truncate ~path ~length 
     | Stat p -> stat p
+    | Symlink(cs,p) -> symlink cs p 
+    | Readlink p -> readlink p
     | Reset -> ops.reset () >>= fun () -> return (Ok_ Unit)
   in
   let _ :msg_from_client -> (msg_from_server,'w) m = serve' in

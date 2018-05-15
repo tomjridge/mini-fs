@@ -14,6 +14,8 @@ type close_err = err_ (* EBADF, but for valid fd, fd will be closed *)
 type rename_err = err_
 type truncate_err = err_
 type stat_err = err_
+type symlink_err = err_
+type readlink_err = err_
 
 (* we often need to map our errors into standard unix errors eg when
    dealing with fuse; in the unix module, we need to construct the

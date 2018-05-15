@@ -28,6 +28,8 @@ module type OPS_TYPE = sig
     rename: path -> path -> ((unit,rename_err)r_,  'w) m;
     truncate : path:path -> length:int -> ((unit,truncate_err)r_,  'w) m;
     stat : path -> ((stat_record,stat_err)r_,  'w) m;
+    symlink: path -> path -> ((unit,symlink_err)r_, 'w) m;
+    readlink: path -> ((string,readlink_err)r_,'w) m;
     reset : unit -> (unit,  'w) m;
   }
 end
@@ -56,6 +58,8 @@ module Ops_type_with_result' = struct
     rename: path -> path -> ((unit,rename_err)r_,  'w) m;
     truncate : path:path -> length:int -> ((unit,truncate_err)r_,  'w) m;
     stat : path -> ((stat_record,stat_err)r_,  'w) m;
+    symlink: path -> path -> ((unit,symlink_err)r_, 'w) m;
+    readlink: path -> ((string,readlink_err)r_,'w) m;
     reset : unit -> (unit,  'w) m;
   }
 end

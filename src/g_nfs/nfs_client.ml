@@ -97,12 +97,19 @@ let mk_client_ops (* (type t) *)
     | Stat' st -> return st
     | _ -> internal_err @@ "stat_file, "^ty_err^" mnfs.68"
   in
+  let symlink contents path =
+    Symlink(contents,path) |> call >>= ret_unit in
+  let readlink path =
+    Readlink(path) |> call >>=| function
+    | Readlink' s -> return s 
+    | _ -> internal_err @@ "readlink, "^ty_err^" mnfs.105"
+  in
   let reset () = Reset |> call >>= function 
     | Ok_ Unit -> return ()
     | _ -> internal_err @@ "reset, "^ty_err^" mnfs.92"
   in
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; reset }
+    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
 
 
 (* specialize mk_client_ops *)

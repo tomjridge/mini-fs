@@ -656,10 +656,52 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
+  let symlink contents path =
+    resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
+    let { parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    begin
+      let meta = mk_meta() in
+      extra_ops.with_fs (fun s ->
+          match result with
+          | Missing -> (
+              s.dirs |> fun dirs ->
+              dirs_ops.map_find pid dirs |> function
+              | None -> `Internal "impossible",s
+              | Some pdir -> 
+                dir_add name (Symlink contents) pdir |> fun pdir ->
+                (* update pdir meta *)
+                {pdir with meta} |> fun pdir ->
+                dirs_ops.map_add pid pdir dirs |> fun dirs ->
+                {s with dirs} |> fun s ->
+                `Ok,s)
+          | _ -> `Error_exists,s)
+    end
+    >>= function
+    | `Ok -> return (Ok ())
+    | `Error_exists -> return (Error `Error_exists)
+    | `Internal s -> extra_ops.internal_err s
+  in
+
+
+  let readlink path = 
+    resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
+    let { parent_id=pid; comp=name; result; trailing_slash } = rpath in
+    begin
+      extra_ops.with_fs (fun s ->
+          match result with
+          | Sym str -> (`Ok str,s)
+          | _ -> `Error_not_symlink,s)
+    end
+    >>= function
+    | `Ok s -> return (Ok s)
+    | `Error_not_symlink -> return (Error `Error_not_symlink)
+    | `Internal s -> extra_ops.internal_err s
+  in
+
   let reset () = return () in
 
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; reset }
+    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
 
 let _ = mk_ops
 

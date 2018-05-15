@@ -83,10 +83,14 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
 
   let stat path = ops.stat path in
 
+  let symlink contents path = ops.symlink contents path in
+
+  let readlink path = ops.readlink path in
+
   let reset () = ops.reset () in
 
   { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; reset }
+    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
   
 
 

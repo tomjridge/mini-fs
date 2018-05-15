@@ -98,6 +98,16 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
   in
 
 
+  let symlink src dst =
+    ops.symlink src dst >>=| fun () ->
+    return (Ok ())
+  in
+
+  let readlink p = 
+    ops.readlink p >>=| fun s ->
+    return (Ok s)
+  in
+
   (* hack to avoid errors for apps that expect chmod *)
   let chmod path i = () in
   let utime path atim mtim = () in
@@ -131,6 +141,8 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
   let rename = wrap2 rename in
   let truncate = wrap2 truncate in
   let getattr = wrap1 getattr in
+  let symlink = wrap2 symlink in
+  let readlink = wrap1 readlink in
 
   { default_operations with 
     init = (fun () -> Printf.printf "filesystem started\n%!");
@@ -147,6 +159,8 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     getattr;
     chmod;
     utime;
+    symlink;
+    readlink;
   } [@@ocaml.warning "-26"]
 
 let readdir' ~ops = Readdir'.readdir' ~ops

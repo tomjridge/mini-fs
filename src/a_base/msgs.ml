@@ -31,6 +31,8 @@ type msg_from_client =
   | Rename of path * path
   | Truncate of path * length
   | Stat of path
+  | Symlink of string * path
+  | Readlink of path
   | Reset
 [@@deriving bin_io, yojson]
                
@@ -43,7 +45,9 @@ type msg_from_server' =
   | Open' of fd
   | Pread' of data
   | Stat' of stat_record
-  | Kind' of st_kind [@@deriving bin_io, yojson]
+  | Kind' of st_kind 
+  | Readlink' of string
+[@@deriving bin_io, yojson]
 
 
 (* or just use error in monad? *)
