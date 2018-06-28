@@ -15,7 +15,7 @@ all: links
 	$$ocamlopt -c $$mls
 	mk_cmxa
 	$(MAKE) install
-	$(MAKE) -C ../bin
+	$(MAKE) -C ../bin  # FIXME probably we don't want to do this from here
 
 run: all
 	$(MAKE) -C ../bin run
@@ -29,12 +29,15 @@ install:
 	install
 
 
-clean:
+clean: FORCE
 	clean
+	$(MAKE) -C ../bin clean
+
+
+real_clean: clean
 	clean_links
 	rm -f META
 	rm -f *.html
-	$(MAKE) -C ../bin clean
 
 
 # doc ------------------------------------------------------------------
