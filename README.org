@@ -3,3 +3,24 @@
 What exactly is a file system? Roughly, it is two maps (one for dirs,
 one for files). But there is also the POSIX API etc. This is a minimal
 version, suitable to understand single-process use of a filesystem.
+
+* Dependencies
+
+opam packages:
+| ocamlfuse           | for FUSE support | ocamlfind lib Fuse |
+| ppx_bin_prot        | deriving bin_io  |                    |
+| ppx_deriving_yojson | deriving yojson  |                    |
+
+
+other packages:
+| tjr_lib             |
+| tjr_net             |
+| tjr_path_resolution |
+
+
+
+old:
+| extunix, extlib |            |
+| core            |            |
+| lwt             | nfs_client |
+| lwt.unix        |            |
