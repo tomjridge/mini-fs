@@ -1,1 +1,1 @@
-ocamlfuse ppx_bin_prot ppx_deriving_yojson
+ocamlfuse ppx_bin_prot ppx_deriving_yojson extunix

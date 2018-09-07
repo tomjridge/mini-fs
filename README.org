@@ -10,6 +10,7 @@ opam packages:
 | ocamlfuse           | for FUSE support | ocamlfind lib Fuse |
 | ppx_bin_prot        | deriving bin_io  |                    |
 | ppx_deriving_yojson | deriving yojson  |                    |
+| extunix             | pread, pwrite    |                    |
 
 
 other packages:
@@ -20,7 +21,7 @@ other packages:
 
 
 old:
-| extunix, extlib |            |
-| core            |            |
-| lwt             | nfs_client |
-| lwt.unix        |            |
+| extlib   |            |
+| core     |            |
+| lwt      | nfs_client |
+| lwt.unix |            |
