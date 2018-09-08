@@ -14,8 +14,9 @@ all: links
 	mk_cma
 	$$ocamlopt -c $$mls
 	mk_cmxa
-	$(MAKE) install
-	$(MAKE) -C ../bin  # FIXME probably we don't want to do this from here
+
+#	$(MAKE) install
+#	$(MAKE) -C ../bin  # FIXME probably we don't want to do this from here
 
 run: all
 	$(MAKE) -C ../bin run
@@ -28,6 +29,8 @@ install:
 	-remove
 	install
 
+uninstall:
+	remove
 
 clean: FORCE
 	clean
