@@ -1,4 +1,6 @@
-* minifs, a minimal file-system-like thing
+-*- org -*-
+
+* mini-fs, a minimal file-system-like thing
 
 What exactly is a file system? Roughly, it is two maps (one for dirs,
 one for files). But there is also the POSIX API etc. This is a minimal
@@ -13,10 +15,9 @@ opam packages:
 | extunix             | pread, pwrite    |                    |
 
 
-other packages:
-| tjr_lib             |
-| tjr_net             |
-| tjr_path_resolution |
+tjr:
+| tjr_path_resolution |            |
+| tjr_net             | networking |
 
 
 
