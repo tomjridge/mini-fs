@@ -7,7 +7,7 @@ meta_description="Minimal file-system-like thing"
 
 # NOTE Fuse is the ocamlfind package, but opam needs ocamlfuse
 # FIXME need to ensure that META is correct
-required_packages="extunix,extlib,Fuse,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net,tjr_path_resolution"
+required_packages="extunix,extlib,ocamlfuse,core,ppx_bin_prot,ppx_deriving_yojson,lwt,lwt.unix,tjr_net,tjr_path_resolution"
 
 natives=""
 bytes=""
