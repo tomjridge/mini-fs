@@ -1,4 +1,4 @@
-open Error_
+(* open Error_ *)
 open Base_
 
 open Bin_prot.Std
@@ -65,7 +65,7 @@ let string_to_msg_s s =
   s |> Yojson.Safe.from_string |> msg_from_server_of_yojson
   |> function
   | Ok x -> x
-  | Error e -> 
+  | Error _e -> 
     exit_1 __LOC__        
 
 let msg_c_to_string m = 
@@ -75,6 +75,6 @@ let string_to_msg_c s =
   s |> Yojson.Safe.from_string |> msg_from_client_of_yojson
   |> function
   | Ok x -> x
-  | Error e -> 
+  | Error _e -> 
     exit_1 __LOC__ 
 

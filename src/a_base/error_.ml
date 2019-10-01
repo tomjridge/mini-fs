@@ -1,4 +1,4 @@
-open Bin_prot.Std
+(* open Bin_prot.Std *)
 
 type exn_ = [ 
     | `Error_no_entry
@@ -40,24 +40,24 @@ end
 (* NOTE going the other way, for unix_ops, we want to trap a
    particular error and return the corresponding exn_ *)
 
-(* Inl are errors we can deal with; Inr need context *)
+(* First are errors we can deal with; Second need context *)
 include struct
-  open Tjr_either
+  (* open Tjr_either *)
   open Unix
   let map_error = function
-    | EEXIST -> Inl `Error_exists
-    | EINVAL -> Inr `EINVAL  (* !!! *)
-    | EISDIR -> Inl `Error_is_directory
-    | ENOENT -> Inl `Error_no_entry
-    | ENOTDIR -> Inl `Error_not_directory
-    | ENOTEMPTY -> Inl `Error_not_empty
+    | EEXIST -> First `Error_exists
+    | EINVAL -> Second `EINVAL  (* !!! *)
+    | EISDIR -> First `Error_is_directory
+    | ENOENT -> First `Error_no_entry
+    | ENOTDIR -> First `Error_not_directory
+    | ENOTEMPTY -> First `Error_not_empty
     | e -> 
       (* FIXME maybe add more here *)
       Printf.sprintf "Unknown error: %s\n" (Unix.error_message e) |> print_endline;
-      Inr `SOME_OTHER_ERROR  (* !!! *)
+      Second `SOME_OTHER_ERROR  (* !!! *)
   let _ = map_error
 
   (* NOTE these are the errors that we have to handle manually when
      they are caught from Unix. calls *)
-  type map_error_inr = [ `EINVAL | `SOME_OTHER_ERROR ]
+  type map_error_second = [ `EINVAL | `SOME_OTHER_ERROR ]
 end

@@ -3,8 +3,8 @@
 (* the client makes network calls, which potentially could be in lwt.m
    or unix.m; so we parameterize over ops *)
 
-open Tjr_monad
-open Tjr_monad.Monad
+(* open Tjr_monad *)
+(* open Tjr_monad.Monad *)
 open Base_
 open Ops_type_
 

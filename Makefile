@@ -1,12 +1,11 @@
-build:
-	$(MAKE) -C src # FIXME also installs and builds bin/ currently 
+TMP_DOC_DIR:=/tmp/tjr_path_resolution
+#scratch:=/tmp/l/github/scratch
 
-install:
-	$(MAKE) -C src install
+default: all
+-include Makefile.ocaml
 
-uninstall:
-	$(MAKE) -C src uninstall
+# run:
+# 	cd test && $(test)
 
-clean:
-	$(MAKE) -C src clean
-	$(MAKE) -C bin clean
+# for auto-completion of Makefile target
+clean::

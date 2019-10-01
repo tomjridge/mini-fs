@@ -25,7 +25,7 @@ let quad_to_addr q =
   ADDR_INET(Unix.inet_addr_of_string q.ip, q.port)
 
 
-let get_config ~filename = 
+let get_config ~filename:_ = 
   let c = 
     Tjr_file.read_file "config.json" 
     |> Yojson.Safe.from_string
@@ -34,7 +34,7 @@ let get_config ~filename =
     | Ok c -> c
     | Error _ -> failwith __LOC__
   in
-  let open Unix in
+  (* let open Unix in *)
   let c' = c.client |> quad_to_addr in
   let s = c.server |> quad_to_addr in
 

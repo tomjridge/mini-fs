@@ -12,8 +12,8 @@ let exit_1 = failwith  (* hopefully not be caught *)
 
 (* following for strings *)
 let dirname_basename path = 
-  assert (Tjr_string.starts_with ~prefix:"/" path);
-  Tjr_string.split_on_last ~sub:"/" path |> fun (p,c) -> 
+  assert (String_.starts_with ~prefix:"/" path);
+  String_.split_on_last ~sub:"/" path |> fun (p,c) -> 
   (* the semantics is that dirname is an absolute path *)
   (if p="" then "/" else p),c
 

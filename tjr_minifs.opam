@@ -1,0 +1,32 @@
+opam-version : "2.0"
+name         : "tjr_minifs"
+version      : "0.0.1" 
+synopsis     : "Description FIXME"
+
+# ----------------------------------------------------------------------
+
+maintainer  : "Tom Ridge <tom.j.ridge@googlemail.com>"
+authors     : "Tom Ridge <tom.j.ridge@googlemail.com>"
+homepage    : "https://github.com/tomjridge/???"
+bug-reports : "https://github.com/tomjridge/???/issues"
+dev-repo    : "git://github.com/tomjridge/???.git"
+
+# ----------------------------------------------------------------------
+
+depends: [
+  "ocamlfind"
+  "dune"
+  "ocamlfuse"
+  "ppx_jane"
+  "ppx_deriving_yojson"
+  "extunix"
+  "base"
+  "lwt"
+  "lwt.unix"
+  "tjr_net"
+  "tjr_path_resolution"
+]
+
+# ----------------------------------------------------------------------
+
+build: ["dune" "build" "-p" name "-j" jobs]

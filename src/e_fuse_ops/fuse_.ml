@@ -1,13 +1,13 @@
 (* bind ops to fuse ----------------------------------- *)
 
-open Tjr_monad
-open Tjr_monad.Monad
+(* open Tjr_monad *)
+(* open Tjr_monad.Monad *)
 open Base_
 open Ops_type_
 
-open Unix
-open LargeFile
-open Bigarray
+(* open Unix *)
+(* open LargeFile *)
+(* open Bigarray *)
 open Fuse
 (* FIXME wrap operations so they return unix_error *)
 
@@ -109,8 +109,8 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
   in
 
   (* hack to avoid errors for apps that expect chmod *)
-  let chmod path i = () in
-  let utime path atim mtim = () in
+  let chmod _path _i = () in
+  let utime _path _atim _mtim = () in
 
 
   let maybe_raise a = a |> co_eta |> function
@@ -151,7 +151,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     mkdir;    
     readdir;
     fopen;
-    mknod = (fun path mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* NOTE gets called instead of fopen to create a file *)
+    mknod = (fun path _mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* NOTE gets called instead of fopen to create a file *)
     read;
     write;
     rename;
