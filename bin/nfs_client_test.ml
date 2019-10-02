@@ -1,6 +1,6 @@
 (* nfs client test  ------------------------------------------------- *)
 
-open Tjr_connection
+(* open Tjr_connection *)
 open Tjr_minifs
 open Base_
 open Ops_type_
@@ -13,7 +13,7 @@ module Connection = Tjr_connection.Unix_
 let _ = Runtime_config.test()
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server ~log_everything -> client
+  fun ~client ~server:_ ~log_everything:_ -> client
 
 
 (* monad ------------------------------------------------------------ *)

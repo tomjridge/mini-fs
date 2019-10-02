@@ -1,0 +1,12 @@
+(env
+  (_ (flags (:standard -open Tjr_net ))))
+
+
+(executables
+  (names fuse_in_mem_main fuse_nfs_client nfs_server_in_mem nfs_client_test nfs_server_unix)
+  (libraries tjr_minifs)
+)
+
+(alias
+  (name all_exes)
+  (deps fuse_in_mem_main.exe fuse_nfs_client.exe nfs_server_in_mem.exe nfs_client_test.exe nfs_server_unix.exe))

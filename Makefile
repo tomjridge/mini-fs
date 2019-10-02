@@ -5,10 +5,12 @@ default: all
 -include Makefile.ocaml
 
 all::
-	$(MAKE) -C bin
+	$(DUNE) build @bin/all_exes
+	find _build -name "*.exe" -exec cp \{\} . \;  # copy exes to this directory
 
 # run:
 # 	cd test && $(test)
 
 # for auto-completion of Makefile target
 clean::
+	rm -f *.exe

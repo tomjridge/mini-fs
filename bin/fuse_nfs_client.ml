@@ -2,10 +2,10 @@
 
 (* we follow nfs_client, but wrap in a fuse binding *)
 open Tjr_monad
-open Tjr_connection
+(* open Tjr_connection *)
 open Tjr_minifs
-open Base_
-open Ops_type_
+(* open Base_ *)
+(* open Ops_type_ *)
 
 (* monad ------------------------------------------------------------ *)
 
@@ -18,14 +18,14 @@ let monad_ops = State_passing.monad_ops ()
 module Connection = Tjr_connection.Unix_
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server ~log_everything -> client
+  fun ~client ~server:_ ~log_everything:_ -> client
 
 (* FIXME put all state in this module? *)
 let conn = 
   Connection.connect ~quad
   |> function 
   | Ok fd -> fd
-  | Error e -> 
+  | Error _e -> 
     failwith __LOC__
 
 let call = Nfs_client.State_passing_call.call ~conn

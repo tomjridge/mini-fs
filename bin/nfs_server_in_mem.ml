@@ -3,7 +3,7 @@
 open Tjr_monad
 (* open Tjr_monad.Monad *)
 
-open Tjr_connection
+(* open Tjr_connection *)
 open Tjr_minifs
 open Base_
 open Msgs
@@ -42,7 +42,7 @@ let send ~conn (m:msg_from_server) =
 (* main ------------------------------------------------------------- *)
 
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
-  fun ~client ~server ~log_everything -> server
+  fun ~client:_ ~server ~log_everything:_ -> server
 
 let run ~init_state m = State_passing.to_fun m init_state
 
@@ -52,7 +52,7 @@ let main () =
   let w_ref = ref init_t in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad >>= function
-  | Error e -> failwith __LOC__
+  | Error _e -> failwith __LOC__
   | Ok conn ->
     let rec loop () = 
       recv_string ~conn >>= function
