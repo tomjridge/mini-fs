@@ -4,6 +4,11 @@ What exactly is a file system? Roughly, it is two maps (one for dirs,
 one for files). But there is also the POSIX API etc. This is a minimal
 version, suitable to understand single-process use of a filesystem.
 
+## Docs
+
+<https://tomjridge.github.io/mini-fs/>
+
+
 ## Dependencies
 
 | Dependency                   | Description  |
