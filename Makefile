@@ -1,4 +1,4 @@
-TMP_DOC_DIR:=/tmp/tjr_path_resolution
+TMP_DOC_DIR:=/tmp/minifs
 #scratch:=/tmp/l/github/scratch
 
 default: all
