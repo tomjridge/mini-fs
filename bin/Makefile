@@ -14,7 +14,7 @@ natives: fuse_in_mem_main.native fuse_nfs_client.native nfs_server_in_mem.native
 # 
 
 %.native: %.ml FORCE
-	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs,tjr_net -linkpkg -o $*.native $*.ml
+	ocamlfind ocamlopt -w -58 -thread -package tjr_minifs,tjr_net -open Tjr_net -linkpkg -o $*.native $*.ml
 
 
 # fuse options:

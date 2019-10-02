@@ -34,8 +34,8 @@ let _EOTHER = Error `Error_other
 let map_error' ~monad_ops (f : [ `EINVAL ] -> 'a) e =
   let return = monad_ops.return in
   Error_.map_error e |> function
-  | Inl e -> return (Error e)
-  | Inr e -> match e with
+  | First e -> return (Error e)
+  | Second e -> match e with
     | `EINVAL -> f `EINVAL
     | `SOME_OTHER_ERROR -> return _EOTHER
 
@@ -44,7 +44,7 @@ let _ = map_error'
 
 let mk_ops ~monad_ops ~extra = 
 
-  let ( >>= ) = monad_ops.bind in
+  (* let ( >>= ) = monad_ops.bind in *)
   let return = monad_ops.return in
 
   (* FIXME refine behaviour in following *)
@@ -112,7 +112,7 @@ let mk_ops ~monad_ops ~extra =
   let opendir path = 
     delay @@ fun _ ->
     try 
-      return (Ok (mk_dh path))
+      return (Ok (mk_dh ~path))
     with 
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
@@ -203,7 +203,7 @@ let mk_ops ~monad_ops ~extra =
     try 
       Unix.close fd; return (Ok())
     with
-    | Unix.Unix_error(e,_,_) -> return _EOTHER
+    | Unix.Unix_error(_e,_,_) -> return _EOTHER
   in 
   (* FIXME record which fd are open? *)
 
@@ -272,17 +272,17 @@ let mk_ops ~monad_ops ~extra =
     pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
 
 
-let unix_ops ~monad_ops () =
+let unix_ops ~monad_ops:_ () =
   (* define within unix_ops, otherwise an error about type vars that
      cannot be generalized *)
-  let open State_passing_instance in
+  let open Tjr_monad.State_passing in
   let monad_ops = monad_ops () in
       
   let ( >>= ) = monad_ops.bind in
 
   let delay : 'a. ('w -> ('a,'w state_passing) m) -> ('a,'w state_passing) m =
     fun f -> 
-      with_world(fun w -> w,w) >>= f 
+      of_fun(fun w -> w,w) >>= f 
   in
 
   let extra = { delay } in

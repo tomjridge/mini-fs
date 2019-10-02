@@ -128,14 +128,14 @@ let _ = mk_client_ops
 (* we also need to implement call: msg_from_client->msg_from_server m;
    here we specialize to step_monad *)
 module State_passing_call = struct
-  open State_passing_instance
+  open State_passing
   open Msgs
 
   (* NOTE specialized to unix impl *)
   module Connection = Tjr_connection.Unix_
 
   let call ~conn (m:msg_from_client) : (msg_from_server,'w state_passing) m = 
-    with_world(fun w -> 
+    of_fun(fun w -> 
         m |> msg_c_to_string |> fun s -> 
         log_.log_lazy (fun () -> Printf.sprintf "sending %s\n" s);
         s |> Connection.send_string ~conn 

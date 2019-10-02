@@ -247,5 +247,9 @@ S a_base
 S d_ops_types
 S e_fuse_ops
 S e_in_mem_ops
+S f_unix_ops
+S g_fuse_in_mem
+S g_nfs
+S h_mount_nfs_as_fuse
 FLG -ppx '/tmp/l/github/an_imp/f_mini-fs/_build/default/.ppx/864c506360c916267443b5a56ada7d1a/ppx.exe --as-ppx --cookie '\''library-name="tjr_minifs"'\'''
 FLG -open Tjr_minifs -w @a-4-29-40-41-42-44-45-48-58-59-60-40 -strict-sequence -strict-formats -short-paths -keep-locs -open Base.Either -open Tjr_lib -open Tjr_monad -open Tjr_fs_shared -open Tjr_path_resolution -open Tjr_net

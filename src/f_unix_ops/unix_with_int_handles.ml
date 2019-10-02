@@ -4,10 +4,10 @@
    (with key the genint) into a map; subsequently, we only pass the
    genint to the client *)
 
-open Tjr_monad
-open Tjr_monad.Monad
+(* open Tjr_monad *)
+(* open Tjr_monad.Monad *)
 
-open Tjr_map
+(* open Tjr_map *)
 open Base_
 open Ops_type_
 
@@ -25,7 +25,7 @@ let init_fd_dh_map = {
 
 (* we assume we can get the fd_dh_map from the world 'w *)
 
-let genint = Tjr_gensym.gensym
+let genint () = Gensym.gensym ()
 
 
 (* target ops_type ----------------------------------------------- *)
@@ -34,7 +34,7 @@ let genint = Tjr_gensym.gensym
 
 type 'w ops_type = (int,int,'w) Ops_type_.ops
 
-open Unix_ops
+(* open Unix_ops *)
 
 let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd = 
   let ( >>= ) = monad_ops.bind in
@@ -97,20 +97,20 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
 (* aux funs dh2i etc ------------------------------------------------ *)
 
 include struct
-  open Tjr_monad.State_passing_instance
-  let dh2i dh = with_world(fun w ->
+  open State_passing
+  let dh2i dh = of_fun(fun w ->
       (* allocate int, add i,dh to map, and return i *)
       genint() |> fun i ->
       {w with int2dh=Map_int.add i dh w.int2dh} |> fun w ->
       i,w)
-  let i2dh i = with_world(fun w->
+  let i2dh i = of_fun(fun w->
       (Map_int.find i w.int2dh),w)  (* FIXME if missing? *)
-  let fd2i fd = with_world(fun w ->
+  let fd2i fd = of_fun(fun w ->
       (* allocate int, add i,dh to map, and return i *)
       genint() |> fun i ->
       {w with int2fd=Map_int.add i fd w.int2fd} |> fun w ->
       i,w)
-  let i2fd i = with_world(fun w->
+  let i2fd i = of_fun(fun w->
       (Map_int.find i w.int2fd),w)  (* FIXME if missing? *)
   let monad_ops = monad_ops ()
 end

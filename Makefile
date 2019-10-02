@@ -4,6 +4,9 @@ TMP_DOC_DIR:=/tmp/tjr_path_resolution
 default: all
 -include Makefile.ocaml
 
+all::
+	$(MAKE) -C bin
+
 # run:
 # 	cd test && $(test)
 

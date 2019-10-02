@@ -3,8 +3,8 @@
 (* This combines fuse with nfs client functionality (server does not
    need fuse) *)
 
-open Base_
-open Ops_type_
+(* open Base_ *)
+(* open Ops_type_ *)
 
 (* NOTE nfs client ops could be in unix.m or lwt.m, although probably
    ocamlfuse does not work properly with lwt *)
@@ -42,9 +42,9 @@ let mk_fuse_nfs_ops
     ~co_eta
 
 let _ : 
-  monad_ops:'a Tjr_monad.Monad.monad_ops ->
+  monad_ops:'a monad_ops ->
   internal_marshal_err:'a Nfs_client.internal_marshal_err ->
-  call:(Msgs.msg_from_client -> (Msgs.msg_from_server, 'a) Tjr_monad.Monad.m) ->
+  call:(Msgs.msg_from_client -> (Msgs.msg_from_server, 'a) m) ->
   i2dh:(Msgs.dh -> 'b) ->
   dh2i:('b -> Msgs.dh) ->
   i2fd:(Msgs.fd -> 'c) ->

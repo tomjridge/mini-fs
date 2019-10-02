@@ -1,7 +1,7 @@
 (* remote fs server using in-mem (could be lwt) *)
 
 open Tjr_monad
-open Tjr_monad.Monad
+(* open Tjr_monad.Monad *)
 
 open Tjr_connection
 open Tjr_minifs
@@ -44,7 +44,7 @@ let send ~conn (m:msg_from_server) =
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server ~log_everything -> server
 
-let run = Tjr_monad.State_passing_instance.run
+let run ~init_state m = State_passing.to_fun m init_state
 
 let main () = 
   let open Tjr_connection.Unix_ in

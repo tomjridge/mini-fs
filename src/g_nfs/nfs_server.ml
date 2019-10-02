@@ -3,8 +3,8 @@
 (* we use some backing ops to provide the functionality, and the code
    below translates this to messages on the wire *)
 
-open Tjr_monad
-open Tjr_monad.Monad
+(* open Tjr_monad *)
+(* open Tjr_monad.Monad *)
 open Base_
 open Ops_type_
 

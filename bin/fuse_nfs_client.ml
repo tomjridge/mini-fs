@@ -9,7 +9,7 @@ open Ops_type_
 
 (* monad ------------------------------------------------------------ *)
 
-let monad_ops = Tjr_monad.State_passing_instance.monad_ops ()
+let monad_ops = State_passing.monad_ops ()
 
 
 (* set up nfs client ------------------------------------------------ *)
@@ -46,8 +46,10 @@ let _ = nfs_ops
 
 (* set up fuse ------------------------------------------------------ *)
 
+let run ~init_state m = State_passing.to_fun m init_state
+
 let co_eta = fun a -> 
-  Tjr_monad.State_passing_instance.run ~init_state: () a |> function
+  run ~init_state: () a |> function
   | a,_ -> a  (* NOTE can ignore the state - it doesn't change *)
 let co_eta = Fuse_.{co_eta}
 

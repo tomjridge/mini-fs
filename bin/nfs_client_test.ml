@@ -18,7 +18,7 @@ let quad = Runtime_config.get_config ~filename:"config.json" @@
 
 (* monad ------------------------------------------------------------ *)
 
-let monad_ops = Tjr_monad.State_passing_instance.monad_ops ()
+let monad_ops = Tjr_monad.State_passing.monad_ops ()
 
 
 (* connection, call ------------------------------------------------- *)
@@ -52,7 +52,9 @@ let ops = client_ops
 
 (* run tests -------------------------------------------------------- *)
 
-let run x = Tjr_monad.State_passing_instance.run ~init_state:() x |> function
+let run ~init_state m = Tjr_monad.State_passing.to_fun m init_state
+
+let run x = run ~init_state:() x |> function
   | a,_ -> a |> function
     | Error e -> (e |> exn__to_string |> log_.log_now; failwith __LOC__)
     | Ok a -> a

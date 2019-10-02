@@ -5,7 +5,7 @@
 
 open Tjr_connection
 open Tjr_monad
-open Tjr_monad.Monad
+(* open Tjr_monad.Monad *)
 open Tjr_minifs
 open Base_
 open Msgs
@@ -65,7 +65,7 @@ let send ~conn (m:msg_from_server) =
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server ~log_everything -> server
 
-let run = Tjr_monad.State_passing_instance.run
+let run ~init_state m = State_passing.to_fun m init_state
 
 let main ~init_world = 
   let open Tjr_connection.Unix_ in
