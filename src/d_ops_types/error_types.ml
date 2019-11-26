@@ -1,20 +1,20 @@
 
 (* FIXME the following should be refined *)
-type err_ = Error_.exn_
-type unlink_err = err_
-type mkdir_err = err_
-type opendir_err = err_
-type readdir_err = err_
+type err_         = Error_.exn_
+type unlink_err   = err_
+type mkdir_err    = err_
+type opendir_err  = err_
+type readdir_err  = err_
 type closedir_err = err_
-type create_err = err_
-type open_err = err_
-type pread_err = err_
-type pwrite_err = err_
-type close_err = err_ (* EBADF, but for valid fd, fd will be closed *)
-type rename_err = err_
+type create_err   = err_
+type open_err     = err_
+type pread_err    = err_
+type pwrite_err   = err_
+type close_err    = err_ (* EBADF, but for valid fd, fd will be closed *)
+type rename_err   = err_
 type truncate_err = err_
-type stat_err = err_
-type symlink_err = err_
+type stat_err     = err_
+type symlink_err  = err_
 type readlink_err = err_
 
 (* we often need to map our errors into standard unix errors eg when
