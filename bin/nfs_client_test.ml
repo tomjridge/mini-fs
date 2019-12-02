@@ -68,9 +68,10 @@ let main () =
   Printf.printf "Calling readdir'\n";    
   readdir' "/" |> run |> List.iter print_endline;
   ()
+(* FIXME note that this causes the server to fail with an exception
+   because we don't close the connection in a nice way *)
 
 let _ = main()
-
 
 
 
