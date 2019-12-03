@@ -43,12 +43,13 @@ Some examples:
 | Flag                 | Description                                               |
 | -------------------- | --------------------------------------------------------- |
 | -f                   | foreground                                                |
+| -s                   | single-threaded (almost certainly necessary)              |
 | -o allow_other       | needed if run as user, but losetup as root                |
 | -o max_write=1048576 | don't attempt writes larger than this; 1048756 = 2^20, 1M |
 | -o auto_unmount      | unmount if/when the process dies                          |
 | -o big_writes        | enable larger than 4kB writes                             |
 
-Typical example: `./fuse_nfs_client.exe -f -o auto_unmount ./fuse_mount`
+Typical example: `./fuse_nfs_client.exe -s -f -o auto_unmount ./fuse_mount`
 
 NOTE: probably run the server in a separate xterm, so that emacs buffering doesn't kill everything
 

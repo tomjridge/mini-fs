@@ -20,7 +20,8 @@ module Connection = Tjr_connection.Unix_
 let quad = Runtime_config.get_config ~filename:"config.json" @@ 
   fun ~client ~server:_ ~log_everything:_ -> client
 
-(* FIXME put all state in this module? *)
+(* FIXME put all state in this module? FIXME the following prevents
+   ./xxx --help from displaying FUSE help *)
 let conn = 
   Connection.connect ~quad
   |> function 
