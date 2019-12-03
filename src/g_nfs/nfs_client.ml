@@ -1,14 +1,14 @@
-(* client ----------------------------------------------------------- *)
+(** NFS client: pass requests over the network to a server *)
 
-(* the client makes network calls, which potentially could be in lwt.m
-   or unix.m; so we parameterize over ops *)
+(** The client makes network calls, which potentially could be in
+   lwt.m or unix.m; so we parameterize over ops *)
 
 open Log_
 open Minifs_intf
 open Ops_type_
 
 
-(* this is used to indicate that the result of a call was not what
+(** This is used to indicate that the result of a call was not what
    was expected *)
 type 'w internal_marshal_err = {
   internal_marshal_err: 'a. string -> ('a,'w) m;
@@ -16,7 +16,7 @@ type 'w internal_marshal_err = {
 
 open Msgs
 
-(* construct message, send, recv *)
+(** Construct a message, send to server, and wait for response *)
 let mk_client_ops (* (type t) *)
     ~monad_ops
     ~internal_marshal_err
@@ -111,7 +111,7 @@ let mk_client_ops (* (type t) *)
     pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
 
 
-(* specialize mk_client_ops *)
+(** Specialize mk_client_ops using standard buffer auxiliary functions *)
 let mk_client_ops = 
   let open Nfs_aux in
   mk_client_ops 
@@ -124,8 +124,9 @@ let _ = mk_client_ops
 
 
 
-(* we also need to implement call: msg_from_client->msg_from_server m;
-   here we specialize to step_monad *)
+(** We also need to implement call: msg_from_client->msg_from_server
+   m; here we specialize to state_passing monad, and Unix network
+   connections *)
 module State_passing_call = struct
   open State_passing
   open Msgs
@@ -145,6 +146,3 @@ module State_passing_call = struct
             s |> string_to_msg_s |> fun m -> 
             (m,w))
 end
-
-
-

@@ -1,7 +1,9 @@
+(** Construct a wrapper round a local POSIX filesystem *)
+
 (* FIXME this should be called "wrap_local_filesystem" or similar *)
 
+open Log_
 open Minifs_intf
-open Minifs_intf.Base_extra
 open Ops_type_
 
 module Unix_base_types = struct
@@ -69,7 +71,7 @@ let mk_ops ~monad_ops ~extra =
         | `File -> Unix.unlink path
         | `Dir -> Unix.rmdir path
         | `Symlink -> (
-          log_.log_now __LOC__;
+            log_.log_now __LOC__;
           Base_extra.exit_1 __LOC__ 
           (* FIXME should be impossible since stat resolves symlinks; but is this what we want? *))
         | _ -> (
@@ -116,9 +118,9 @@ let mk_ops ~monad_ops ~extra =
 
   let readdir dh = 
     delay @@ fun _ ->
-    try Unix.readdir dh |> fun e -> return (Ok([e],Finished.not finished))
+    try Unix.readdir dh |> fun e -> return (Ok([e],Finished.unfinished))
     with
-    | End_of_file -> return (Ok([],finished))
+    | End_of_file -> return (Ok([],Finished.finished))
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
       | `EINVAL -> handle_EINVAL ()

@@ -1,8 +1,11 @@
-(* version of unix that keeps track of an int<->fd/dh map *)
+(** Version of unix ops that keeps track of an int<->fd/dh map *)
 
-(* when we allocate an fd or dh, we tag it with a genint, then insert
+(** When we allocate an fd or dh, we tag it with a genint, then insert
    (with key the genint) into a map; subsequently, we only pass the
    genint to the client *)
+
+(* FIXME parameterization overkill? FIXME hacky implementation *)
+
 
 open Minifs_intf
 open Ops_type_

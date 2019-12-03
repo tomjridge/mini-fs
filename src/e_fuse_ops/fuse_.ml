@@ -1,4 +1,4 @@
-(* bind ops to fuse ----------------------------------- *)
+(** Construct [Fuse.operations] given a backend FS ops *)
 
 open Log_
 open Minifs_intf

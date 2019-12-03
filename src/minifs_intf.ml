@@ -1,8 +1,13 @@
+(** Alias *)
+type buffer = Bigarray_buffer.buffer
+
+(** Alias for result FIXME why? *)
 type ('a,'e)r_ = ('a,'e)result
 
+(** Errors *)
 module Error_ = struct
-  (* open Bin_prot.Std *)
 
+  (** Typical errors we encounter *)
   type exn_ = [ 
     | `Error_no_entry
     | `Error_not_directory
@@ -24,20 +29,22 @@ module Error_ = struct
 
   include struct
     open Unix
+
+    (** Convert exn_ to a unix exception FIXME some refinement needed *)
     let mk_unix_exn (e:exn_) = e |> function
-      | `Error_no_entry -> Unix_error(ENOENT, "154","")
-      | `Error_not_directory -> Unix_error(ENOTDIR, "155","")
-      | `Error_not_file -> Unix_error(EINVAL, "156","") (* FIXME *)
-      | `Error_not_symlink -> Unix_error(EINVAL, "156b","") (* FIXME *)
+      | `Error_no_entry                        -> Unix_error(ENOENT, "154","")
+      | `Error_not_directory                   -> Unix_error(ENOTDIR, "155","")
+      | `Error_not_file                        -> Unix_error(EINVAL, "156","") (* FIXME *)
+      | `Error_not_symlink                     -> Unix_error(EINVAL, "156b","") (* FIXME *)
       | `Error_attempt_to_rename_dir_over_file -> Unix_error(EINVAL, "157","") (* FIXME *)
-      | `Error_attempt_to_rename_root -> Unix_error(EINVAL, "158","") (* FIXME *)
-      | `Error_attempt_to_rename_to_subdir -> Unix_error(EINVAL, "159","") (* FIXME *)
-      | `Error_no_src_entry -> Unix_error(ENOENT, "160","")
-      | `Error_path_resolution -> Unix_error(EUNKNOWNERR 999,"162","") (* FIXME *)
-      | `Error_not_empty -> Unix_error(ENOTEMPTY,"163","")
-      | `Error_exists -> Unix_error(EEXIST,"163","")
-      | `Error_is_directory -> Unix_error(EISDIR,"165","")
-      | `Error_other -> Unix_error(EUNKNOWNERR 999,"161","")
+      | `Error_attempt_to_rename_root          -> Unix_error(EINVAL, "158","") (* FIXME *)
+      | `Error_attempt_to_rename_to_subdir     -> Unix_error(EINVAL, "159","") (* FIXME *)
+      | `Error_no_src_entry                    -> Unix_error(ENOENT, "160","")
+      | `Error_path_resolution                 -> Unix_error(EUNKNOWNERR 999,"162","") (* FIXME *)
+      | `Error_not_empty                       -> Unix_error(ENOTEMPTY,"163","")
+      | `Error_exists                          -> Unix_error(EEXIST,"163","")
+      | `Error_is_directory                    -> Unix_error(EISDIR,"165","")
+      | `Error_other                           -> Unix_error(EUNKNOWNERR 999,"161","")
   end
 
   (* NOTE going the other way, for unix_ops, we want to trap a
@@ -45,8 +52,11 @@ module Error_ = struct
 
   (* First are errors we can deal with; Second need context *)
   include struct
-    (* open Tjr_either *)
     open Unix
+
+    (** Convert a Unix exception to one of two classes: First are
+       those that we can deal with by mapping to our [exn] type; the
+       second are those that we have to handle manually *)
     let map_error = function
       | EEXIST -> First `Error_exists
       | EINVAL -> Second `EINVAL  (* !!! *)
@@ -60,46 +70,37 @@ module Error_ = struct
         Second `SOME_OTHER_ERROR  (* !!! *)
     let _ = map_error
 
-    (* NOTE these are the errors that we have to handle manually when
+    (** NOTE these are the errors that we have to handle manually when
        they are caught from Unix. calls *)
     type map_error_second = [ `EINVAL | `SOME_OTHER_ERROR ]
   end
 end
 include Error_
 
+(** Simplified stat record, and the usual conversions to/from Unix equivalents *)
 module Stat_record = struct
   open Log_
   open Bin_prot.Std
 
   type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io,yojson]
 
-
   type meta = {
     atim:float; 
-
     ctim:unit;  
     (* by default, we don't use this, but return ctim as mtim since atim
        apparently doesn't affect atim*)
-
     mtim:float;
   } [@@deriving bin_io,yojson]
 
 
-  include struct
-    open Unix.LargeFile
-    let unix2meta st = {
+  let unix2meta st = Unix.LargeFile.{
       atim=st.st_atime;
       ctim=();
       mtim=st.st_mtime;
     }
-  end
-
-
 
   type stat_record = { sz:int; kind:st_kind; meta:meta } 
   [@@deriving bin_io,yojson]
-
-
 
   include struct
     open Unix
@@ -116,7 +117,7 @@ module Stat_record = struct
       | `Other -> S_BLK  (* FIXME *)
   end
 
-
+  (** Default file and directory stat records *)
   module Default = struct
     open Unix
     open LargeFile
@@ -182,6 +183,7 @@ module Stat_record = struct
 end
 include Stat_record
 
+(** Some utility functions *)
 module Base_extra = struct
   (* ensure 64 bit system *)
   let _ = assert(Sys.int_size = 63)
@@ -198,10 +200,6 @@ module Base_extra = struct
     (if p="" then "/" else p),c
 
 
-  (* include Bigarray_buffer *)
-
-
-
   type length = int (* FIXME in following *)
   type offset = int
 
@@ -213,29 +211,29 @@ module Base_extra = struct
     type dh=int  (* FIXME why specialize here? *)
   end
 
-
-  (* logging ---------------------------------------------------------- *)
-
-  include Log_
+  (* include Log_ *)
 end
 let exit_1 = Base_extra.exit_1
 
 module Finished = struct
   (* FIXME remove these? *)
-  type is_finished = {is_finished:bool}
+  module Export = struct
+    type is_finished = {is_finished:bool}
+  end
+  include Export
   let finished = {is_finished=true}
-  let not x = { is_finished=not x.is_finished}
+  let unfinished = {is_finished=false}
+  (* let not x = { is_finished=not x.is_finished} *)
 end
-include Finished
+include Finished.Export
 
 
+(** Messages between client and server *)
 module Msgs = struct
-  (* open Error_ *)
   open Base_extra
   open Stat_record
 
   open Bin_prot.Std
-
 
   type length = int[@@deriving bin_io, yojson]
   type offset = int[@@deriving bin_io, yojson]
@@ -248,6 +246,7 @@ module Msgs = struct
 
   type data = string[@@deriving bin_io, yojson]
 
+  (** Messages sent from the client *)
   type msg_from_client = 
     | Unlink of path
     | Mkdir of path
@@ -268,6 +267,7 @@ module Msgs = struct
   [@@deriving bin_io, yojson]
 
 
+  (** Messages received from the server *)
   type msg_from_server' = 
     | Unit
     | Int of int
@@ -282,16 +282,19 @@ module Msgs = struct
 
 
   (* or just use error in monad? *)
+  (** Messages received from the server *)
   type msg_from_server = 
     | Ok_ of msg_from_server' 
-    | Error_ of Error_.exn_ [@@deriving bin_io, yojson]
+    | Error_ of Error_.exn_ 
+  [@@deriving bin_io, yojson]
   (* FIXME Error is probably a bad choice of constructor - prefer Exn_ *)
 
 
-
+  (** Convert server msg to string *)
   let msg_s_to_string m = 
     m |> msg_from_server_to_yojson |> Yojson.Safe.pretty_to_string
 
+  (** Convert string to server msg *)
   let string_to_msg_s s = 
     s |> Yojson.Safe.from_string |> msg_from_server_of_yojson
     |> function
@@ -299,21 +302,23 @@ module Msgs = struct
     | Error _e -> 
       exit_1 __LOC__        
 
+  (** Convert client msg to string *)
   let msg_c_to_string m = 
     m |> msg_from_client_to_yojson |> Yojson.Safe.pretty_to_string
 
+  (** Convert string to message from client *)
   let string_to_msg_c s = 
     s |> Yojson.Safe.from_string |> msg_from_client_of_yojson
     |> function
     | Ok x -> x
     | Error _e -> 
       exit_1 __LOC__ 
-
-
 end
 
 
-
+(** Various types of error... an attempt to refine the different types
+   of error each call can return FIXME needs further refinement *)
+(* FIXME combine with Error_ ? *)
 module Error_types = struct
 
   (* FIXME the following should be refined *)
@@ -350,6 +355,7 @@ module Error_types = struct
 end
 
 
+(** fd and dh represented by ints... which is the usual underlying repn *)
 module Int_base_types = struct
   type fd = int
   type dh = int
@@ -361,20 +367,45 @@ module Int_base_types = struct
 end
 
 
-
+(** The FS operations we work with: unlink, mkdir etc *)
 module Ops_type_ = struct
-  (* open Tjr_monad.Monad *)
-  (* open Base_ *)
-  (* open R_ *)
   open Error_types
-  open Bigarray_buffer
   open Stat_record
-
-  (* sig -------------------------------------------------------------- *)
 
   type path = string
 
   module type OPS_TYPE = sig
+    (** NOTE the 'w parameter is the monad phantom var type *)
+    type ('fd,'dh,'w) ops = {
+      root     : path;
+      unlink   : path -> ((unit,unlink_err)r_,  'w) m;
+      mkdir    : path -> ((unit,mkdir_err)r_,  'w) m;
+      opendir  : path -> (('dh,opendir_err)r_,  'w) m;
+      (* NOTE: . and .. are returned *)
+      readdir  : 'dh -> ((string list * is_finished,readdir_err)r_,  'w) m;
+      closedir : 'dh -> ((unit,closedir_err)r_,  'w) m;
+      create   : path -> ((unit,create_err)r_,  'w) m;
+      open_    : path -> (('fd,open_err)r_,  'w) m;
+      pread    : 
+        fd:'fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
+        ((int,pread_err)r_,  'w) m; 
+      pwrite   : 
+        fd:'fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
+        ((int,pwrite_err)r_,  'w) m;
+      close    : 'fd -> ((unit,close_err)r_,  'w) m;
+      rename   : path -> path -> ((unit,rename_err)r_,  'w) m;
+      truncate : path:path -> length:int -> ((unit,truncate_err)r_,  'w) m;
+      stat     : path -> ((stat_record,stat_err)r_,  'w) m;
+      symlink  : path -> path -> ((unit,symlink_err)r_, 'w) m;
+      readlink : path -> ((string,readlink_err)r_,'w) m;
+      reset    : unit -> (unit,  'w) m;
+    }
+  end
+
+
+  (* FIXME duplication with sig; OCaml language now allows to avoid
+     this replication (module type of?) *)
+  module Internal = struct
     type ('fd,'dh,'w) ops = {
       root     : path;
       unlink   : path -> ((unit,unlink_err)r_,  'w) m;
@@ -401,39 +432,8 @@ module Ops_type_ = struct
     }
   end
 
-
-  (* FIXME duplication with sig *)
-  (* don't use this module - just use the included type in this file *)
-  module Ops_type_with_result' = struct
-    type ('fd,'dh,'w) ops = {
-      root     : path;
-      unlink   : path -> ((unit,unlink_err)r_,  'w) m;
-      mkdir    : path -> ((unit,mkdir_err)r_,  'w) m;
-      opendir  : path -> (('dh,opendir_err)r_,  'w) m;
-      (* . and .. are returned *)
-      readdir  : 'dh -> ((string list * is_finished,readdir_err)r_,  'w) m;
-      closedir : 'dh -> ((unit,closedir_err)r_,  'w) m;
-      create   : path -> ((unit,create_err)r_,  'w) m;
-      open_    : path -> (('fd,open_err)r_,  'w) m;
-      pread    : 
-        fd:'fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
-        ((int,pread_err)r_,  'w) m; 
-      pwrite   : 
-        fd:'fd -> foff:int -> length:int -> buffer:buffer -> boff:int -> 
-        ((int,pwrite_err)r_,  'w) m;
-      close    : 'fd -> ((unit,close_err)r_,  'w) m;
-      rename   : path -> path -> ((unit,rename_err)r_,  'w) m;
-      truncate : path:path -> length:int -> ((unit,truncate_err)r_,  'w) m;
-      stat     : path -> ((stat_record,stat_err)r_,  'w) m;
-      symlink  : path -> path -> ((unit,symlink_err)r_, 'w) m;
-      readlink : path -> ((string,readlink_err)r_,'w) m;
-      reset    : unit -> (unit,  'w) m;
-    }
-  end
-
-  include Ops_type_with_result'
+  include Internal
 
 end
 
 
-type buffer = Bigarray_buffer.buffer

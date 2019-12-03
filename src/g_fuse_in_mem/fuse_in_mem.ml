@@ -1,4 +1,4 @@
-(* mount an in-mem fs via fuse -------------------------------------- *)
+(** A fuse filesystem backed by an in-memory FS *)
 
 open Log_
 open Minifs_intf

@@ -1,11 +1,10 @@
-(* open Tjr_monad.Monad *)
+(** A utility function to return all possible entries in a directory (for small directories/testing only! *)
 
-(* Read all directory entries at once; obviously not a good idea if
-   there are a large number of entries. *)
 open Minifs_intf
 open Ops_type_
 
-(* for small directories *)
+(** Read all directory entries at once; obviously not a good idea if
+   there are a large number of entries. *)
 let readdir' ~monad_ops ~ops = 
   let ( >>= ) = monad_ops.bind in
   let return = monad_ops.return in
