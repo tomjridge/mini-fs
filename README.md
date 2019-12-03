@@ -1,12 +1,26 @@
-# mini-fs, a minimal file-system-like thing
+# miniFS, a minimal file-system-like thing
 
 What exactly is a file system? Roughly, it is two maps (one for dirs,
 one for files). But there is also the POSIX API etc. This is a minimal
 version, suitable to understand single-process use of a filesystem.
 
+
+
+## Modules
+
+
+
+<img src="https://docs.google.com/drawings/d/e/2PACX-1vQcYK7STiRj8bxZBFvkYaqQtsAXxCrjAKrfD2GV_uDuec5DmEY3qNq1Nbj_h-om3L1HHA5JY_RBd_uF/pub?w=953&amp;h=352">
+
+The code is modularized. So, for example, it is possible to take the FUSE filesystem operations (which are parameterized over an arbitrary implementation of FS ops), and combine with the NFS client ops to get an NFS client mounted via FUSE. On the server, you can take the NFS server (again, paramterized by some backend) and combine with the in-memory implementation to get an in-memory NFS server. Alternatively, you can combine with the "Unix ops" (a passthrough to an underlying POSIX filesystem), to serve local files over the network. Cool!
+
+
+
 ## Docs
 
 <https://tomjridge.github.io/mini-fs/>
+
+
 
 
 ## Dependencies
@@ -18,6 +32,7 @@ version, suitable to understand single-process use of a filesystem.
 | ppx_yojson                   |              |
 | extunix                      | pread,pwrite |
 | tjr_path_resolution, tjr_net |              |
+
 
 
 ## Executables
@@ -79,7 +94,7 @@ This is used to get hold of some dummy permissions etc. Probably a FIXME
 
 ## Addendum: Known bugs
 
-* Recursive copies of directories seems to hang in emacs for some reason, but cp works fine from the command line
+* Recursive copies of directories seems to hang in emacs for some reason, but cp works fine from the command line FIXED this was due to multithreading - you need to make sure you run FUSE in single-threaded mode
 
 
 
