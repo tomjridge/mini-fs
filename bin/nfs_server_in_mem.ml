@@ -1,11 +1,10 @@
 (* remote fs server using in-mem (could be lwt) *)
 
 open Tjr_monad
+open Log_
 (* open Tjr_monad.Monad *)
 
 (* open Tjr_connection *)
-open Tjr_minifs
-open Base_
 open Msgs
 
 (* backend ---------------------------------------------------------- *)
@@ -41,7 +40,7 @@ let send ~conn (m:msg_from_server) =
 
 (* main ------------------------------------------------------------- *)
 
-let quad = Runtime_config.get_config ~filename:"config.json" @@ 
+let quad = Runtime_config.get_config () @@ 
   fun ~client:_ ~server ~log_everything:_ -> server
 
 let run ~init_state m = State_passing.to_fun m init_state

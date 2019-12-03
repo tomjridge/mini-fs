@@ -1,8 +1,7 @@
 (* nfs client test  ------------------------------------------------- *)
 
 (* open Tjr_connection *)
-open Tjr_minifs
-open Base_
+open Log_
 open Ops_type_
 
 module Connection = Tjr_connection.Unix_
@@ -12,7 +11,7 @@ module Connection = Tjr_connection.Unix_
 
 let _ = Runtime_config.test()
 
-let quad = Runtime_config.get_config ~filename:"config.json" @@ 
+let quad = Runtime_config.get_config () @@ 
   fun ~client ~server:_ ~log_everything:_ -> client
 
 
@@ -68,9 +67,10 @@ let main () =
   Printf.printf "Calling readdir'\n";    
   readdir' "/" |> run |> List.iter print_endline;
   ()
+(* FIXME note that this causes the server to fail with an exception
+   because we don't close the connection in a nice way *)
 
 let _ = main()
-
 
 
 

@@ -1,15 +1,16 @@
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
-(* open Tjr_either *)
+(** Construct an in-memory FS ops *)
+
+(* FIXME more documentation *)
+
+open Log_
 open Tjr_map
-open Base_
-(* open R_ *)
+open Minifs_intf
 open Ops_type_
 
 (* NOTE we specialize this later *)
 let resolve = Tjr_path_resolution.resolve
 
-
+(* FIXME tidy this file *)
 
 (* in-mem impl ------------------------------------------------------ *)
 
@@ -411,7 +412,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         | None -> `Internal "readdir, impossible, dh not found mim.328",s
         | Some xs -> `Ok xs,s) 
     >>= function
-    | `Ok xs -> return (Ok(xs,finished))
+    | `Ok xs -> return (Ok(xs,Finished.finished))
     | `Internal s -> extra_ops.internal_err s
   in
 

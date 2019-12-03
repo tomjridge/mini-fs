@@ -1,9 +1,9 @@
+(** Construct a wrapper round a local POSIX filesystem *)
+
 (* FIXME this should be called "wrap_local_filesystem" or similar *)
 
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
-(* open Tjr_either *)
-open Base_
+open Log_
+open Minifs_intf
 open Ops_type_
 
 module Unix_base_types = struct
@@ -12,10 +12,6 @@ module Unix_base_types = struct
 (*  let fd2int x = ExtUnix.All.int_of_file_descr x *)
 end
 include Unix_base_types
-
-
-(* generate types --------------------------------------------------- *)
-
 
 
 (* construct ops ---------------------------------------------------- *)
@@ -75,12 +71,12 @@ let mk_ops ~monad_ops ~extra =
         | `File -> Unix.unlink path
         | `Dir -> Unix.rmdir path
         | `Symlink -> (
-          log_.log_now __LOC__;
-          exit_1 __LOC__ 
+            log_.log_now __LOC__;
+          Base_extra.exit_1 __LOC__ 
           (* FIXME should be impossible since stat resolves symlinks; but is this what we want? *))
         | _ -> (
           log_.log_now __LOC__;
-          exit_1 __LOC__)
+          Base_extra.exit_1 __LOC__)
       end;
       return (Ok())
     with
@@ -122,9 +118,9 @@ let mk_ops ~monad_ops ~extra =
 
   let readdir dh = 
     delay @@ fun _ ->
-    try Unix.readdir dh |> fun e -> return (Ok([e],not finished))
+    try Unix.readdir dh |> fun e -> return (Ok([e],Finished.unfinished))
     with
-    | End_of_file -> return (Ok([],finished))
+    | End_of_file -> return (Ok([],Finished.finished))
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
       | `EINVAL -> handle_EINVAL ()

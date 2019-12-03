@@ -1,4 +1,4 @@
-(* aux -------------------------------------------------------------- *)
+(** NFS utility functions *)
 
 
 (* NOTE data is Msgs.data = string; buffer is mim.buffer = bigarray *)

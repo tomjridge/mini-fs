@@ -1,14 +1,13 @@
-(* version of unix that keeps track of an int<->fd/dh map *)
+(** Version of unix ops that keeps track of an int<->fd/dh map *)
 
-(* when we allocate an fd or dh, we tag it with a genint, then insert
+(** When we allocate an fd or dh, we tag it with a genint, then insert
    (with key the genint) into a map; subsequently, we only pass the
    genint to the client *)
 
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
+(* FIXME parameterization overkill? FIXME hacky implementation *)
 
-(* open Tjr_map *)
-open Base_
+
+open Minifs_intf
 open Ops_type_
 
 module Base_types = Int_base_types

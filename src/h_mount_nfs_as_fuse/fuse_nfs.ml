@@ -1,15 +1,12 @@
-(* mount nfs via fuse ----------------------------------------------- *)
+(** The most complicated example: an NFS client mounted via FUSE *)
 
-(* This combines fuse with nfs client functionality (server does not
-   need fuse) *)
+(** This combines fuse with nfs client functionality (server does not
+   need fuse of course). *)
 
-(* open Base_ *)
-(* open Ops_type_ *)
-
-(* NOTE nfs client ops could be in unix.m or lwt.m, although probably
+(** NOTE nfs client ops could be in unix.m or lwt.m, although probably
    ocamlfuse does not work properly with lwt *)
 
-(* Steps:
+(** Steps:
    - construct client
    - wrap with fuse
 
@@ -17,11 +14,10 @@
    types.
 *)
 
+open Minifs_intf
 
-(* open Nfs_client *)
 let mk_client_ops = Nfs_client.mk_client_ops
 
-(* open Fuse_ *)
 let mk_fuse_ops = Fuse_.mk_fuse_ops
 
 let mk_fuse_nfs_ops 
