@@ -1,7 +1,8 @@
-(** Simple filesystem modules. 
+(** Simple filesystem modules.  *)
 
-FIXME tidy this
-*)
+(* FIXME tidy this *)
+
+(** {%html: <img src="https://docs.google.com/drawings/d/e/2PACX-1vQcYK7STiRj8bxZBFvkYaqQtsAXxCrjAKrfD2GV_uDuec5DmEY3qNq1Nbj_h-om3L1HHA5JY_RBd_uF/pub?w=953&amp;h=352"> %} *)
 
 (** {2 Base utilities} *)
 
