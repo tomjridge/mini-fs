@@ -25,9 +25,9 @@ let quad_to_addr q =
   ADDR_INET(Unix.inet_addr_of_string q.ip, q.port)
 
 
-let get_config ~filename:_ = 
+let get_config ?(filename="minifs_config.json") () = 
   let c = 
-    Tjr_file.read_file "config.json" 
+    Tjr_file.read_file filename
     |> Yojson.Safe.from_string
     |> config_of_yojson
     |> function
