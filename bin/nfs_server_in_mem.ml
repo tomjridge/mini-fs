@@ -1,11 +1,10 @@
 (* remote fs server using in-mem (could be lwt) *)
 
 open Tjr_monad
+open Log_
 (* open Tjr_monad.Monad *)
 
 (* open Tjr_connection *)
-open Tjr_minifs
-open Base_
 open Msgs
 
 (* backend ---------------------------------------------------------- *)

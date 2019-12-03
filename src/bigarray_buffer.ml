@@ -48,3 +48,11 @@ let string_to_bigarray s =
   blit_string_to_bigarray ~src:s ~soff:0 ~len ~dst:buf ~doff:0;
   buf
 
+
+(* buffers size check  ---------------------------------------------- *)
+
+let buf_size_check n = 
+  if n < 0 || n > Sys.max_string_length 
+  then (log_.log_now __LOC__; failwith __LOC__ )
+  else ()
+

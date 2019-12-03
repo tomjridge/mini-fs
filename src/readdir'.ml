@@ -2,6 +2,7 @@
 
 (* Read all directory entries at once; obviously not a good idea if
    there are a large number of entries. *)
+open Minifs_intf
 open Ops_type_
 
 (* for small directories *)
@@ -15,7 +16,7 @@ let readdir' ~monad_ops ~ops =
         ops.readdir dh 
         >>= function Error e -> return (Error e) | Ok (es',finished) ->
           es:=!es@es';
-          if finished then return (Ok !es) else f ()
+          if finished.is_finished then return (Ok !es) else f ()
       in
       f() >>= fun x -> 
       ops.closedir dh >>= fun _ -> 

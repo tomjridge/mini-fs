@@ -4,11 +4,7 @@
    (with key the genint) into a map; subsequently, we only pass the
    genint to the client *)
 
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
-
-(* open Tjr_map *)
-open Base_
+open Minifs_intf
 open Ops_type_
 
 module Base_types = Int_base_types

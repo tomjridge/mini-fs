@@ -1,5 +1,5 @@
 (env
-  (_ (flags (:standard -open Tjr_net ))))
+  (_ (flags (:standard -open Tjr_net -open Tjr_minifs -open Tjr_minifs.Minifs_intf ))))
 
 
 (executables

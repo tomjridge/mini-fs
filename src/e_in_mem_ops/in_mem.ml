@@ -1,15 +1,13 @@
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
-(* open Tjr_either *)
+
+open Log_
 open Tjr_map
-open Base_
-(* open R_ *)
+open Minifs_intf
 open Ops_type_
 
 (* NOTE we specialize this later *)
 let resolve = Tjr_path_resolution.resolve
 
-
+(* FIXME tidy this file *)
 
 (* in-mem impl ------------------------------------------------------ *)
 

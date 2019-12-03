@@ -1,14 +1,11 @@
 (* bind ops to fuse ----------------------------------- *)
 
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
-open Base_
+open Log_
+open Minifs_intf
 open Ops_type_
 
-(* open Unix *)
-(* open LargeFile *)
-(* open Bigarray *)
 open Fuse
+
 (* FIXME wrap operations so they return unix_error *)
 
 type 'w co_eta = {
@@ -167,5 +164,8 @@ let readdir' ~ops = Readdir'.readdir' ~ops
 
 let mk_fuse_ops ~monad_ops ~ops = mk_fuse_ops ~monad_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
 
-let _ = mk_fuse_ops
+let _ : 
+monad_ops:'a monad_ops ->
+ops:('b, 'c, 'a) ops -> co_eta:'a co_eta -> operations 
+= mk_fuse_ops
 

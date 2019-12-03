@@ -3,32 +3,17 @@
 FIXME tidy this
 *)
 
-(** {2 Base} *)
-
-module Base_ = Base_
-
-module Bigarray_buffer = Bigarray_buffer
-
-module Error_ = Error_
+(** {2 Base utilities} *)
 
 module Log_ = Log_
-
-module Msgs = Msgs
-
-module R_ = R_
-
 module Runtime_config = Runtime_config
 
-module Stat_record = Stat_record
+(** {2 Interface} *)
+
+module Minifs_intf = Minifs_intf
 
 
-(** {2 Ops types} *)
-
-module Error_types = Error_types
-
-module Int_base_types = Int_base_types
-
-module Ops_type_ = Ops_type_
+(** {2 Readdir util} *)
 
 module Readdir' = Readdir'
 

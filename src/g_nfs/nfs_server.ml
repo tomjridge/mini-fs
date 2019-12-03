@@ -3,9 +3,7 @@
 (* we use some backing ops to provide the functionality, and the code
    below translates this to messages on the wire *)
 
-(* open Tjr_monad *)
-(* open Tjr_monad.Monad *)
-open Base_
+open Minifs_intf
 open Ops_type_
 
 (*
@@ -18,6 +16,7 @@ open Msgs
 
 (* NOTE the server is roughly a function of type msg_from_client ->
    msg_from_server m, which wraps a backend ops *)
+open Bigarray_buffer
 
 let mk_serve
   ~monad_ops
@@ -45,7 +44,7 @@ let mk_serve
   let opendir p = ops.opendir p 
     >>=| fun dh -> Dh (dh2i dh) in
   let readdir dh = ops.readdir dh 
-    >>=| fun (xs,b) -> Readdir' (xs,b) in
+    >>=| fun (xs,b) -> Readdir' (xs,b.is_finished) in
   let closedir dh = ops.closedir dh 
     >>=| ret_unit in
   let create path = ops.create path >>=| ret_unit in

@@ -1,6 +1,7 @@
 (* mount an in-mem fs via fuse -------------------------------------- *)
 
-open Base_
+open Log_
+open Minifs_intf
 open In_mem
 open Fuse_
 open Tjr_monad

@@ -3,9 +3,6 @@
 (* This combines fuse with nfs client functionality (server does not
    need fuse) *)
 
-(* open Base_ *)
-(* open Ops_type_ *)
-
 (* NOTE nfs client ops could be in unix.m or lwt.m, although probably
    ocamlfuse does not work properly with lwt *)
 
@@ -17,6 +14,7 @@
    types.
 *)
 
+open Minifs_intf
 
 (* open Nfs_client *)
 let mk_client_ops = Nfs_client.mk_client_ops

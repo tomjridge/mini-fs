@@ -5,9 +5,7 @@
 
 (* open Tjr_connection *)
 open Tjr_monad
-(* open Tjr_monad.Monad *)
-open Tjr_minifs
-open Base_
+open Log_
 open Msgs
 
 (* backend ---------------------------------------------------------- *)

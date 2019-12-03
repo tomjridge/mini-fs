@@ -1,8 +1,7 @@
 (* nfs client test  ------------------------------------------------- *)
 
 (* open Tjr_connection *)
-open Tjr_minifs
-open Base_
+open Log_
 open Ops_type_
 
 module Connection = Tjr_connection.Unix_
