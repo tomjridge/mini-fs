@@ -7,18 +7,36 @@ open Tjr_map
 open Minifs_intf
 open Ops_type_
 
+(** {2 Prelude} *)
+
 (* NOTE we specialize this later *)
 let resolve = Tjr_path_resolution.resolve
 
-(* FIXME tidy this file *)
+module Map_int = Stdlib.Map.Make(
+  struct 
+    type t = int let compare: t->t->int = Stdlib.compare 
+  end)
 
-(* in-mem impl ------------------------------------------------------ *)
+
+module Set_string = Stdlib.Set.Make(
+  struct
+    type t = string let compare: t->t->int = Stdlib.compare 
+  end)
+
+
+module Map_string = Stdlib.Map.Make(
+  struct 
+    type t = string let compare: t->t->int = Stdlib.compare 
+  end)
+
 
 let time = Unix.time (* 1s resolution *)
 
 module Mem_base_types = Int_base_types
 include Mem_base_types
 
+
+(** {2 File and directory ids} *)
 
 (* file ids *)
 module Fid : sig
@@ -46,35 +64,8 @@ end
 include Did
 
 
-module Map_fid = Tjr_map.Make_map_ops(
-  struct 
-    type t = fid let compare: t->t->int = Pervasives.compare 
-  end)
 
-
-module Map_did = Tjr_map.Make_map_ops(
-  struct 
-    type t = did let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-module Map_string = Tjr_map.Make_map_ops(
-  struct 
-    type t = string let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-module Map_int = Tjr_map.Make_map_ops(
-  struct 
-    type t = int let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-module Set_string = Set.Make(
-  struct
-    type t = string let compare: t->t->int = Pervasives.compare 
-  end)
-
+(** {2 Other basic types: dir_entry, file_meta_and_data } *)
 
 type symlink = string [@@deriving yojson]
 
@@ -83,30 +74,6 @@ type symlink = string [@@deriving yojson]
    record the string data in the entry *)
 type dir_entry = Fid of fid | Did of did | Symlink of symlink[@@deriving yojson]
 
-(* a name map - from strings to dir entries *)
-type name_map_carrier = dir_entry Map_string.t
-type nm_ops = (string,dir_entry,name_map_carrier) map_ops
-let nm_ops : nm_ops = Map_string.map_ops
-
-
-let mk_meta () = 
-  time () |> fun t ->
-  { atim=t;ctim=();mtim=t}
-
-
-type dir_with_parent = {
-  name_map :name_map_carrier;
-  meta     :meta;
-  parent   :did
-}
-
-let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
-  let dir_empty ~meta ~parent = { name_map=nm_ops.empty; meta; parent } in
-  let dir_find k t = nm_ops.find_opt k t.name_map in
-  let dir_add k v t = {t with name_map=nm_ops.add k v t.name_map} in
-  let dir_remove k t = {t with name_map=nm_ops.remove k t.name_map} in
-  let dir_bindings t = nm_ops.bindings t.name_map in
-  (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
 
 type file_meta_and_data = {
   meta: meta; 
@@ -116,19 +83,68 @@ open Tjr_buffer
 let contents_ops = Tjr_buffer.mk_buf_ops()
 
 
-type files_carrier = file_meta_and_data Map_fid.t
+(** {2 Dirs as maps from string} *)
+
+(* a name map - from strings to dir entries *)
+type name_map_carrier = dir_entry Map_string.t
+type nm_ops = (string,dir_entry,name_map_carrier) map_ops
+(* let nm_ops : nm_ops = Map_string.map_ops *)
+module Nm_ops = Map_string
+
+type dir_with_parent = {
+  name_map :name_map_carrier;
+  meta     :meta;
+  parent   :did
+}
+
+
+(** {2 Other map types} *)
+
+module Map_fid = Tjr_map.Make_map_ops(
+  struct 
+    type k = fid 
+    type v = file_meta_and_data
+    let k_cmp: k->k->int = Stdlib.compare 
+  end)
+
+
+module Map_did = Tjr_map.Make_map_ops(
+  struct 
+    type k = did
+    type v = dir_with_parent
+    let k_cmp: k->k->int = Stdlib.compare 
+  end)
+
+
+let mk_meta () = 
+  time () |> fun t ->
+  { atim=t;ctim=();mtim=t}
+
+
+let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
+  let dir_empty ~meta ~parent = { name_map=Nm_ops.empty; meta; parent } in
+  let dir_find k t = Nm_ops.find_opt k t.name_map in
+  let dir_add k v t = {t with name_map=Nm_ops.add k v t.name_map} in
+  let dir_remove k t = {t with name_map=Nm_ops.remove k t.name_map} in
+  let dir_bindings t = Nm_ops.bindings t.name_map in
+  (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
+
+
+
+type files_carrier = Map_fid.t
 type files_ops = (fid,file_meta_and_data,files_carrier) map_ops
 let files_ops : files_ops = Map_fid.map_ops
 
 
-type dirs_carrier = dir_with_parent Map_did.t
+type dirs_carrier = Map_did.t
 type dirs_ops = (did,dir_with_parent,dirs_carrier) map_ops
 let dirs_ops : dirs_ops = Map_did.map_ops
 
 
 type dhandles_carrier = string list Map_int.t
 type dhandles_ops = (dh,string list,dhandles_carrier) map_ops
-let dhandles_ops : dhandles_ops = Map_int.map_ops
+(* let dhandles_ops : dhandles_ops = Map_int.map_ops *)
+module Dhandles_ops = Map_int
 
 (* NOTE symlinks are stored directly as a dir entry *)
 
@@ -171,7 +187,7 @@ module Fs_t_to_json = struct
     dirs=
       dirs_ops.bindings fs.dirs 
       |> List.map (fun (did,dir) -> 
-          dir.name_map |> nm_ops.bindings |> fun bs ->
+          dir.name_map |> Nm_ops.bindings |> fun bs ->
           (did,(bs,dir.parent)));
     max_did=fs.max_did;
   }
@@ -190,7 +206,7 @@ let init_fs = {
   max_fid=fid0;
   dirs=(dirs_ops.empty |> dirs_ops.add root_did (empty_dir ~meta:(mk_meta()) ~parent:root_did));
   max_did=root_did;
-  dir_handles=dhandles_ops.empty;
+  dir_handles=Dhandles_ops.empty;
   max_dh=0;
 }
 
@@ -394,7 +410,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             dir_bindings dir |> List.map fst |> fun names ->
             1+s.max_dh |> fun dh ->
             s.dir_handles |> fun handles ->
-            dhandles_ops.add dh names handles |> fun dir_handles ->
+            Dhandles_ops.add dh names handles |> fun dir_handles ->
             {s with dir_handles; max_dh=dh } |> fun s ->                            
             `Ok(dh),s)
     end
@@ -408,7 +424,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   let readdir dh = 
     extra_ops.with_fs (fun s ->
         s.dir_handles |> fun handles ->
-        dhandles_ops.find_opt dh handles |> function
+        Dhandles_ops.find_opt dh handles |> function
         | None -> `Internal "readdir, impossible, dh not found mim.328",s
         | Some xs -> `Ok xs,s) 
     >>= function

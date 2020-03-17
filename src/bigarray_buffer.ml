@@ -1,6 +1,6 @@
 open Log_
 
-FIXME perhaps bigstring now provides this functionality?
+(* FIXME perhaps bigstring now provides this functionality? *)
 
 (* fuse uses this form of buffer *)
 

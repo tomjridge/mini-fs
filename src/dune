@@ -4,8 +4,8 @@
 
 (library
   (public_name "tjr_minifs")
-  (preprocess (pps ppx_deriving_yojson ppx_jane))
-  (libraries ppx_jane ppx_deriving_yojson extunix lwt lwt.unix ocamlfuse base tjr_monad tjr_fs_shared tjr_net tjr_path_resolution)
+  (preprocess (pps ppx_deriving_yojson ppx_bin_prot))
+  (libraries ppx_bin_prot ppx_deriving_yojson extunix lwt lwt.unix ocamlfuse base tjr_monad tjr_fs_shared tjr_net tjr_path_resolution)
 )
 
 (include_subdirs unqualified)

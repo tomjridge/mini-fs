@@ -148,7 +148,9 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     mkdir;    
     readdir;
     fopen;
-    mknod = (fun path _mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* NOTE gets called instead of fopen to create a file *)
+    mknod = (fun path _mode -> 
+      let _ = fopen path [Unix.O_CREAT] in
+      ()); (* NOTE gets called instead of fopen to create a file *)
     read;
     write;
     rename;
