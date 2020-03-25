@@ -2,11 +2,13 @@
 
 There is a lot of overlap with {!Stdlib.Unix}. We want our code to run
    in contexts where Unix is not available. Thus, we have to define
-   many equiv types. We also want to use eg the ocaml Fuse bindings,
+   many equiv types. We also want to use eg the OCaml Fuse bindings,
    which use {!Stdlib.Unix} types. So we need to be able to convert
    between our types and the existing types in Unix.
 
 *)
+
+(** {2 Misc} *)
 
 
 (** Alias *)
@@ -16,7 +18,67 @@ type buf = buffer
 (** Alias for result FIXME why? *)
 type ('a,'e)r_ = ('a,'e)result
 
-(** Errors *)
+
+(** fd and dh represented by ints... which is the usual underlying repn *)
+module Int_base_types = struct
+  type fd = int
+  type dh = int
+
+  let fd2i (x:fd) : int = x
+  let i2fd (x:int) : fd = x
+  let dh2i (x:dh) : int = x
+  let i2dh (x:int) : dh = x
+end
+
+type finished = {finished:bool}
+
+
+(** Some utility functions *)
+module Base_extra = struct
+
+  (* ensure 64 bit system *)
+  let _ = assert(Sys.int_size = 63)
+
+
+  let exit_1 = failwith  (* hopefully not be caught FIXME remove this *)
+
+
+  (* following for strings *)
+  let dirname_basename path = 
+    assert (String_.starts_with ~prefix:"/" path);
+    String_.split_on_last ~sub:"/" path |> fun (p,c) -> 
+    (* the semantics is that dirname is an absolute path *)
+    (if p="" then "/" else p),c
+
+
+  type length = int (* FIXME in following *)
+  type offset = int
+
+
+  (* FIXME replace path and dh with int-like and string-like *)
+  open Bin_prot.Std
+  type path=string [@@deriving bin_io, yojson]
+  type dh=int  (* FIXME why specialize here? *)
+end
+let exit_1 = Base_extra.exit_1
+
+(*
+module Finished = struct
+  (* FIXME remove these? *)
+  module Export = struct
+    type is_finished = {is_finished:bool}
+  end
+  include Export
+  let finished = {is_finished=true}
+  let unfinished = {is_finished=false}
+  (* let not x = { is_finished=not x.is_finished} *)
+end
+include Finished.Export
+*)
+
+
+(** {2 Errors} *)
+
 module Error_ = struct
 
   (** Typical errors we encounter *)
@@ -85,6 +147,46 @@ end
 (* include Error_ *)
 type exn_ = Error_.exn_
 
+(** Errors for each API function... an attempt to refine the different
+   types of error each call can return FIXME needs further refinement
+   *)
+(* FIXME combine with Error_ ? *)
+module Call_specific_errors = struct
+
+  (* FIXME the following should be refined *)
+  type err_         = Error_.exn_
+  type unlink_err   = err_
+  type mkdir_err    = err_
+  type opendir_err  = err_
+  type readdir_err  = err_
+  type closedir_err = err_
+  type create_err   = err_
+  type open_err     = err_
+  type pread_err    = err_
+  type pwrite_err   = err_
+  type close_err    = err_ (* EBADF, but for valid fd, fd will be closed *)
+  type rename_err   = err_
+  type truncate_err = err_
+  type stat_err     = err_
+  type symlink_err  = err_
+  type readlink_err = err_
+
+  (* we often need to map our errors into standard unix errors eg when
+     dealing with fuse; in the unix module, we need to construct the
+     reverse mapping *)
+
+  (* Our version of the Unix_error exception; we want to pattern match
+     exhaustively and name the type *)
+  type unix_error_ = [`Unix_error of Unix.error * string * string ]
+
+  let unknown_error = `Unix_error(Unix.EUNKNOWNERR 999,"FIXME","FIXME")
+end
+
+
+
+
+(** {2 Stat records} *)
+
 module Kind = struct
   type st_kind = [`Dir | `File | `Symlink | `Other ] [@@deriving bin_io,yojson]
 end
@@ -100,7 +202,8 @@ module Meta = struct
     mtim:float;
   } [@@deriving bin_io,yojson]
 end
-include Meta
+type meta = Meta.meta
+open Meta
 
 (** Simplified stat record *)
 module Stat_record = struct
@@ -108,7 +211,9 @@ module Stat_record = struct
   type stat_record = { sz:int; kind:st_kind; meta:meta } 
   [@@deriving bin_io,yojson]
 end
-include Stat_record
+open Stat_record
+type stat_record = Stat_record.stat_record
+(* include Stat_record *)
 
 
 (** Conversions to/from Unix equivalents *)
@@ -150,7 +255,7 @@ module St_convs = struct
 
     let default_dir_stats = LargeFile.stat "."
 
-    let stat2unix stat = 
+    let stat2unix (stat:stat_record) = 
       match stat.kind with
       | `Dir -> 
         {default_dir_stats with 
@@ -197,49 +302,10 @@ module St_convs = struct
 end
 
 
-(** Some utility functions *)
-module Base_extra = struct
-
-  (* ensure 64 bit system *)
-  let _ = assert(Sys.int_size = 63)
 
 
-  let exit_1 = failwith  (* hopefully not be caught FIXME remove this *)
+(** {2 Msgs btwn client and server} *)
 
-
-  (* following for strings *)
-  let dirname_basename path = 
-    assert (String_.starts_with ~prefix:"/" path);
-    String_.split_on_last ~sub:"/" path |> fun (p,c) -> 
-    (* the semantics is that dirname is an absolute path *)
-    (if p="" then "/" else p),c
-
-
-  type length = int (* FIXME in following *)
-  type offset = int
-
-
-  (* FIXME replace path and dh with int-like and string-like *)
-  open Bin_prot.Std
-  type path=string [@@deriving bin_io, yojson]
-  type dh=int  (* FIXME why specialize here? *)
-end
-let exit_1 = Base_extra.exit_1
-
-module Finished = struct
-  (* FIXME remove these? *)
-  module Export = struct
-    type is_finished = {is_finished:bool}
-  end
-  include Export
-  let finished = {is_finished=true}
-  let unfinished = {is_finished=false}
-  (* let not x = { is_finished=not x.is_finished} *)
-end
-include Finished.Export
-
-
-(** Messages between client and server *)
 module Msgs = struct
   open Base_extra
 
@@ -326,55 +392,12 @@ module Msgs = struct
 end
 
 
-(** Errors for each API function... an attempt to refine the different
-   types of error each call can return FIXME needs further refinement
-   *)
-(* FIXME combine with Error_ ? *)
-module Call_specific_errors = struct
-
-  (* FIXME the following should be refined *)
-  type err_         = Error_.exn_
-  type unlink_err   = err_
-  type mkdir_err    = err_
-  type opendir_err  = err_
-  type readdir_err  = err_
-  type closedir_err = err_
-  type create_err   = err_
-  type open_err     = err_
-  type pread_err    = err_
-  type pwrite_err   = err_
-  type close_err    = err_ (* EBADF, but for valid fd, fd will be closed *)
-  type rename_err   = err_
-  type truncate_err = err_
-  type stat_err     = err_
-  type symlink_err  = err_
-  type readlink_err = err_
-
-  (* we often need to map our errors into standard unix errors eg when
-     dealing with fuse; in the unix module, we need to construct the
-     reverse mapping *)
-
-  (* Our version of the Unix_error exception; we want to pattern match
-     exhaustively and name the type *)
-  type unix_error_ = [`Unix_error of Unix.error * string * string ]
-
-  let unknown_error = `Unix_error(Unix.EUNKNOWNERR 999,"FIXME","FIXME")
-end
 
 
-(** fd and dh represented by ints... which is the usual underlying repn *)
-module Int_base_types = struct
-  type fd = int
-  type dh = int
-
-  let fd2i x = x
-  let i2fd x = x
-  let dh2i x = x
-  let i2dh x = x
-end
 
 
-(** The FS operations we work with: unlink, mkdir etc *)
+(** {2 The main filesystem operations: unlink, mkdir etc} *)
+
 module Ops_type = struct
   open Call_specific_errors
 
@@ -385,7 +408,7 @@ module Ops_type = struct
     unlink   : path -> ((unit,unlink_err)r_, 'w) m;
     mkdir    : path -> ((unit,mkdir_err)r_,'w) m;
     opendir  : path -> (('dh,opendir_err)r_, 'w) m;
-    readdir  : 'dh  -> ((string list * is_finished,readdir_err)r_, 'w) m;
+    readdir  : 'dh  -> ((string list * finished,readdir_err)r_, 'w) m;
     (** NOTE . and .. are returned *)
 
     closedir : 'dh  -> ((unit,closedir_err)r_,  'w) m;

@@ -58,7 +58,7 @@ let run x = run ~init_state:() x |> function
     | Error e -> (e |> Error_.exn__to_string |> log_.log_now; failwith __LOC__)
     | Ok a -> a
 
-let readdir' = Readdir'.readdir' ~monad_ops ~ops
+let readdir' = Readdir_util.readdir' ~monad_ops ~ops
 
 let main () = 
   Printf.printf "Calling mkdir tmp; mkdir tmp2\n";

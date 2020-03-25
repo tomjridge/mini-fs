@@ -8,10 +8,14 @@ open Fuse
 
 (* FIXME wrap operations so they return unix_error *)
 
+(** Fuse lives in the real-world, so we need a way to project from the monad *)
 type 'w co_eta = {
   co_eta: 'a. ('a,'w) m -> 'a
 }
 
+(** NOTE hidden defns of mk_fuse_ops *)
+
+(**/**)
 let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta = 
 
   let ( >>= ) = monad_ops.bind in
@@ -162,12 +166,22 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     readlink;
   } [@@ocaml.warning "-26"]
 
-let readdir' ~ops = Readdir'.readdir' ~ops
 
-let mk_fuse_ops ~monad_ops ~ops = mk_fuse_ops ~monad_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
+let mk_fuse_ops ~monad_ops ~ops = 
+  let readdir' ~ops = Readdir_util.readdir' ~ops in
+  mk_fuse_ops ~monad_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
 
-let _ : 
-monad_ops:'a monad_ops ->
-ops:('b, 'c, 'a) ops -> co_eta:'a co_eta -> operations 
+(**/**)
+
+let mk_fuse_ops : 
+monad_ops:'t monad_ops ->
+ops:('f, 'd, 't) ops -> 
+co_eta:'t co_eta -> 
+operations 
 = mk_fuse_ops
-
+(** {[
+monad_ops:'t monad_ops ->
+ops:('f, 'd, 't) ops -> 
+co_eta:'t co_eta -> 
+operations 
+]} *)

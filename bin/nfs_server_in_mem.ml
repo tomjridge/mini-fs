@@ -48,7 +48,7 @@ let run ~init_state m = State_passing.to_fun m init_state
 let main () = 
   let open Tjr_connection.Unix_ in
   let ( >>= ) = bind in
-  let w_ref = ref init_t in
+  let w_ref = ref init_fsystem in
   print_endline "nfs_server accepting connections";
   listen_accept ~quad >>= function
   | Error _e -> failwith __LOC__

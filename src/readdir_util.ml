@@ -1,4 +1,4 @@
-(** A utility function to return all possible entries in a directory (for small directories/testing only! *)
+(** A utility function to return all possible entries in a directory (for small directories/testing only!) *)
 
 open Minifs_intf
 (* open Ops_type_ *)
@@ -15,7 +15,7 @@ let readdir' ~monad_ops ~(ops:(_,_,_)ops) =
         ops.readdir dh 
         >>= function Error e -> return (Error e) | Ok (es',finished) ->
           es:=!es@es';
-          if finished.is_finished then return (Ok !es) else f ()
+          if finished.finished then return (Ok !es) else f ()
       in
       f() >>= fun x -> 
       ops.closedir dh >>= fun _ -> 

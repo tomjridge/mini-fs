@@ -44,7 +44,7 @@ let mk_serve
   let opendir p = ops.opendir p 
     >>=| fun dh -> Dh (dh2i dh) in
   let readdir dh = ops.readdir dh 
-    >>=| fun (xs,b) -> Readdir' (xs,b.is_finished) in
+    >>=| fun (xs,b) -> Readdir' (xs,b.finished) in
   let closedir dh = ops.closedir dh 
     >>=| ret_unit in
   let create path = ops.create path >>=| ret_unit in

@@ -118,9 +118,9 @@ let mk_ops ~monad_ops ~extra =
 
   let readdir dh = 
     delay @@ fun _ ->
-    try Unix.readdir dh |> fun e -> return (Ok([e],Finished.unfinished))
+    try Unix.readdir dh |> fun e -> return (Ok([e],{finished=false}))
     with
-    | End_of_file -> return (Ok([],Finished.finished))
+    | End_of_file -> return (Ok([],{finished=true}))
     | Unix.Unix_error(e,_,_) -> 
       e |> map_error @@ function
       | `EINVAL -> handle_EINVAL ()

@@ -66,7 +66,7 @@ let mk_client_ops (* (type t) *)
     | _ -> internal_err @@ "opendir, "^ty_err^" mnfs.39"
   in
   let readdir dh = Readdir(dh2i dh) |> call >>=| function
-    | Readdir' (xs,b) -> return (xs,{is_finished=b})
+    | Readdir' (xs,b) -> return (xs,{finished=b})
     | _ -> internal_err @@ "readdir, "^ty_err^" mnfs.43"
   in
   let closedir dh = Closedir(dh2i dh) |> call >>= ret_unit in
