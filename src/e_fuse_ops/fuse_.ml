@@ -2,7 +2,7 @@
 
 open Log_
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 open Fuse
 
@@ -60,7 +60,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     ops.open_ path >>=| fun fd ->  
     (* FIXME cache fds in LRU? *)
     (* FIXME fd leak if pread errors *)
-    ops.pread ~fd ~foff:ofs ~length:buf_size ~buffer:buf ~boff:0 >>=| fun n ->
+    ops.pread ~fd ~foff:ofs ~len:buf_size ~buf:buf ~boff:0 >>=| fun n ->
     ops.close fd >>=| fun () ->
     return (Ok n)
   in
@@ -71,7 +71,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     let buf_size = Bigarray.Array1.dim buf in
     ops.open_ path >>=| fun fd ->
     (* FIXME fd leak *)
-    ops.pwrite ~fd ~foff ~length:buf_size ~buffer:buf ~boff:0 >>=| fun n ->
+    ops.pwrite ~fd ~foff ~len:buf_size ~buf:buf ~boff:0 >>=| fun n ->
     ops.close fd >>=| fun () ->
     return (Ok n)
   in
@@ -80,7 +80,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
 
   let truncate path length = 
     length |> Int64.to_int |> fun length ->  (* FIXME *)
-    ops.truncate ~path ~length
+    ops.truncate path length
   in
 
 
@@ -91,7 +91,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     path0 |> fun path ->
     (* log_.log @@ "# mfuse.getattr.l112"; *)
     (* FIXME kind needs to be wrapped so it throws a unix_error *)
-    path |> ops.stat >>=| fun st -> return (Ok(stat2unix st))
+    path |> ops.stat >>=| fun st -> return (Ok(St_convs.stat2unix st))
   in
 
 
@@ -113,7 +113,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
   let maybe_raise a = a |> co_eta |> function
     | Ok a -> a
     | Error e -> 
-      mk_unix_exn e |> fun e ->
+      Error_.mk_unix_exn e |> fun e ->
       raise e
   in
   let _ = maybe_raise in

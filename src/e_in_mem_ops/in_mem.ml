@@ -5,7 +5,7 @@
 open Log_
 open Tjr_map
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 (** {2 Prelude} *)
 
@@ -118,7 +118,7 @@ module Map_did = Tjr_map.Make_map_ops(
 
 let mk_meta () = 
   time () |> fun t ->
-  { atim=t;ctim=();mtim=t}
+  ({ atim=t;ctim=();mtim=t} : meta)
 
 
 let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
@@ -476,7 +476,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
   (* FIXME must account for reading beyond end of file; FIXME atim *)
-  let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pread ~fd ~foff ~len ~(buf:buffer) ~boff = 
     (* buf_size_check length; *)
     let fid = fd2int fd in
     extra_ops.with_fs (fun s ->
@@ -486,19 +486,19 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         | Some(f) ->
           let clen = contents_ops.len f.data in
           (* NOTE we have some flexibility to choose length *)
-          assert(length >= 0);
+          assert(len >= 0);
           assert(foff >= 0);
           assert(boff >= 0);
-          assert(boff+length <= Biga.length buffer);
+          assert(boff+len <= Biga.length buf);
           (* following assures that foff+length<=clen *)
-          let length = if foff > clen then 0 else min length (clen - foff) in
+          let length = if foff > clen then 0 else min len (clen - foff) in
           match () with
           (* NOTE foff may be > clen, but then length is 0 *)
           | _ when length=0 -> (`Ok 0,s)
           | _ -> 
             contents_ops.blit_buf_to_bigarray 
               ~src:f.data ~soff:foff ~len:length 
-              ~dst:buffer ~doff:boff;
+              ~dst:buf ~doff:boff;
             (`Ok length,s)) 
     >>= function
     | `Internal s -> extra_ops.internal_err s
@@ -506,7 +506,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
-  let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
     (* buf_size_check length; *)
     extra_ops.with_fs (fun s ->
         let fid = fd2int fd in
@@ -515,23 +515,23 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         files_ops.find_opt fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
         | Some f ->
-          let blen = Biga.length buffer in
-          assert(length >= 0);
+          let blen = Biga.length buf in
+          assert(len >= 0);
           assert(foff >= 0);
           assert(boff >= 0);
-          assert(boff+length <= blen);
+          assert(boff+len <= blen);
           (* we allow foff beyond EOF *)
           let contents = 
-            if foff+length > contents_ops.len f.data 
-            then contents_ops.resize (foff+length) f.data
+            if foff+len > contents_ops.len f.data 
+            then contents_ops.resize (foff+len) f.data
             else f.data
           in
-          assert(foff+length <= contents_ops.len contents);
+          assert(foff+len <= contents_ops.len contents);
           contents_ops.blit_bigarray_to_buf
-            ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
+            ~src:buf ~soff:boff ~len ~dst:contents ~doff:foff 
           |> fun data ->
           (files_ops.add fid {f with data;meta} files)[@ ocaml.warning "-23"] |> fun files ->
-          (`Ok length,{s with files}))
+          (`Ok len,{s with files}))
     >>= function
     | `Internal s -> extra_ops.internal_err s
     | `Ok l -> return (Ok l)  
@@ -615,7 +615,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
 
 
   (* FIXME truncate parent name; FIXME also stat *)
-  let truncate ~path ~length = 
+  let truncate path length = 
     resolve_file_path path >>=| fun fid ->
     extra_ops.with_fs (fun s ->
         s.files |> fun files ->
@@ -632,7 +632,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
-  let dummy_symlink_meta = { atim=0.0; ctim=(); mtim=0.0 } in
+  let dummy_symlink_meta = ({ atim=0.0; ctim=(); mtim=0.0 } : meta) in
 
   (* FIXME here and elsewhere atim is not really dealt with *)
   let stat path = 
@@ -716,8 +716,11 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
 
   let reset () = return () in
 
-  { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
+  let ops : (_,_,_)ops = { 
+    root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  in
+  ops
 
 let _ = mk_ops
 

@@ -2,7 +2,7 @@
 
 (* open Tjr_connection *)
 open Log_
-open Ops_type_
+(* open Ops_type_ *)
 
 module Connection = Tjr_connection.Unix_
 
@@ -55,7 +55,7 @@ let run ~init_state m = Tjr_monad.State_passing.to_fun m init_state
 
 let run x = run ~init_state:() x |> function
   | a,_ -> a |> function
-    | Error e -> (e |> exn__to_string |> log_.log_now; failwith __LOC__)
+    | Error e -> (e |> Error_.exn__to_string |> log_.log_now; failwith __LOC__)
     | Ok a -> a
 
 let readdir' = Readdir'.readdir' ~monad_ops ~ops

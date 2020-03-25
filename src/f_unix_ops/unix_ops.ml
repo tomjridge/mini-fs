@@ -4,7 +4,7 @@
 
 open Log_
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 module Unix_base_types = struct
   type fd=Unix.file_descr
@@ -67,7 +67,7 @@ let mk_ops ~monad_ops ~extra =
     try 
       stat path |> fun st ->
       begin
-        st.st_kind |> unix2kind |> function
+        st.st_kind |> St_convs.unix2kind |> function
         | `File -> Unix.unlink path
         | `Dir -> Unix.rmdir path
         | `Symlink -> (
@@ -166,12 +166,12 @@ let mk_ops ~monad_ops ~extra =
   let open_ path = mk_fd path in
 
 
-  let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pread ~fd ~foff ~len ~(buf:buffer) ~boff = 
     delay @@ fun _ ->
     try
       (* bigarray pread has no boff, and length is taken from array, so
          resort to slicing *)
-      Bigarray.Array1.sub buffer boff length |> fun buffer -> 
+      Bigarray.Array1.sub buf boff len |> fun buffer -> 
       ExtUnix.All.BA.pread fd foff buffer |> fun nread ->
       return (Ok nread)
     with
@@ -181,10 +181,10 @@ let mk_ops ~monad_ops ~extra =
   in
 
 
-  let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
     delay @@ fun _ ->
     try 
-      Bigarray.Array1.sub buffer boff length |> fun buffer -> 
+      Bigarray.Array1.sub buf boff len |> fun buffer -> 
       ExtUnix.All.BA.pwrite fd foff buffer |> fun n ->
       return (Ok n)
     with
@@ -215,7 +215,7 @@ let mk_ops ~monad_ops ~extra =
       | `EINVAL -> handle_EINVAL ()
   in
 
-  let truncate ~path ~length = 
+  let truncate path length = 
     delay @@ fun _ ->
     try
       Unix.truncate path length; 
@@ -231,7 +231,7 @@ let mk_ops ~monad_ops ~extra =
     delay @@ fun _ ->
     try
       let open Unix.LargeFile in
-      stat path |> unix2stat |> fun stat -> 
+      stat path |> St_convs.unix2stat |> fun stat -> 
       return (Ok stat)
     with
     | Unix.Unix_error(e,_,_) -> 
@@ -263,9 +263,11 @@ let mk_ops ~monad_ops ~extra =
 
   let reset () = return () in
 
-
-  { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  let ops : (_,_,_)ops = 
+    { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
+      pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  in
+  ops
 
 
 let unix_ops ~monad_ops:_ () =

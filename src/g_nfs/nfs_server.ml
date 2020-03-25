@@ -4,7 +4,7 @@
    below translates this to messages on the wire *)
 
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 (*
 type 'w extra_ops = {
@@ -20,7 +20,7 @@ open Bigarray_buffer
 
 let mk_serve
   ~monad_ops
-    ~ops  (* backend *)
+    ~(ops:(_,_,_)ops)  (* backend *)
     ~data_of_buffer
     ~buffer_of_data
     ~mk_buffer
@@ -56,7 +56,7 @@ let mk_serve
     buf_size_check length;
     let length = min length Sys.max_string_length in
     mk_buffer length |> fun buffer ->
-    ops.pread ~fd ~foff ~length ~buffer ~boff:0 
+    ops.pread ~fd ~foff ~len:length ~buf:buffer ~boff:0 
     >>=| fun nread -> 
     buf_size_check nread;
     data_of_buffer ~buffer ~len:nread |> fun data ->
@@ -65,14 +65,14 @@ let mk_serve
   let pwrite ~fd ~foff ~data = 
     let length = String.length data in
     buf_size_check length;
-    let length = min length Sys.max_string_length in
+    let len = min length Sys.max_string_length in
     buffer_of_data data |> fun buffer ->
-    ops.pwrite ~fd ~foff ~length ~buffer ~boff:0 
+    ops.pwrite ~fd ~foff ~len ~buf:buffer ~boff:0 
     >>=| fun nwritten -> Int nwritten
   in
   let close fd = ops.close fd >>=| ret_unit in
   let rename src dst = ops.rename src dst >>=| ret_unit in
-  let truncate ~path ~length = ops.truncate ~path ~length >>=| ret_unit in
+  let truncate path length = ops.truncate path length >>=| ret_unit in
   let stat p = ops.stat p >>=| fun st -> Stat' st in
   let symlink contents p = ops.symlink contents p >>=| ret_unit in
   let readlink p = ops.readlink p >>=| fun s -> Readlink' s in
@@ -88,7 +88,7 @@ let mk_serve
     | Pwrite(fd,foff,data) -> pwrite ~fd:(i2fd fd) ~foff ~data
     | Close fd -> close (i2fd fd)
     | Rename (src,dst) -> rename src dst
-    | Truncate(path,length) -> truncate ~path ~length 
+    | Truncate(path,length) -> truncate path length 
     | Stat p -> stat p
     | Symlink(cs,p) -> symlink cs p 
     | Readlink p -> readlink p

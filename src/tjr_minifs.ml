@@ -7,6 +7,7 @@
 (** {2 Base utilities} *)
 
 module Log_ = Log_
+
 module Runtime_config = Runtime_config
 
 (** {2 Interface} *)
