@@ -1,24 +1,56 @@
-(** Construct an in-memory FS ops *)
+(** Construct an in-memory version of the filesystem ops; don't open *)
 
 (* FIXME more documentation *)
 
 open Log_
 open Tjr_map
 open Minifs_intf
-open Ops_type_
+
+
+module Int_base_types = Int_base_types
+open Int_base_types
+
+
+(** {2 Misc} *)
+
+(** NOTE hidden defn of resolve *)
+(**/**)
 
 (* NOTE we specialize this later *)
 let resolve = Tjr_path_resolution.resolve
+(**/**)
 
-(* FIXME tidy this file *)
+module Map_int = Stdlib.Map.Make(
+  struct 
+    type t = int let compare: t->t->int = Stdlib.compare 
+  end)
 
-(* in-mem impl ------------------------------------------------------ *)
+
+module Set_string = Stdlib.Set.Make(
+  struct
+    type t = string let compare: t->t->int = Stdlib.compare 
+  end)
+
+
+module Map_string = Stdlib.Map.Make(
+  struct 
+    type t = string let compare: t->t->int = Stdlib.compare 
+  end)
+
 
 let time = Unix.time (* 1s resolution *)
 
-module Mem_base_types = Int_base_types
-include Mem_base_types
+let mk_meta () = 
+  time () |> fun t ->
+  ({ atim=t;ctim=();mtim=t} : meta)
 
+let fdata_ops = Tjr_buffer.mk_buf_ops()
+
+type path = string
+
+
+
+(** {2 File and directory ids} *)
 
 (* file ids *)
 module Fid : sig
@@ -30,7 +62,8 @@ end = struct
   let fid0=0
   let  inc_fid x = x+1
 end
-include Fid
+open Fid
+type fid = Fid.fid
 
 
 (* dir ids *)
@@ -43,96 +76,119 @@ end = struct
   let root_did = 1234
   let inc_did x = x+1 
 end
-include Did
+open Did
+type did = Did.did
 
 
-module Map_fid = Tjr_map.Make_map_ops(
-  struct 
-    type t = fid let compare: t->t->int = Pervasives.compare 
-  end)
 
+(** {2 Other basic types: dir_entry, file_meta_and_data } *)
 
-module Map_did = Tjr_map.Make_map_ops(
-  struct 
-    type t = did let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-module Map_string = Tjr_map.Make_map_ops(
-  struct 
-    type t = string let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-module Map_int = Tjr_map.Make_map_ops(
-  struct 
-    type t = int let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-module Set_string = Set.Make(
-  struct
-    type t = string let compare: t->t->int = Pervasives.compare 
-  end)
-
-
-type symlink = string [@@deriving yojson]
+module Symlink_type = struct
+  type symlink = string [@@deriving yojson]
+end
+open Symlink_type
 
 (* type id = Fid of fid | Did of did [@@deriving yojson] *)
 (* entries are either files, dirs, or symlinks; for symlinks we just
    record the string data in the entry *)
-type dir_entry = Fid of fid | Did of did | Symlink of symlink[@@deriving yojson]
+module Dir_entry = struct
+  type dir_entry = Fid of fid | Did of did | Symlink of symlink[@@deriving yojson]
+  let is_fid = function
+    | Fid _ -> true
+    | _ -> false
+
+
+  let is_did = function
+    | Did _ -> true 
+    | _ -> false
+
+  let is_symlink _x = function
+    | Symlink _ -> true
+    | _ -> false
+end
+open Dir_entry
+type dir_entry = Dir_entry.dir_entry = Fid of fid | Did of did | Symlink of symlink
+
+
+
+
+
+type file_meta_and_data = {
+  meta: Meta.meta; 
+  data: Tjr_buffer.buf
+}
+
+
+(** {2 Dirs as maps from string} *)
 
 (* a name map - from strings to dir entries *)
-type name_map_carrier = dir_entry Map_string.t
-type nm_ops = (string,dir_entry,name_map_carrier) map_ops
-let nm_ops : nm_ops = Map_string.map_ops
+(* type name_map_carrier = dir_entry Map_string.t *)
+type dents_carrier = dir_entry Map_string.t
 
-
-let mk_meta () = 
-  time () |> fun t ->
-  { atim=t;ctim=();mtim=t}
-
+type dents_ops = (string,dir_entry,dents_carrier) map_ops
+(* let dents_ops : dents_ops = Map_string.map_ops *)
+module Dents_ops = Map_string
 
 type dir_with_parent = {
-  name_map :name_map_carrier;
-  meta     :meta;
+  name_map :dents_carrier;
+  meta     :Meta.meta;
   parent   :did
 }
 
 let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
-  let dir_empty ~meta ~parent = { name_map=nm_ops.empty; meta; parent } in
-  let dir_find k t = nm_ops.find_opt k t.name_map in
-  let dir_add k v t = {t with name_map=nm_ops.add k v t.name_map} in
-  let dir_remove k t = {t with name_map=nm_ops.remove k t.name_map} in
-  let dir_bindings t = nm_ops.bindings t.name_map in
+  let dir_empty ~meta ~parent = { name_map=Dents_ops.empty; meta; parent } in
+  let dir_find k t = Dents_ops.find_opt k t.name_map in
+  let dir_add k v t = {t with name_map=Dents_ops.add k v t.name_map} in
+  let dir_remove k t = {t with name_map=Dents_ops.remove k t.name_map} in
+  let dir_bindings t = Dents_ops.bindings t.name_map in
   (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
 
-type file_meta_and_data = {
-  meta: meta; 
-  data: Tjr_buffer.buf
-}
-open Tjr_buffer
-let contents_ops = Tjr_buffer.mk_buf_ops()
+let empty_dir ~parent ~meta = dir_empty ~parent ~meta
 
 
-type files_carrier = file_meta_and_data Map_fid.t
-type files_ops = (fid,file_meta_and_data,files_carrier) map_ops
-let files_ops : files_ops = Map_fid.map_ops
+module Map_did = Tjr_map.Make_map_ops(
+  struct 
+    type k = did
+    type v = dir_with_parent
+    let k_cmp: k->k->int = Stdlib.compare 
+  end)
 
-
-type dirs_carrier = dir_with_parent Map_did.t
+type dirs_carrier = Map_did.t
 type dirs_ops = (did,dir_with_parent,dirs_carrier) map_ops
 let dirs_ops : dirs_ops = Map_did.map_ops
 
 
+(** {2 Global files map from fid} *)
+
+module Map_fid = Tjr_map.Make_map_ops(
+  struct 
+    type k = fid 
+    type v = file_meta_and_data
+    let k_cmp: k->k->int = Stdlib.compare 
+  end)
+
+type files_carrier = Map_fid.t
+type files_ops = (fid,file_meta_and_data,files_carrier) map_ops
+let files_ops : files_ops = Map_fid.map_ops
+
+
+(** {2 Dir handles} *)
+
+(** This is needed because we access dir handles in stages: openddir,
+   readdir, closedir; so we have to maintain information about open
+   dhs *)
+
 type dhandles_carrier = string list Map_int.t
 type dhandles_ops = (dh,string list,dhandles_carrier) map_ops
-let dhandles_ops : dhandles_ops = Map_int.map_ops
+(* let dhandles_ops : dhandles_ops = Map_int.map_ops *)
+module Dhandles_ops = Map_int
 
-(* NOTE symlinks are stored directly as a dir entry *)
 
-type fs_t = {
+(** {2 Filesystem state} *)
+
+(** NOTE symlinks are stored directly as a dir entry *)
+
+type fsys = {
   files: files_carrier;
   max_fid: fid;
   dirs: dirs_carrier;
@@ -146,8 +202,7 @@ let lookup_did did fs =
   fs.dirs |> fun map ->
   Map_did.map_ops.find_opt did map
 
-
-module Fs_t_to_json = struct
+module Fsys_to_json = struct
   (* an easily-jsonable version *)
   type fs' = {
     files: (fid * string) list;
@@ -164,70 +219,50 @@ module Fs_t_to_json = struct
   } [@@deriving yojson]
 
   (* FIXME meta not included *)
-  let from_fs (fs:fs_t) = {
+  let from_fs (fs:fsys) = {
     files=files_ops.bindings fs.files |> List.map (fun (fid,c) -> 
-        (fid,contents_ops.to_string c.data));
+        (fid,fdata_ops.to_string c.data));
     max_fid=fs.max_fid;
     dirs=
       dirs_ops.bindings fs.dirs 
       |> List.map (fun (did,dir) -> 
-          dir.name_map |> nm_ops.bindings |> fun bs ->
+          dir.name_map |> Dents_ops.bindings |> fun bs ->
           (did,(bs,dir.parent)));
     max_did=fs.max_did;
   }
+
+  let fsys_to_json fs = (
+      from_fs fs |> fs'_to_yojson |> Yojson.Safe.pretty_to_string)
+
 end
 
-
-let fs_to_json fs = Fs_t_to_json.(
-    from_fs fs |> fs'_to_yojson |> Yojson.Safe.pretty_to_string)
-
-
-let empty_dir ~parent ~meta = dir_empty ~parent ~meta
-
-
-let init_fs = {
+let init_fsys = {
   files=files_ops.empty;
   max_fid=fid0;
-  dirs=(dirs_ops.empty |> dirs_ops.add root_did (empty_dir ~meta:(mk_meta()) ~parent:root_did));
+  dirs=(dirs_ops.empty 
+        |> dirs_ops.add root_did (empty_dir ~meta:(mk_meta()) ~parent:root_did));
   max_did=root_did;
-  dir_handles=dhandles_ops.empty;
+  dir_handles=Dhandles_ops.empty;
   max_dh=0;
 }
 
 
-type path = string
+(** {2 Extra monadic operations} *)
 
+(** These operations are needed to build the ops; in turn, they can be created via the [with_fs] type. FIXME perhaps generalize over fsys type *)
 
-let is_fid = function
-  | Fid _ -> true
-  | _ -> false
-
-
-let is_did = function
-  | Did _ -> true 
-  | _ -> false
-
-let is_symlink _x = function
-  | Symlink _ -> true
-  | _ -> false
-
-
-
-(* extra ops on top of monad ---------------------------------------- *)
-
-(* NOTE following can be built on top of with_fs and internal_err (?) *)
 type 't extra_ops = {
   (* err: 'a. 'e -> (('a,'e)r_,'t) m;  (* FIXME? how can we handle all errors? *) *)
   new_did: unit -> (did,'t) m;
   new_fid: unit -> (fid,'t) m;
-  with_fs: 'a. (fs_t -> 'a * fs_t) -> ('a,'t) m;  (* ASSUME-ed not to raise exception *)
+  with_fs: 'a. (fsys -> 'a * fsys) -> ('a,'t) m;  (* ASSUME-ed not to raise exception *)
   internal_err: 'a. string -> ('a,'t) m;
   dirs_add: did -> dir_with_parent -> (unit,'t) m;
   is_ancestor: parent:did -> child:dir_with_parent -> (bool,'t) m
 }
 
 
-(* main functionality ----------------------------------------------- *)
+(** {2 Main functionality} *)
 
 open Tjr_path_resolution
 
@@ -394,7 +429,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             dir_bindings dir |> List.map fst |> fun names ->
             1+s.max_dh |> fun dh ->
             s.dir_handles |> fun handles ->
-            dhandles_ops.add dh names handles |> fun dir_handles ->
+            Dhandles_ops.add dh names handles |> fun dir_handles ->
             {s with dir_handles; max_dh=dh } |> fun s ->                            
             `Ok(dh),s)
     end
@@ -408,16 +443,17 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   let readdir dh = 
     extra_ops.with_fs (fun s ->
         s.dir_handles |> fun handles ->
-        dhandles_ops.find_opt dh handles |> function
+        Dhandles_ops.find_opt dh handles |> function
         | None -> `Internal "readdir, impossible, dh not found mim.328",s
         | Some xs -> `Ok xs,s) 
     >>= function
-    | `Ok xs -> return (Ok(xs,Finished.finished))
+    | `Ok xs -> return (Ok(xs,{finished=true}))
     | `Internal s -> extra_ops.internal_err s
   in
 
 
-  let closedir _dh = return (Ok()) in (* FIXME should we record which rd are valid? ie not closed *)
+  let closedir _dh = return (Ok()) in 
+  (* FIXME should we record which rd are valid? ie not closed *)
 
 
   (* default size preallocated for a file *)
@@ -440,7 +476,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
           dirs_ops.add parent pdir dirs |> fun dirs ->
           {s with dirs} |> fun s ->
           s.files |> fun files ->
-          let data = contents_ops.create ~internal_len 0 in
+          let data = fdata_ops.create ~internal_len 0 in
           files_ops.add fid {meta;data} files |> fun files ->
           `Ok,{s with files}) 
     >>= function
@@ -460,7 +496,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
   (* FIXME must account for reading beyond end of file; FIXME atim *)
-  let pread ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pread ~fd ~foff ~len ~(buf:buffer) ~boff = 
     (* buf_size_check length; *)
     let fid = fd2int fd in
     extra_ops.with_fs (fun s ->
@@ -468,21 +504,21 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         files_ops.find_opt fid files |> function
         | None -> `Internal "pread, impossible, no file, mim.325",s
         | Some(f) ->
-          let clen = contents_ops.len f.data in
+          let clen = fdata_ops.len f.data in
           (* NOTE we have some flexibility to choose length *)
-          assert(length >= 0);
+          assert(len >= 0);
           assert(foff >= 0);
           assert(boff >= 0);
-          assert(boff+length <= Biga.length buffer);
+          assert(boff+len <= Tjr_buffer.Biga.length buf);
           (* following assures that foff+length<=clen *)
-          let length = if foff > clen then 0 else min length (clen - foff) in
+          let length = if foff > clen then 0 else min len (clen - foff) in
           match () with
           (* NOTE foff may be > clen, but then length is 0 *)
           | _ when length=0 -> (`Ok 0,s)
           | _ -> 
-            contents_ops.blit_buf_to_bigarray 
+            fdata_ops.blit_buf_to_bigarray 
               ~src:f.data ~soff:foff ~len:length 
-              ~dst:buffer ~doff:boff;
+              ~dst:buf ~doff:boff;
             (`Ok length,s)) 
     >>= function
     | `Internal s -> extra_ops.internal_err s
@@ -490,7 +526,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
-  let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
     (* buf_size_check length; *)
     extra_ops.with_fs (fun s ->
         let fid = fd2int fd in
@@ -499,23 +535,23 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         files_ops.find_opt fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
         | Some f ->
-          let blen = Biga.length buffer in
-          assert(length >= 0);
+          let blen = Tjr_buffer.Biga.length buf in
+          assert(len >= 0);
           assert(foff >= 0);
           assert(boff >= 0);
-          assert(boff+length <= blen);
+          assert(boff+len <= blen);
           (* we allow foff beyond EOF *)
           let contents = 
-            if foff+length > contents_ops.len f.data 
-            then contents_ops.resize (foff+length) f.data
+            if foff+len > fdata_ops.len f.data 
+            then fdata_ops.resize (foff+len) f.data
             else f.data
           in
-          assert(foff+length <= contents_ops.len contents);
-          contents_ops.blit_bigarray_to_buf
-            ~src:buffer ~soff:boff ~len:length ~dst:contents ~doff:foff 
+          assert(foff+len <= fdata_ops.len contents);
+          fdata_ops.blit_bigarray_to_buf
+            ~src:buf ~soff:boff ~len ~dst:contents ~doff:foff 
           |> fun data ->
           (files_ops.add fid {f with data;meta} files)[@ ocaml.warning "-23"] |> fun files ->
-          (`Ok length,{s with files}))
+          (`Ok len,{s with files}))
     >>= function
     | `Internal s -> extra_ops.internal_err s
     | `Ok l -> return (Ok l)  
@@ -599,14 +635,14 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
 
 
   (* FIXME truncate parent name; FIXME also stat *)
-  let truncate ~path ~length = 
+  let truncate path length = 
     resolve_file_path path >>=| fun fid ->
     extra_ops.with_fs (fun s ->
         s.files |> fun files ->
         files_ops.find_opt fid files |> function
         | None -> `Internal "file not found mim.362",s
         | Some f ->
-          contents_ops.resize length f.data  |> fun data ->
+          fdata_ops.resize length f.data  |> fun data ->
           let meta = mk_meta() in
           files_ops.add fid ({f with data;meta}[@ocaml.warning "-23"]) files |> fun files ->
           `Ok (),{s with files}) 
@@ -616,10 +652,11 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
-  let dummy_symlink_meta = { atim=0.0; ctim=(); mtim=0.0 } in
+  let dummy_symlink_meta = ({ atim=0.0; ctim=(); mtim=0.0 } : meta) in
 
   (* FIXME here and elsewhere atim is not really dealt with *)
   let stat path = 
+    let open Stat_record in
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
     let { parent_id=_pid; comp=_name; result; trailing_slash=_ } = rpath in
     begin
@@ -631,9 +668,8 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             files_ops.find_opt fid files |> function
             | None -> `Internal "file fid not found mim.379",s
             | Some f ->          
-              contents_ops.len f.data |> fun sz ->
-              f.meta |> fun meta ->
-              `Ok { sz;meta;kind=`File },s)
+              fdata_ops.len f.data |> fun sz ->
+              `Ok { sz;meta=f.meta;kind=`File },s)
       | Dir did -> 
         extra_ops.with_fs (fun s ->
             s.dirs |> fun dirs ->
@@ -700,25 +736,30 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
 
   let reset () = return () in
 
-  { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
+  let ops : (_,_,_)ops = { 
+    root; unlink; mkdir; opendir; readdir; closedir; create; open_;
     pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  in
+  ops
 
 let _ = mk_ops
 
-(* monad ------------------------------------------------------------ *)
 
 
-type t = { 
+(** {2 State-passing instance FIXME tidy} *)
+
+(** Like fsys, but track any errors that occur, and maybe raise them from the monad *)
+type fsystem = { 
 (*  thread_error_state: exn_ option;  (* for current call *) *)
   internal_error_state: string option;
-  fs: fs_t
+  fsys: fsys
 }
 
 
-let init_t = {
+let init_fsystem = {
 (*  thread_error_state=None; *)
   internal_error_state=None;
-  fs=init_fs
+  fsys=init_fsys
 }
 
 (*
@@ -735,42 +776,42 @@ include In_mem_monad
 *)
 
 (* easily json-able FIXME used? *)
+
+(** NOTE hidden [Y_] module *)
+
+(**/**)
 module Y_ = struct
-  open Fs_t_to_json
+  open Fsys_to_json
   type t' = {
     internal_error_state: string option;
     fs:fs' 
   } [@@deriving yojson]
 
-  let from_t (t:t) = {
+  let from_t (t:fsystem) = {
     internal_error_state=t.internal_error_state;
-    fs=Fs_t_to_json.from_fs t.fs
+    fs=Fsys_to_json.from_fs t.fsys
   }
 end
+(**/**)
 
-
-let t_to_string t = Y_.(
+let fsystem_to_string t = Y_.(
     t |> from_t |> t'_to_yojson |> Yojson.Safe.pretty_to_string)
 
 
 
+(** State-passing helper functions type; used to construct [extra_ops] *)
+type 't with_fs = {
+  with_fs: 'a. (fsys -> 'a * fsys) -> ('a,'t) m;
+  internal_err: 'a. string -> ('a,'t) m
+}
 
-(* extra ----------------------------------------------------------- *)
-
-module Extra_core = struct
-  type 't t = {
-    with_fs: 'a. (fs_t -> 'a * fs_t) -> ('a,'t) m;
-    internal_err: 'a. string -> ('a,'t) m
-  }
-end
-
-let mk_extra_ops ~monad_ops ~(extra_core:'t Extra_core.t) = 
+let mk_extra_ops ~monad_ops ~(with_fs:'t with_fs) = 
 
   let ( >>= ) = monad_ops.bind in
   let return = monad_ops.return in
   
   (* following was Extra_core.{with_fs,internal_err} = extra_core, but there was a ppx bug https://github.com/ocaml-ppx/ocaml-migrate-parsetree/issues/18 *)
-  let with_fs,internal_err = Extra_core.(extra_core.with_fs,extra_core.internal_err) in
+  let with_fs,internal_err = (with_fs.with_fs,with_fs.internal_err) in
 
   let new_did () = with_fs (fun fs ->
       { fs with max_did=(inc_did fs.max_did) } |> fun fs' ->
@@ -819,8 +860,8 @@ let mk_extra_ops ~monad_ops ~(extra_core:'t Extra_core.t) =
   extra
 
 
-let mk_ops ~monad_ops ~extra_core = 
-  let extra_ops = mk_extra_ops ~monad_ops ~extra_core in
+let mk_ops ~monad_ops ~with_fs : (fid,did,'t)ops = 
+  let extra_ops = mk_extra_ops ~monad_ops ~with_fs in
   mk_ops ~monad_ops ~extra_ops
 
 
@@ -828,16 +869,16 @@ let mk_ops ~monad_ops ~extra_core =
 
 let in_mem_monad_ops = State_passing.monad_ops ()
 
-let in_mem_state_passing_ops = 
+let in_mem_state_passing_ops : (fid,did,fsystem state_passing) ops = 
   (* FIXME internal_err should just mark the state as erroneous
      without having to produce an 'a; maybe state is either erroneous
      or ok *)
-  let extra_core = Extra_core.{
+  let with_fs = {
     with_fs=(fun f -> 
       State_passing.of_fun
           (fun t -> 
-             f t.fs |> fun (a,fs) ->
-             a,{t with fs}));
+             f t.fsys |> fun (a,fsys) ->
+             a,{t with fsys}));
     internal_err=(fun s -> 
         State_passing.of_fun
           (fun _t ->
@@ -845,7 +886,7 @@ let in_mem_state_passing_ops =
              exit_1 (s^"; "^__LOC__)))
   }
   in
-  let ops = mk_ops ~monad_ops:in_mem_monad_ops ~extra_core in
+  let ops = mk_ops ~monad_ops:in_mem_monad_ops ~with_fs in
   ops
 
 let _ = in_mem_state_passing_ops

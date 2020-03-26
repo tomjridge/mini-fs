@@ -8,7 +8,7 @@
 
 
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 module Base_types = Int_base_types
 
@@ -31,7 +31,7 @@ let genint () = Gensym.gensym ()
 
 (* this is what we aim to provide *)
 
-type 'w ops_type = (int,int,'w) Ops_type_.ops
+type 'w ops_type = (int,int,'w) ops
 
 (* open Unix_ops *)
 
@@ -64,21 +64,21 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
     return (Ok i)
   in
 
-  let pread ~fd ~foff ~length ~buffer ~boff = 
+  let pread ~fd ~foff ~len ~buf ~boff = 
     i2fd fd >>= fun fd ->
-    ops.pread ~fd ~foff ~length ~buffer ~boff 
+    ops.pread ~fd ~foff ~len ~buf ~boff 
   in
 
-  let pwrite ~fd ~foff ~length ~(buffer:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
     i2fd fd >>= fun fd ->
-    ops.pwrite ~fd ~foff ~length ~buffer ~boff 
+    ops.pwrite ~fd ~foff ~len ~buf ~boff 
   in  
 
   let close fd = i2fd fd >>= fun fd -> ops.close fd in
 
   let rename src dst = ops.rename src dst in
 
-  let truncate ~path ~length = ops.truncate ~path ~length in
+  let truncate path length = ops.truncate path length in
 
   let stat path = ops.stat path in
 
@@ -88,8 +88,12 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
 
   let reset () = ops.reset () in
 
-  { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  let ops : (_,_,_)ops = 
+    { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
+      pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  in
+
+  ops
   
 
 

@@ -7,6 +7,7 @@
 (** {2 Base utilities} *)
 
 module Log_ = Log_
+
 module Runtime_config = Runtime_config
 
 (** {2 Interface} *)
@@ -16,7 +17,7 @@ module Minifs_intf = Minifs_intf
 
 (** {2 Readdir util} *)
 
-module Readdir' = Readdir'
+module Readdir_util = Readdir_util
 
 
 (** {2 Fuse} *)

@@ -10,7 +10,7 @@ let mk_unix_exn = Error_.mk_unix_exn
 
 (* NOTE could have multiple filesystems in memory, but here we just
    fix one reference which points to the state of one in-mem fs *)
-let w_ = ref In_mem.init_t
+let w_ = ref In_mem.init_fsystem
 
 let run ~init_state m = State_passing.to_fun m init_state
 

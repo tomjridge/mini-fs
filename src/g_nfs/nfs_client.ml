@@ -5,7 +5,7 @@
 
 open Log_
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 
 (** This is used to indicate that the result of a call was not what
@@ -66,7 +66,7 @@ let mk_client_ops (* (type t) *)
     | _ -> internal_err @@ "opendir, "^ty_err^" mnfs.39"
   in
   let readdir dh = Readdir(dh2i dh) |> call >>=| function
-    | Readdir' (xs,b) -> return (xs,{is_finished=b})
+    | Readdir' (xs,b) -> return (xs,{finished=b})
     | _ -> internal_err @@ "readdir, "^ty_err^" mnfs.43"
   in
   let closedir dh = Closedir(dh2i dh) |> call >>= ret_unit in
@@ -75,15 +75,15 @@ let mk_client_ops (* (type t) *)
     | Open' fd -> return (i2fd fd)
     | _ -> internal_err @@ "open_, "^ty_err^" mnfs.49"
   in
-  let pread ~fd ~foff ~length ~buffer ~boff =
-    Pread(fd2i fd,foff,length) |> call >>=| function
+  let pread ~fd ~foff ~len ~buf ~boff =
+    Pread(fd2i fd,foff,len) |> call >>=| function
     | Pread' data -> 
-      blit_data_to_buffer ~data ~buffer ~boff;
+      blit_data_to_buffer ~data ~buffer:buf ~boff;
       return (data_length data)
     | _ -> internal_err @@ "pread, "^ty_err^" mnfs.56"
   in
-  let pwrite ~fd ~foff ~length ~buffer ~boff =
-    data_of_buffer ~buffer ~off:boff ~len:length |> fun data ->
+  let pwrite ~fd ~foff ~len ~buf ~boff =
+    data_of_buffer ~buffer:buf ~off:boff ~len:len |> fun data ->
     Pwrite(fd2i fd,foff,data) |> call >>=| function
     | Int nwritten -> return nwritten
     | _ -> internal_err @@ "pwrite, "^ty_err^" mnfs.62"
@@ -91,7 +91,7 @@ let mk_client_ops (* (type t) *)
   let close fd = Close (fd2i fd) |> call >>= ret_unit in
   let rename src dst = 
     Rename(src,dst) |> call >>= ret_unit in
-  let truncate ~path ~length = Truncate(path,length) |> call >>= ret_unit in
+  let truncate path length = Truncate(path,length) |> call >>= ret_unit in
   let stat p = Stat p |> call >>=| function
     | Stat' st -> return st
     | _ -> internal_err @@ "stat_file, "^ty_err^" mnfs.68"
@@ -107,8 +107,11 @@ let mk_client_ops (* (type t) *)
     | Ok_ Unit -> return ()
     | _ -> internal_err @@ "reset, "^ty_err^" mnfs.92"
   in
-  { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
-    pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  let ops : (_,_,_)ops = 
+    { root; unlink; mkdir; opendir; readdir; closedir; create; open_;
+      pread; pwrite; close; rename; truncate; stat; symlink; readlink; reset }
+  in
+  ops
 
 
 (** Specialize mk_client_ops using standard buffer auxiliary functions *)

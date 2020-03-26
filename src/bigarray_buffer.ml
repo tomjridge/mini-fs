@@ -1,5 +1,7 @@
 open Log_
 
+(* FIXME perhaps bigstring now provides this functionality? *)
+
 (* fuse uses this form of buffer *)
 
 type buffer = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t

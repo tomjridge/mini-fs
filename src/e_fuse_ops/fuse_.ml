@@ -2,16 +2,20 @@
 
 open Log_
 open Minifs_intf
-open Ops_type_
+(* open Ops_type_ *)
 
 open Fuse
 
 (* FIXME wrap operations so they return unix_error *)
 
+(** Fuse lives in the real-world, so we need a way to project from the monad *)
 type 'w co_eta = {
   co_eta: 'a. ('a,'w) m -> 'a
 }
 
+(** NOTE hidden defns of mk_fuse_ops *)
+
+(**/**)
 let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta = 
 
   let ( >>= ) = monad_ops.bind in
@@ -60,7 +64,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     ops.open_ path >>=| fun fd ->  
     (* FIXME cache fds in LRU? *)
     (* FIXME fd leak if pread errors *)
-    ops.pread ~fd ~foff:ofs ~length:buf_size ~buffer:buf ~boff:0 >>=| fun n ->
+    ops.pread ~fd ~foff:ofs ~len:buf_size ~buf:buf ~boff:0 >>=| fun n ->
     ops.close fd >>=| fun () ->
     return (Ok n)
   in
@@ -71,7 +75,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     let buf_size = Bigarray.Array1.dim buf in
     ops.open_ path >>=| fun fd ->
     (* FIXME fd leak *)
-    ops.pwrite ~fd ~foff ~length:buf_size ~buffer:buf ~boff:0 >>=| fun n ->
+    ops.pwrite ~fd ~foff ~len:buf_size ~buf:buf ~boff:0 >>=| fun n ->
     ops.close fd >>=| fun () ->
     return (Ok n)
   in
@@ -80,7 +84,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
 
   let truncate path length = 
     length |> Int64.to_int |> fun length ->  (* FIXME *)
-    ops.truncate ~path ~length
+    ops.truncate path length
   in
 
 
@@ -91,7 +95,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     path0 |> fun path ->
     (* log_.log @@ "# mfuse.getattr.l112"; *)
     (* FIXME kind needs to be wrapped so it throws a unix_error *)
-    path |> ops.stat >>=| fun st -> return (Ok(stat2unix st))
+    path |> ops.stat >>=| fun st -> return (Ok(St_convs.stat2unix st))
   in
 
 
@@ -113,7 +117,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
   let maybe_raise a = a |> co_eta |> function
     | Ok a -> a
     | Error e -> 
-      mk_unix_exn e |> fun e ->
+      Error_.mk_unix_exn e |> fun e ->
       raise e
   in
   let _ = maybe_raise in
@@ -148,7 +152,9 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     mkdir;    
     readdir;
     fopen;
-    mknod = (fun path _mode -> ignore(fopen path [Unix.O_CREAT]); ()); (* NOTE gets called instead of fopen to create a file *)
+    mknod = (fun path _mode -> 
+      let _ = fopen path [Unix.O_CREAT] in
+      ()); (* NOTE gets called instead of fopen to create a file *)
     read;
     write;
     rename;
@@ -160,12 +166,22 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
     readlink;
   } [@@ocaml.warning "-26"]
 
-let readdir' ~ops = Readdir'.readdir' ~ops
 
-let mk_fuse_ops ~monad_ops ~ops = mk_fuse_ops ~monad_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
+let mk_fuse_ops ~monad_ops ~ops = 
+  let readdir' ~ops = Readdir_util.readdir' ~ops in
+  mk_fuse_ops ~monad_ops ~readdir':(readdir' ~monad_ops ~ops) ~ops
 
-let _ : 
-monad_ops:'a monad_ops ->
-ops:('b, 'c, 'a) ops -> co_eta:'a co_eta -> operations 
+(**/**)
+
+let mk_fuse_ops : 
+monad_ops:'t monad_ops ->
+ops:('f, 'd, 't) ops -> 
+co_eta:'t co_eta -> 
+operations 
 = mk_fuse_ops
-
+(** {[
+monad_ops:'t monad_ops ->
+ops:('f, 'd, 't) ops -> 
+co_eta:'t co_eta -> 
+operations 
+]} *)
