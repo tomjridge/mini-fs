@@ -440,3 +440,11 @@ end
 type ('fd,'dh,'t) ops = ('fd,'dh,'t) Ops_type.ops
 
 type path = Ops_type.path
+
+
+
+(** Extract a value from a monad (Fuse lives in the real-world, so we
+   need a way to project from a monad like lwt) *)
+type 'w co_eta = {
+  co_eta: 'a. ('a,'w) m -> 'a
+}

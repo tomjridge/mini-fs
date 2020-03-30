@@ -52,7 +52,7 @@ let run ~init_state m = State_passing.to_fun m init_state
 let co_eta = fun a -> 
   run ~init_state: () a |> function
   | a,_ -> a  (* NOTE can ignore the state - it doesn't change *)
-let co_eta = Fuse_.{co_eta}
+let co_eta = {co_eta}
 
 
 let fuse_ops = 

@@ -8,11 +8,6 @@ open Fuse
 
 (* FIXME wrap operations so they return unix_error *)
 
-(** Fuse lives in the real-world, so we need a way to project from the monad *)
-type 'w co_eta = {
-  co_eta: 'a. ('a,'w) m -> 'a
-}
-
 (** NOTE hidden defns of mk_fuse_ops *)
 
 (**/**)

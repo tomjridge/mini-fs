@@ -54,3 +54,8 @@ module Nfs_server = Nfs_server
 (** {2 Fuse + NFS (client and server)} *)
 
 module Fuse_nfs = Fuse_nfs
+
+
+(** {2 Lwt util: co-eta} *)
+
+module Lwt_util = Lwt_util

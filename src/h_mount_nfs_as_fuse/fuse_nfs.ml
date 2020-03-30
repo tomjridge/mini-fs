@@ -44,5 +44,5 @@ let _ :
   i2dh:(Msgs.dh -> 'b) ->
   dh2i:('b -> Msgs.dh) ->
   i2fd:(Msgs.fd -> 'c) ->
-  fd2i:('c -> Msgs.fd) -> co_eta:'a Fuse_.co_eta -> Fuse.operations
+  fd2i:('c -> Msgs.fd) -> co_eta:'a co_eta -> Fuse.operations
   = mk_fuse_nfs_ops
