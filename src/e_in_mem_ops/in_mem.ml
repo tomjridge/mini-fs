@@ -265,6 +265,8 @@ type 't extra_ops = {
 (** {2 Main functionality} *)
 
 open Tjr_path_resolution
+open Tjr_path_resolution.Intf
+(* we reuse the path_resolution library FIXME *)
 
 let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) = 
   let ( >>= ) = monad_ops.bind in
@@ -289,8 +291,6 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   let resolve_name ~(dir_with_parent:dir_with_parent) ~name : dir_entry option = 
     dir_find name dir_with_parent 
   in
-
-  (* we reuse the path_resolution library FIXME *)
 
   let dir_entry_option_to_resolve_result eopt : (fid,did) resolved_comp = 
     match eopt with
