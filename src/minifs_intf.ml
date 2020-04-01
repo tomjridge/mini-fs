@@ -1,4 +1,4 @@
-(** Minifs main types.
+(** Minifs main types; safe to open.
 
 There is a lot of overlap with {!Stdlib.Unix}. We want our code to run
    in contexts where Unix is not available. Thus, we have to define
