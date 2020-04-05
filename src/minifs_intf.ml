@@ -6,6 +6,8 @@ There is a lot of overlap with {!Stdlib.Unix}. We want our code to run
    which use {!Stdlib.Unix} types. So we need to be able to convert
    between our types and the existing types in Unix.
 
+FIXME a lot of these types should be moved to fs_shared
+
 *)
 
 (** {2 Misc} *)
@@ -192,23 +194,23 @@ module Kind = struct
 end
 open Kind
 
-module Meta = struct
+module Times = struct
   open Bin_prot.Std
-  type meta = {
+  type times = {
     atim:float; 
-    ctim:unit;  
+    (* ctim:unit;   *)
     (* by default, we don't use this, but return ctim as mtim since atim
        apparently doesn't affect atim*)
     mtim:float;
   } [@@deriving bin_io,yojson]
 end
-type meta = Meta.meta
-open Meta
+type times = Times.times
+open Times
 
 (** Simplified stat record *)
 module Stat_record = struct
   open Bin_prot.Std
-  type stat_record = { sz:int; kind:st_kind; meta:meta } 
+  type stat_record = { sz:int; kind:st_kind; times:times } 
   [@@deriving bin_io,yojson]
 end
 open Stat_record
@@ -220,9 +222,9 @@ type stat_record = Stat_record.stat_record
 module St_convs = struct
   open Log_
 
-  let unix2meta st = Unix.LargeFile.{
+  let unix2times st = Unix.LargeFile.{
       atim=st.st_atime;
-      ctim=();
+      (* ctim=(); *)
       mtim=st.st_mtime;
     }
 
@@ -261,25 +263,25 @@ module St_convs = struct
         {default_dir_stats with 
          st_size=Int64.of_int stat.sz;  (* FIXME use int64 *)
          st_kind=kind2unix stat.kind; 
-         st_atime=stat.meta.atim; 
-         st_ctime=stat.meta.mtim;
-         st_mtime=stat.meta.mtim;
+         st_atime=stat.times.atim; 
+         st_ctime=stat.times.mtim;
+         st_mtime=stat.times.mtim;
         }
       | `File -> 
         {default_file_stats with
          st_size=Int64.of_int stat.sz; 
          st_kind=kind2unix stat.kind; 
-         st_atime=stat.meta.atim; 
-         st_ctime=stat.meta.mtim;
-         st_mtime=stat.meta.mtim;
+         st_atime=stat.times.atim; 
+         st_ctime=stat.times.mtim;
+         st_mtime=stat.times.mtim;
         }
       | `Symlink -> 
         {default_file_stats with
          st_size=Int64.of_int stat.sz;
          st_kind=kind2unix stat.kind;
-         st_atime=stat.meta.atim; 
-         st_ctime=stat.meta.mtim;
-         st_mtime=stat.meta.mtim;
+         st_atime=stat.times.atim; 
+         st_ctime=stat.times.mtim;
+         st_mtime=stat.times.mtim;
         }
       | `Other -> 
         log_.log ("Unknown stat, `Other, at "^__LOC__);
@@ -290,10 +292,10 @@ module St_convs = struct
 
     let unix2stat stat = 
       match stat.st_kind with
-      | S_DIR -> { sz=1; kind=`Dir; meta=unix2meta stat }
-      | S_REG -> { sz=Int64.to_int stat.st_size; kind=`File; meta=unix2meta stat }
-      | S_LNK -> { sz=Int64.to_int stat.st_size; kind=`Symlink; meta=unix2meta stat }
-      | _ -> { sz=Int64.to_int stat.st_size; kind=`Other; meta=unix2meta stat }
+      | S_DIR -> { sz=1; kind=`Dir; times=unix2times stat }
+      | S_REG -> { sz=Int64.to_int stat.st_size; kind=`File; times=unix2times stat }
+      | S_LNK -> { sz=Int64.to_int stat.st_size; kind=`Symlink; times=unix2times stat }
+      | _ -> { sz=Int64.to_int stat.st_size; kind=`Other; times=unix2times stat }
   end
 
   let stat2unix = Default.stat2unix

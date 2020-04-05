@@ -40,9 +40,9 @@ module Map_string = Stdlib.Map.Make(
 
 let time = Unix.time (* 1s resolution *)
 
-let mk_meta () = 
+let mk_times () = 
   time () |> fun t ->
-  ({ atim=t;ctim=();mtim=t} : meta)
+  ({ atim=t;mtim=t} : times)
 
 let fdata_ops = Tjr_buffer.mk_buf_ops()
 
@@ -81,7 +81,7 @@ type did = Did.did
 
 
 
-(** {2 Other basic types: dir_entry, file_meta_and_data } *)
+(** {2 Other basic types: dir_entry, file_times_and_data } *)
 
 module Symlink_type = struct
   type symlink = string [@@deriving yojson]
@@ -113,8 +113,8 @@ type dir_entry = Dir_entry.dir_entry = Fid of fid | Did of did | Symlink of syml
 
 
 
-type file_meta_and_data = {
-  meta: Meta.meta; 
+type file_times_and_data = {
+  times: Times.times; 
   data: Tjr_buffer.buf
 }
 
@@ -131,19 +131,19 @@ module Dents_ops = Map_string
 
 type dir_with_parent = {
   name_map :dents_carrier;
-  meta     :Meta.meta;
+  times    :Times.times;
   parent   :did
 }
 
 let (dir_empty,dir_find,dir_add,dir_remove,dir_bindings) = 
-  let dir_empty ~meta ~parent = { name_map=Dents_ops.empty; meta; parent } in
+  let dir_empty ~times ~parent = { name_map=Dents_ops.empty; times; parent } in
   let dir_find k t = Dents_ops.find_opt k t.name_map in
   let dir_add k v t = {t with name_map=Dents_ops.add k v t.name_map} in
   let dir_remove k t = {t with name_map=Dents_ops.remove k t.name_map} in
   let dir_bindings t = Dents_ops.bindings t.name_map in
   (dir_empty,dir_find,dir_add,dir_remove,dir_bindings)  
 
-let empty_dir ~parent ~meta = dir_empty ~parent ~meta
+let empty_dir ~parent ~times = dir_empty ~parent ~times
 
 
 module Map_did = Tjr_map.Make_map_ops(
@@ -163,12 +163,12 @@ let dirs_ops : dirs_ops = Map_did.map_ops
 module Map_fid = Tjr_map.Make_map_ops(
   struct 
     type k = fid 
-    type v = file_meta_and_data
+    type v = file_times_and_data
     let k_cmp: k->k->int = Stdlib.compare 
   end)
 
 type files_carrier = Map_fid.t
-type files_ops = (fid,file_meta_and_data,files_carrier) map_ops
+type files_ops = (fid,file_times_and_data,files_carrier) map_ops
 let files_ops : files_ops = Map_fid.map_ops
 
 
@@ -240,7 +240,7 @@ let init_fsys = {
   files=files_ops.empty;
   max_fid=fid0;
   dirs=(dirs_ops.empty 
-        |> dirs_ops.add root_did (empty_dir ~meta:(mk_meta()) ~parent:root_did));
+        |> dirs_ops.add root_did (empty_dir ~times:(mk_times()) ~parent:root_did));
   max_did=root_did;
   dir_handles=Dhandles_ops.empty;
   max_dh=0;
@@ -388,12 +388,12 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     match result with 
     | Missing -> (
         begin
-          let meta = mk_meta () in
+          let times = mk_times () in
           extra_ops.new_did () >>= fun (did:did) -> 
           extra_ops.with_fs (fun s -> 
               s.dirs |> fun dirs ->
               (* add new empty dir to dirs *)
-              dirs_ops.add did (empty_dir ~meta ~parent:pid) dirs |> fun dirs ->
+              dirs_ops.add did (empty_dir ~times ~parent:pid) dirs |> fun dirs ->
               (* add name to parent *)
               dirs_ops.find_opt pid s.dirs |> fun pdir ->
               match pdir with 
@@ -401,7 +401,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
               | Some pdir -> 
                 dir_add name (Did did) pdir |> fun pdir ->
                 (* update parent meta *)
-                {pdir with meta} |> fun pdir ->
+                {pdir with times} |> fun pdir ->
                 (* update parent in dirs *)
                 dirs_ops.add pid pdir dirs |> fun dirs ->
                 `Ok,{s with dirs})
@@ -464,7 +464,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
     let { parent_id=parent; comp=name; result=_; trailing_slash=_ } = rpath in
     extra_ops.new_fid () >>= fun (fid:fid) -> 
-    let meta = mk_meta() in
+    let times = mk_times() in
     extra_ops.with_fs (fun s -> 
         s.dirs |> fun dirs ->
         dirs_ops.find_opt parent dirs |> function
@@ -472,12 +472,12 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         | Some pdir ->
           dir_add name (Fid fid) pdir |> fun pdir ->
           (* update pdir meta *)
-          {pdir with meta} |> fun pdir ->
+          {pdir with times} |> fun pdir ->
           dirs_ops.add parent pdir dirs |> fun dirs ->
           {s with dirs} |> fun s ->
           s.files |> fun files ->
           let data = fdata_ops.create ~internal_len 0 in
-          files_ops.add fid {meta;data} files |> fun files ->
+          files_ops.add fid {times;data} files |> fun files ->
           `Ok,{s with files}) 
     >>= function
     | `Internal s -> extra_ops.internal_err s
@@ -530,7 +530,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     (* buf_size_check length; *)
     extra_ops.with_fs (fun s ->
         let fid = fd2int fd in
-        let meta = mk_meta() in
+        let times = mk_times() in
         s.files |> fun files ->
         files_ops.find_opt fid files |> function
         | None -> `Internal "pwrite, impossible, no file, mim.339",s
@@ -550,7 +550,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
           fdata_ops.blit_bigarray_to_buf
             ~src:buf ~soff:boff ~len ~dst:contents ~doff:foff 
           |> fun data ->
-          (files_ops.add fid {f with data;meta} files)[@ ocaml.warning "-23"] |> fun files ->
+          (files_ops.add fid {f with data;times} files)[@ ocaml.warning "-23"] |> fun files ->
           (`Ok len,{s with files}))
     >>= function
     | `Internal s -> extra_ops.internal_err s
@@ -575,20 +575,20 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             let scomp = spath.comp in
             resolve_did dpath.parent_id >>= fun ddir ->
             let dcomp = dpath.comp in
-            let meta = mk_meta() in
+            let times = mk_times() in
             let insert_and_remove id =
               match spath.parent_id = dpath.parent_id with
               | true -> 
                 dir_add dcomp id ddir |> fun ddir ->
                 dir_remove scomp ddir |> fun ddir ->
-                {ddir with meta} |> fun ddir ->
+                {ddir with times} |> fun ddir ->
                 extra_ops.dirs_add dpath.parent_id ddir >>= fun () ->
                 return (Ok ())
               | false -> 
                 dir_add dcomp id ddir |> fun ddir ->
-                {ddir with meta} |> fun ddir ->
+                {ddir with times} |> fun ddir ->
                 dir_remove scomp sdir |> fun sdir ->
-                {sdir with meta} |> fun sdir ->
+                {sdir with times} |> fun sdir ->
                 extra_ops.dirs_add spath.parent_id sdir >>= fun () ->
                 extra_ops.dirs_add dpath.parent_id ddir >>= fun () ->
                 return (Ok ())
@@ -615,7 +615,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
                   | false -> 
                     (* FIXME other checks *)
                     resolve_did sdid >>= fun sdir -> 
-                    {sdir with meta} |> fun sdir ->
+                    {sdir with times} |> fun sdir ->
                     (* new directory id *)
                     extra_ops.new_did() >>= fun did ->
                     (* record new directory with updated parent *)
@@ -643,8 +643,8 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
         | None -> `Internal "file not found mim.362",s
         | Some f ->
           fdata_ops.resize length f.data  |> fun data ->
-          let meta = mk_meta() in
-          files_ops.add fid ({f with data;meta}[@ocaml.warning "-23"]) files |> fun files ->
+          let times = mk_times() in
+          files_ops.add fid ({f with data;times}[@ocaml.warning "-23"]) files |> fun files ->
           `Ok (),{s with files}) 
     >>= function
     | `Ok () -> return (Ok ())
@@ -652,7 +652,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
-  let dummy_symlink_meta = ({ atim=0.0; ctim=(); mtim=0.0 } : meta) in
+  let dummy_symlink_times = ({ atim=0.0; mtim=0.0 } : times) in
 
   (* FIXME here and elsewhere atim is not really dealt with *)
   let stat path = 
@@ -669,7 +669,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             | None -> `Internal "file fid not found mim.379",s
             | Some f ->          
               fdata_ops.len f.data |> fun sz ->
-              `Ok { sz;meta=f.meta;kind=`File },s)
+              `Ok { sz;times=f.times;kind=`File },s)
       | Dir did -> 
         extra_ops.with_fs (fun s ->
             s.dirs |> fun dirs ->
@@ -677,13 +677,13 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             | None -> `Internal "dir did not found mim.651",s
             | Some (f:dir_with_parent) ->          
               let sz = 1 in (* for dir? FIXME size of dir *)
-              f.meta |> fun meta ->
-              `Ok { sz;meta;kind=`Dir },s)
+              f.times |> fun times ->
+              `Ok { sz;times;kind=`Dir },s)
       | Sym s -> 
         let sz = String.length s in
-        let meta = dummy_symlink_meta in
+        let times = dummy_symlink_times in
         let kind = `Symlink in
-        return @@ `Ok { sz;meta;kind }
+        return @@ `Ok { sz;times;kind }
     end
     >>= function
     | `Ok stat -> return (Ok stat)
@@ -696,7 +696,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     resolve_path ~follow_last_symlink:`If_trailing_slash path >>=| fun rpath ->
     let { parent_id=pid; comp=name; result; trailing_slash=_ } = rpath in
     begin
-      let meta = mk_meta() in
+      let times = mk_times() in
       extra_ops.with_fs (fun s ->
           match result with
           | Missing -> (
@@ -705,8 +705,8 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
               | None -> `Internal "impossible",s
               | Some pdir -> 
                 dir_add name (Symlink contents) pdir |> fun pdir ->
-                (* update pdir meta *)
-                {pdir with meta} |> fun pdir ->
+                (* update pdir times *)
+                {pdir with times} |> fun pdir ->
                 dirs_ops.add pid pdir dirs |> fun dirs ->
                 {s with dirs} |> fun s ->
                 `Ok,s)
