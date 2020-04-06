@@ -4,15 +4,12 @@
 open Log_
 (* open Ops_type_ *)
 
-module Connection = Tjr_connection.Unix_
+module Connection = Tjr_net.Unix_
 
 
 (* config ----------------------------------------------------------- *)
 
-let _ = Runtime_config.test()
-
-let quad = Runtime_config.get_config () @@ 
-  fun ~client ~server:_ ~log_everything:_ -> client
+let endpt_pair = Runtime_config.client_endpt_pair
 
 
 (* monad ------------------------------------------------------------ *)
@@ -23,7 +20,7 @@ let monad_ops = Tjr_monad.State_passing.monad_ops ()
 (* connection, call ------------------------------------------------- *)
 
 let conn = 
-  Connection.connect ~quad
+  Connection.connect endpt_pair
   |> function 
   | Ok fd -> fd
   | Error _ -> failwith __LOC__

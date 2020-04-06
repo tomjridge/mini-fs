@@ -53,28 +53,27 @@ let _ : msg_from_client -> (msg_from_server,'t) m = serve
 
 
 let send ~conn (m:msg_from_server) =
-  let open Tjr_connection.Unix_ in
-  m |> msg_s_to_string |> send_string ~conn
+  let open Tjr_net.Unix_ in
+  m |> msg_s_to_string |> send_string conn
 
 
 
 (* main ------------------------------------------------------------- *)
 
-let quad = Runtime_config.get_config () @@ 
-  fun ~client:_ ~server ~log_everything:_ -> server
+let endpt_pair = Runtime_config.server_endpt_pair
 
 let run ~init_state m = State_passing.to_fun m init_state
 
 let main ~init_world = 
-  let open Tjr_connection.Unix_ in
+  let open Tjr_net.Unix_ in
   let ( >>= ) = bind in
   let w_ref = ref init_world in
   print_endline "nfs_server accepting connections";
-  listen_accept ~quad >>= function
+  listen_accept endpt_pair >>= function
   | Error _e -> failwith __LOC__
   | Ok conn ->
     let rec loop () = 
-      recv_string ~conn >>= function
+      recv_string conn >>= function
       | Error () -> failwith __LOC__
       | Ok s ->
         log_.log s;

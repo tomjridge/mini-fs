@@ -135,15 +135,15 @@ module State_passing_call = struct
   open Msgs
 
   (* NOTE specialized to unix impl *)
-  module Connection = Tjr_connection.Unix_
+  module Connection = Tjr_net.Unix_
 
   let call ~conn (m:msg_from_client) : (msg_from_server,'w state_passing) m = 
     of_fun(fun w -> 
         m |> msg_c_to_string |> fun s -> 
         log_.log_lazy (fun () -> Printf.sprintf "sending %s\n" s);
-        s |> Connection.send_string ~conn 
+        s |> Connection.send_string conn 
         |> function Error () -> Base_extra.exit_1 __LOC__ | Ok () -> 
-          Connection.recv_string ~conn 
+          Connection.recv_string conn 
           |> function Error () -> Base_extra.exit_1 __LOC__ | Ok s -> 
             log_.log_lazy (fun () -> Printf.sprintf "receiving %s\n" s);
             s |> string_to_msg_s |> fun m -> 

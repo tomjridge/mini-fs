@@ -2,10 +2,7 @@
 
 (* we follow nfs_client, but wrap in a fuse binding *)
 open Tjr_monad
-(* open Tjr_connection *)
 open Tjr_minifs
-(* open Base_ *)
-(* open Ops_type_ *)
 
 (* monad ------------------------------------------------------------ *)
 
@@ -15,15 +12,15 @@ let monad_ops = State_passing.monad_ops ()
 (* set up nfs client ------------------------------------------------ *)
 
 (* establish the connection to the server *)
-module Connection = Tjr_connection.Unix_
+module Connection = Tjr_net.Unix_
 
-let quad = Runtime_config.get_config () @@ 
-  fun ~client ~server:_ ~log_everything:_ -> client
+let endpt_pair = Runtime_config.server_endpt_pair
+
 
 (* FIXME put all state in this module? FIXME the following prevents
    ./xxx --help from displaying FUSE help *)
 let conn = 
-  Connection.connect ~quad
+  Connection.connect endpt_pair
   |> function 
   | Ok fd -> fd
   | Error _e -> 

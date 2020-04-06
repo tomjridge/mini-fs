@@ -6,8 +6,7 @@ let log_ = mk_log_ops()
 
 let log_ = 
   (* FIXME we may read config file twice, here and in main; cache? *)
-  if Runtime_config.get_config () @@ 
-    fun ~client:_ ~server:_ ~log_everything -> log_everything
+  if Runtime_config.config.log_everything 
   then 
     (* NOTE this ensures all logs appear immediately *)
     {
