@@ -9,13 +9,11 @@ module S = struct
   type config = {
     client: conf_endpt;
     server: conf_endpt;
-    log_everything: bool;
   }  [@@deriving yojson]
 
   let default_config = Some {
       client={ inet_addr="127.0.0.1"; port=8001 };
       server={ inet_addr="127.0.0.1"; port=8002 };
-      log_everything=true;
     }
 
   let filename="minifs_config.json"

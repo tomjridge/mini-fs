@@ -5,8 +5,7 @@ let log_ = mk_log_ops()
 
 
 let log_ = 
-  (* FIXME we may read config file twice, here and in main; cache? *)
-  if Runtime_config.config.log_everything 
+  if Config.log_immediately
   then 
     (* NOTE this ensures all logs appear immediately *)
     {

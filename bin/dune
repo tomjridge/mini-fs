@@ -1,9 +1,10 @@
 (env
-  (_ (flags (:standard -open Tjr_net -open Tjr_minifs -open Tjr_minifs.Minifs_intf ))))
+  (_ (flags (:standard -open Tjr_lib -open Tjr_net -open Tjr_minifs -open Tjr_minifs.Minifs_intf ))))
 
 
 (executables
   (names fuse_in_mem_main fuse_nfs_client nfs_server_in_mem nfs_client_test nfs_server_unix)
+  (preprocess (pps ppx_deriving_yojson))
   (libraries tjr_minifs)
 )
 
