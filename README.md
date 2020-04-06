@@ -92,12 +92,6 @@ This is now included in Makefile. Then we run an executable as:
 
 
 
-## Existence of tmp.txt
-
-This is used to get hold of some dummy permissions etc. Probably a FIXME
-
-
-
 ## Addendum: Known bugs
 
 * Recursive copies of directories seems to hang in emacs for some reason, but cp works fine from the command line FIXED this was due to multithreading - you need to make sure you run FUSE in single-threaded mode
