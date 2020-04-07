@@ -244,29 +244,16 @@ module St_convs = struct
   module Default = struct
     open Unix
     open LargeFile
-    let default_file_stats = LargeFile.{
-        st_dev=999;
-        st_ino=999;
-        st_kind=S_REG;
-        st_perm= -1;
-        st_nlink= -1;
-        st_uid=999;
-        st_gid=999;
-        st_rdev=999;
-        st_size= -1L;
-        st_atime=0.;
-        st_mtime=0.;
-        st_ctime=0.;
-      }
-        
-    let default_file_stats = 
-      { default_file_stats with 
-        st_nlink = 1;
-        st_kind=Unix.S_REG;
-        st_perm = 0o640;
-      }
 
     let default_dir_stats = LargeFile.stat "."
+
+    let default_file_stats = 
+      (* try to take them from the current directory *)
+      { default_dir_stats with
+        st_kind=S_REG;
+        st_perm= 0o660;
+        st_nlink= 1;
+      }
 
     let stat2unix (stat:stat_record) = 
       match stat.kind with
