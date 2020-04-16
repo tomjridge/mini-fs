@@ -22,7 +22,7 @@ open S
 
 module Runtime_config_ = Tjr_config.Make(S)
 
-let config = Runtime_config_.config
+let config = Lazy.force Runtime_config_.config
                
 let conf_endpt_to_endpt (e:conf_endpt) : Net_intf.endpt =
   ADDR_INET(Unix.inet_addr_of_string e.inet_addr, e.port)
