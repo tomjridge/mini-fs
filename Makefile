@@ -1,7 +1,5 @@
-TMP_DOC_DIR:=/tmp/minifs
-#scratch:=/tmp/l/github/scratch
-
 default: all
+
 -include Makefile.ocaml
 
 all::
