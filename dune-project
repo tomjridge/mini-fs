@@ -20,7 +20,6 @@
    extunix
    base
    lwt
-   lwt.unix
    tjr_net
    tjr_path_resolution))
 
