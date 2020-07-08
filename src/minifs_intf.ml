@@ -204,7 +204,7 @@ module Times = struct
     mtim:float;
   } [@@deriving bin_io,yojson]
 end
-type times = Times.times
+type times = Times.times[@@deriving bin_io]
 open Times
 
 (** Simplified stat record *)
