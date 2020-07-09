@@ -203,6 +203,10 @@ module Times = struct
        apparently doesn't affect atim*)
     mtim:float;
   } [@@deriving bin_io,yojson]
+
+  let update_atim atim t = {t with atim}
+
+  let update_mtim mtim t = {t with mtim}   
 end
 type times = Times.times[@@deriving bin_io]
 open Times
