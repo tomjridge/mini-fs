@@ -6,7 +6,7 @@
 (maintainers          "Tom Ridge <tom.j.ridge@googlemail.com>")
 (source               (github tomjridge/mini-fs))
 (homepage             https://github.com/tomjridge/mini-fs)
-(documentation        https://tomjridge.github.io/mini-fs)
+(documentation        https://tomjridge.github.io/ocamldocs)
 (generate_opam_files  true)
 
 
