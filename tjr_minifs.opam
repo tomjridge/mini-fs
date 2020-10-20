@@ -4,7 +4,7 @@ synopsis: "A component-ized filesystem library (FUSE, NFS etc)"
 maintainer: ["Tom Ridge <tom.j.ridge@googlemail.com>"]
 authors: ["Tom Ridge <tom.j.ridge@googlemail.com>"]
 homepage: "https://github.com/tomjridge/mini-fs"
-doc: "https://tomjridge.github.io/mini-fs"
+doc: "https://tomjridge.github.io/ocamldocs"
 bug-reports: "https://github.com/tomjridge/mini-fs/issues"
 depends: [
   "dune" {>= "2.0"}
