@@ -84,6 +84,7 @@ type did = Did.did
 (** {2 Other basic types: dir_entry, file_times_and_data } *)
 
 module Symlink_type = struct
+  type sid = unit
   type symlink = string [@@deriving yojson]
 end
 open Symlink_type
@@ -292,13 +293,13 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     dir_find name dir_with_parent 
   in
 
-  let dir_entry_option_to_resolve_result eopt : (fid,did) resolved_comp = 
+  let dir_entry_option_to_resolve_result eopt : (fid,did,sid) resolved_comp = 
     match eopt with
     | None -> RC_missing
     | Some x -> x |> function
       | Fid fid -> RC_file fid
       | Did did -> RC_dir did
-      | Symlink s -> RC_sym s
+      | Symlink s -> RC_sym ((),s)
   in
 
   (* path resolution *)
@@ -306,7 +307,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     let root = root_did in
     (* paths are always absolute when coming from fuse, and via the
        api... FIXME assert this? *)
-    let resolve_comp (did:did) (comp:string) : ((fid,did)resolved_comp,'t) m = 
+    let resolve_comp (did:did) (comp:string) : ((fid,did,sid)resolved_comp,'t) m = 
       (* we want to use resolve_name, but this works with dir_with_parent *)
       extra_ops.with_fs (fun fs -> 
           Map_did.map_ops.find_opt did fs.dirs |> function
@@ -679,7 +680,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
               let sz = 1 in (* for dir? FIXME size of dir *)
               f.times |> fun times ->
               `Ok { sz;times;kind=`Dir },s)
-      | Sym s -> 
+      | Sym ((),s) -> 
         let sz = String.length s in
         let times = dummy_symlink_times in
         let kind = `Symlink in
@@ -725,7 +726,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
     begin
       extra_ops.with_fs (fun s ->
           match result with
-          | Sym str -> (`Ok str,s)
+          | Sym ((),str) -> (`Ok str,s)
           | _ -> `Error_not_symlink,s)
     end
     >>= function
