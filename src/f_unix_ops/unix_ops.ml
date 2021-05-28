@@ -166,7 +166,7 @@ let mk_ops ~monad_ops ~extra =
   let open_ path = mk_fd path in
 
 
-  let pread ~fd ~foff ~len ~(buf:buffer) ~boff = 
+  let pread ~fd ~foff ~len ~(buf:ba_buf) ~boff = 
     delay @@ fun _ ->
     try
       (* bigarray pread has no boff, and length is taken from array, so
@@ -181,7 +181,7 @@ let mk_ops ~monad_ops ~extra =
   in
 
 
-  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:ba_buf) ~boff = 
     delay @@ fun _ ->
     try 
       Bigarray.Array1.sub buf boff len |> fun buffer -> 

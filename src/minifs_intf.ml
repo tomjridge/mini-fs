@@ -14,8 +14,8 @@ FIXME a lot of these types should be moved to fs_shared
 
 
 (** Alias *)
-type buffer = Bigarray_buffer.buffer
-type buf = buffer
+type ba_buffer = Bigarray_buffer.buffer
+type ba_buf = ba_buffer
 
 (** Alias for result FIXME why? *)
 type ('a,'e)r_ = ('a,'e)result
@@ -420,9 +420,9 @@ module Ops_type = struct
     (** create is to create a file; use mkdir for a dir *)
 
     open_    : path -> (('fd,open_err)r_,  'w) m;
-    pread    : fd:'fd -> foff:int -> len:int -> buf:buf -> boff:int -> 
+    pread    : fd:'fd -> foff:int -> len:int -> buf:ba_buf -> boff:int -> 
       ((int,pread_err)r_, 'w) m; 
-    pwrite   : fd:'fd -> foff:int -> len:int -> buf:buf -> boff:int -> 
+    pwrite   : fd:'fd -> foff:int -> len:int -> buf:ba_buf -> boff:int -> 
       ((int,pwrite_err)r_, 'w) m;
     close    : 'fd  -> ((unit,close_err)r_,  'w) m;
 

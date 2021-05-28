@@ -497,7 +497,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
   (* FIXME must account for reading beyond end of file; FIXME atim *)
-  let pread ~fd ~foff ~len ~(buf:buffer) ~boff = 
+  let pread ~fd ~foff ~len ~(buf:ba_buf) ~boff = 
     (* buf_size_check length; *)
     let fid = fd2int fd in
     extra_ops.with_fs (fun s ->
@@ -527,7 +527,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
   in
 
 
-  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:ba_buf) ~boff = 
     (* buf_size_check length; *)
     extra_ops.with_fs (fun s ->
         let fid = fd2int fd in

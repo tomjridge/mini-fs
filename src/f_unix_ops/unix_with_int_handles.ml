@@ -69,7 +69,7 @@ let ops ~monad_ops ~dh2i ~i2dh ~fd2i ~i2fd =
     ops.pread ~fd ~foff ~len ~buf ~boff 
   in
 
-  let pwrite ~fd ~foff ~len ~(buf:buffer) ~boff = 
+  let pwrite ~fd ~foff ~len ~(buf:ba_buf) ~boff = 
     i2fd fd >>= fun fd ->
     ops.pwrite ~fd ~foff ~len ~buf ~boff 
   in  
