@@ -249,13 +249,14 @@ module St_convs = struct
     open Unix
     open LargeFile
 
-    let default_dir_stats = LargeFile.stat "."
+    let default_dir_stats = { (LargeFile.stat ".") with
+                              st_perm=0o777 }
 
     let default_file_stats = 
       (* try to take them from the current directory *)
       { default_dir_stats with
         st_kind=S_REG;
-        st_perm= 0o660;
+        st_perm= 0o777; (* all perms for all users *)
         st_nlink= 1;
       }
 
