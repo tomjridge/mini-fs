@@ -2,7 +2,6 @@
 
 (* FIXME this should be called "wrap_local_filesystem" or similar *)
 
-open Log_
 open Minifs_intf
 (* open Ops_type_ *)
 
@@ -71,11 +70,11 @@ let mk_ops ~monad_ops ~extra =
         | `File -> Unix.unlink path
         | `Dir -> Unix.rmdir path
         | `Symlink -> (
-            log_.log_now __LOC__;
+            log_now __LOC__;
           Base_extra.exit_1 __LOC__ 
           (* FIXME should be impossible since stat resolves symlinks; but is this what we want? *))
         | _ -> (
-          log_.log_now __LOC__;
+            log_now __LOC__;
           Base_extra.exit_1 __LOC__)
       end;
       return (Ok())

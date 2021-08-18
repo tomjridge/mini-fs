@@ -12,6 +12,8 @@ open Minifs_intf
 
 module Base_types = Int_base_types
 
+module Map_int = Map.Make(Int)
+
 type fd_dh_map = {
   int2fd: Unix.file_descr Map_int.t;
   int2dh: Unix.dir_handle Map_int.t;
@@ -24,7 +26,11 @@ let init_fd_dh_map = {
 
 (* we assume we can get the fd_dh_map from the world 'w *)
 
-let genint () = Gensym.gensym ()
+let genint =
+  let counter = ref 0 in
+  fun () -> 
+    incr counter;
+    (!counter) -1
 
 
 (* target ops_type ----------------------------------------------- *)

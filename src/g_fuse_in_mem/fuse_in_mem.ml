@@ -1,6 +1,5 @@
 (** A fuse filesystem backed by an in-memory FS *)
 
-open Log_
 open Minifs_intf
 open In_mem
 open Fuse_
@@ -21,7 +20,7 @@ let co_eta = fun a -> run ~init_state:!w_ a |> function
         w_:=w;
         a)
     | Some s -> (
-        log_.log_now s;
+        log_now s;
         exit_1 __LOC__)
 
 let co_eta = { co_eta }

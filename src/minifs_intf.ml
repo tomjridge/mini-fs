@@ -47,8 +47,8 @@ module Base_extra = struct
 
   (* following for strings *)
   let dirname_basename path = 
-    assert (String_.starts_with ~prefix:"/" path);
-    String_.split_on_last ~sub:"/" path |> fun (p,c) -> 
+    assert (Base.String.is_prefix ~prefix:"/" path);
+    Base.String.rsplit2_exn ~on:'/' path |> fun (p,c) -> 
     (* the semantics is that dirname is an absolute path *)
     (if p="" then "/" else p),c
 
@@ -224,7 +224,6 @@ type stat_record = Stat_record.stat_record
 
 (** Conversions to/from Unix equivalents *)
 module St_convs = struct
-  open Log_
 
   let unix2times st = Unix.LargeFile.{
       atim=st.st_atime;
@@ -287,7 +286,7 @@ module St_convs = struct
          st_mtime=stat.times.mtim;
         }
       | `Other -> 
-        log_.log ("Unknown stat, `Other, at "^__LOC__);
+        Printf.printf "Unknown stat, `Other, at %s\n%!" __LOC__;
         (* FIXME what to do here? *)
         {default_file_stats with
          st_kind=kind2unix stat.kind }

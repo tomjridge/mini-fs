@@ -1,6 +1,5 @@
 (** Construct [Fuse.operations] given a backend FS ops *)
 
-open Log_
 open Minifs_intf
 (* open Ops_type_ *)
 
@@ -85,8 +84,8 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
 
   (* stat_file and kind combined in following *)
   let getattr path0 = 
-    log_.log_lazy (fun () -> 
-        Printf.sprintf "# getattr (%s) mfuse.getattr.l110\n" path0);
+(*    log_.log_lazy (fun () -> 
+        Printf.sprintf "# getattr (%s) mfuse.getattr.l110\n" path0);*)
     path0 |> fun path ->
     (* log_.log @@ "# mfuse.getattr.l112"; *)
     (* FIXME kind needs to be wrapped so it throws a unix_error *)
@@ -120,7 +119,7 @@ let mk_fuse_ops ~monad_ops ~readdir' ~(ops:('fd,'dh,'w)ops) ~co_eta =
   (* notify when exception is thrown *)
   let wrap f = 
     try f ()
-    with e -> log_.log_lazy (fun () -> Printexc.to_string e); raise e
+    with e -> Log.log_lazy (fun () -> Printexc.to_string e); raise e
   in
   let wrap1 f = fun a -> wrap @@ fun () -> f a |> maybe_raise in
   let wrap2 f = fun a b -> wrap @@ fun () -> f a b |> maybe_raise in

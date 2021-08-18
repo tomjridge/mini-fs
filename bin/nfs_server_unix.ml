@@ -5,7 +5,6 @@
 
 (* open Tjr_connection *)
 open Tjr_monad
-open Log_
 open Msgs
 
 (* backend ---------------------------------------------------------- *)
@@ -76,7 +75,7 @@ let main ~init_world =
       recv_string conn >>= function
       | Error () -> failwith __LOC__
       | Ok s ->
-        log_.log s;
+        log_now s;
         string_to_msg_c s |> fun msg -> 
         serve msg |> fun x ->
         run ~init_state:!w_ref x |> function

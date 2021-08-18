@@ -1,5 +1,6 @@
 (* separate file so can use before we get to base_ *)
 
+(*
 include Tjr_lib.Log
 let log_ = mk_log_ops()
 
@@ -17,4 +18,4 @@ let log_ =
 
 (* FIXME add config flag *)
 let () = at_exit log_.print_last_n
-
+*)

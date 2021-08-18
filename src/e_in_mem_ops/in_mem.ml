@@ -2,7 +2,6 @@
 
 (* FIXME more documentation *)
 
-open Log_
 open Tjr_map
 open Minifs_intf
 
@@ -312,7 +311,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
       extra_ops.with_fs (fun fs -> 
           Map_did.map_ops.find_opt did fs.dirs |> function
           | None -> (
-            log_.log_now __LOC__;
+            log_now __LOC__;
             exit_1 "impossible, invalid did")
           | Some dwp -> 
             resolve_name ~dir_with_parent:dwp ~name:comp 
@@ -597,7 +596,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
             match spath.result,dpath.result with
             (* FIMXE following for symlinks *)
             | Sym _,_ | _,Sym _ -> (
-              log_.log_now __LOC__;
+              log_now __LOC__;
               exit_1 "FIXME shouldn't happen - follow=`Always")
             | File fid,Missing -> insert_and_remove (Fid fid)
             | File fid1,File fid2 -> 
@@ -629,7 +628,7 @@ let mk_ops ~monad_ops ~(extra_ops: 't extra_ops) =
               then return (Ok ())
               else extra_ops.internal_err "FIXME rename d to d, dst should be empty?"
             | Missing ,_ -> (
-                log_.log_now __LOC__;
+                log_now __LOC__;
                 exit_1 "impossible")
     end
   in
@@ -883,7 +882,7 @@ let in_mem_state_passing_ops : (fid,did,fsystem state_passing) ops =
     internal_err=(fun s -> 
         State_passing.of_fun
           (fun _t ->
-             log_.log_now __LOC__;
+             log_now __LOC__;
              exit_1 (s^"; "^__LOC__)))
   }
   in

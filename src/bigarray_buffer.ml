@@ -1,4 +1,3 @@
-open Log_
 
 (* FIXME perhaps bigstring now provides this functionality? *)
 
@@ -36,7 +35,7 @@ let bigarray_to_string ~src ~off ~len =
   (* ASSUMES not (len < 0 or n > Sys.max_string_length) *)
   match len < 0 || len > Sys.max_string_length with
   | true -> 
-    log_.log_now (Printf.sprintf "bigarray_to_string: len is %d\n" len);
+    Printf.printf "bigarray_to_string: len is %d\n%!" len;
     failwith __LOC__
   | false ->
     Bytes.create len |> fun dst ->
@@ -55,6 +54,6 @@ let string_to_bigarray s =
 
 let buf_size_check n = 
   if n < 0 || n > Sys.max_string_length 
-  then (log_.log_now __LOC__; failwith __LOC__ )
+  then (print_endline __LOC__; failwith __LOC__ )
   else ()
 
